@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { HattrickApiService } from '../../services/hattrick-api.service';
+import { TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-oauth-setup',
@@ -15,7 +16,7 @@ export class OAuthSetupComponent {
   error: string | null = null;
   success: boolean = false;
 
-  constructor(private hattrickApi: HattrickApiService) {}
+  constructor(private hattrickApi: HattrickApiService, private translate: TranslateService) {}
 
   async startAuthorization(): Promise<void> {
     this.loading = true;
@@ -27,7 +28,7 @@ export class OAuthSetupComponent {
       this.authorizationUrl = response.authorizationUrl;
       this.step = 2;
     } catch (err: any) {
-      this.error = 'Błąd podczas inicjalizacji OAuth: ' + err.message;
+      this.error = this.translate.instant('oauth.errorInit') + err.message;
     } finally {
       this.loading = false;
     }
@@ -39,7 +40,7 @@ export class OAuthSetupComponent {
 
   async completeAuthorization(): Promise<void> {
     if (!this.verifier) {
-      this.error = 'Wpisz PIN z Hattrick';
+      this.error = this.translate.instant('oauth.errorPin');
       return;
     }
 
@@ -53,7 +54,7 @@ export class OAuthSetupComponent {
       
       localStorage.setItem('hattrick_session_id', this.sessionId);
     } catch (err: any) {
-      this.error = 'Błąd podczas finalizacji OAuth: ' + err.message;
+      this.error = this.translate.instant('oauth.errorFinalize') + err.message;
     } finally {
       this.loading = false;
     }
@@ -70,7 +71,7 @@ export class OAuthSetupComponent {
 
   copyToClipboard(text: string): void {
     navigator.clipboard.writeText(text).then(() => {
-      alert('Skopiowano do schowka!');
+      alert(this.translate.instant('common.copiedToClipboard'));
     });
   }
 }

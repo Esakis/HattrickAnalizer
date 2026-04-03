@@ -1,42 +1,42 @@
 <div class="optimizer-container">
   <div class="header">
     <div class="header-content">
-      <h1>⚽ Hattrick Lineup Optimizer</h1>
-      <p class="subtitle">Optymalizuj swój skład pod konkretnego przeciwnika</p>
+      <h1>⚽ {{ 'optimizer.title' | translate }}</h1>
+      <p class="subtitle">{{ 'optimizer.subtitle' | translate }}</p>
     </div>
     <div class="header-buttons">
       <button class="btn-nav" routerLink="/players">
-        👥 Moi Zawodnicy
+        {{ 'navigation.players' | translate }}
       </button>
       <button class="btn-nav" routerLink="/oauth-setup">
-        🔐 OAuth
+        {{ 'navigation.oauth' | translate }}
       </button>
     </div>
   </div>
 
   <div class="input-section">
     <div class="form-group">
-      <label for="myTeamId">ID Twojej Drużyny:</label>
+      <label for="myTeamId">{{ 'optimizer.myTeamIdLabel' | translate }}</label>
       <input 
         type="number" 
         id="myTeamId" 
         [(ngModel)]="myTeamId" 
-        placeholder="np. 123456"
+        placeholder="{{ 'optimizer.teamIdPlaceholder' | translate }}"
         class="form-control">
     </div>
 
     <div class="form-group">
-      <label for="opponentTeamId">ID Drużyny Przeciwnika:</label>
+      <label for="opponentTeamId">{{ 'optimizer.opponentTeamIdLabel' | translate }}</label>
       <input 
         type="number" 
         id="opponentTeamId" 
         [(ngModel)]="opponentTeamId" 
-        placeholder="np. 654321"
+        placeholder="{{ 'optimizer.teamIdPlaceholder' | translate }}"
         class="form-control">
     </div>
 
     <div class="form-group">
-      <label for="tactic">Preferowana Taktyka:</label>
+      <label for="tactic">{{ 'optimizer.tacticLabel' | translate }}</label>
       <select 
         id="tactic" 
         [(ngModel)]="preferredTactic"
@@ -51,7 +51,7 @@
       (click)="optimizeLineup()" 
       [disabled]="loading"
       class="btn-primary">
-      {{ loading ? 'Optymalizacja...' : 'Optymalizuj Skład' }}
+      {{ loading ? ('optimizer.optimizing' | translate) : ('optimizer.optimizeLineup' | translate) }}
     </button>
 
     <div *ngIf="error" class="error-message">
@@ -61,10 +61,10 @@
 
   <div *ngIf="result" class="results-section">
     <div class="comparison-section">
-      <h2>Porównanie Drużyn</h2>
+      <h2>{{ 'optimizer.comparison.title' | translate }}</h2>
       <div class="ratings-comparison">
         <div class="rating-row">
-          <span class="rating-label">Środek pola:</span>
+          <span class="rating-label">{{ 'optimizer.comparison.midfield' | translate }}</span>
           <div class="rating-bars">
             <div class="bar my-team" [style.width.%]="(result.comparison.myTeamRatings.midfield / (result.comparison.myTeamRatings.midfield + result.comparison.opponentRatings.midfield)) * 100">
               {{ result.comparison.myTeamRatings.midfield | number:'1.0-0' }}
@@ -76,7 +76,7 @@
         </div>
 
         <div class="rating-row">
-          <span class="rating-label">Obrona centralna:</span>
+          <span class="rating-label">{{ 'optimizer.comparison.centralDefense' | translate }}</span>
           <div class="rating-bars">
             <div class="bar my-team" [style.width.%]="(result.comparison.myTeamRatings.centralDefense / (result.comparison.myTeamRatings.centralDefense + result.comparison.opponentRatings.centralDefense)) * 100">
               {{ result.comparison.myTeamRatings.centralDefense | number:'1.0-0' }}
@@ -88,7 +88,7 @@
         </div>
 
         <div class="rating-row">
-          <span class="rating-label">Atak centralny:</span>
+          <span class="rating-label">{{ 'optimizer.comparison.centralAttack' | translate }}</span>
           <div class="rating-bars">
             <div class="bar my-team" [style.width.%]="(result.comparison.myTeamRatings.centralAttack / (result.comparison.myTeamRatings.centralAttack + result.comparison.opponentRatings.centralAttack)) * 100">
               {{ result.comparison.myTeamRatings.centralAttack | number:'1.0-0' }}
@@ -102,14 +102,14 @@
 
       <div class="strengths-weaknesses">
         <div class="strengths" *ngIf="result.comparison.strengths.length > 0">
-          <h3>💪 Twoje Mocne Strony</h3>
+          <h3>💪 {{ 'optimizer.strengths' | translate }}</h3>
           <ul>
             <li *ngFor="let strength of result.comparison.strengths">{{ strength }}</li>
           </ul>
         </div>
 
         <div class="weaknesses" *ngIf="result.comparison.weaknesses.length > 0">
-          <h3>⚠️ Słabe Punkty</h3>
+          <h3>⚠️ {{ 'optimizer.weaknesses' | translate }}</h3>
           <ul>
             <li *ngFor="let weakness of result.comparison.weaknesses">{{ weakness }}</li>
           </ul>
@@ -118,7 +118,7 @@
     </div>
 
     <div class="lineup-section">
-      <h2>Optymalny Skład</h2>
+      <h2>{{ 'optimizer.optimalLineup' | translate }}</h2>
       <div class="lineup-field">
         <div class="position-row">
           <div class="position" *ngFor="let pos of ['GK']">
@@ -172,7 +172,7 @@
     </div>
 
     <div class="recommendations-section">
-      <h2>📋 Rekomendacje Taktyczne</h2>
+      <h2>📋 {{ 'optimizer.recommendations' | translate }}</h2>
       <ul class="recommendations-list">
         <li *ngFor="let recommendation of result.recommendations">
           {{ recommendation }}

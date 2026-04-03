@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { HattrickApiService } from '../../services/hattrick-api.service';
 import { OptimizerRequest, OptimizerResponse } from '../../models/lineup.model';
+import { TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-lineup-optimizer',
@@ -16,20 +17,26 @@ export class LineupOptimizerComponent {
   loading: boolean = false;
   error: string | null = null;
 
-  tactics = [
-    { value: 'Normal', label: 'Normalna' },
-    { value: 'Offensive', label: 'Ofensywna' },
-    { value: 'Defensive', label: 'Defensywna' },
-    { value: 'Counter', label: 'Kontratak' },
-    { value: 'AttackMiddle', label: 'Atak środkiem' },
-    { value: 'AttackWings', label: 'Atak skrzydłami' }
-  ];
+  tactics: { value: string; label: string }[] = [];
 
-  constructor(private hattrickApi: HattrickApiService) {}
+  constructor(private hattrickApi: HattrickApiService, private translate: TranslateService) {
+    this.initializeTranslations();
+  }
+
+  private initializeTranslations(): void {
+    this.tactics = [
+      { value: 'Normal', label: this.translate.instant('optimizer.tactics.normal') },
+      { value: 'Offensive', label: this.translate.instant('optimizer.tactics.offensive') },
+      { value: 'Defensive', label: this.translate.instant('optimizer.tactics.defensive') },
+      { value: 'Counter', label: this.translate.instant('optimizer.tactics.counter') },
+      { value: 'AttackMiddle', label: this.translate.instant('optimizer.tactics.attackMiddle') },
+      { value: 'AttackWings', label: this.translate.instant('optimizer.tactics.attackWings') }
+    ];
+  }
 
   optimizeLineup(): void {
     if (!this.myTeamId || !this.opponentTeamId) {
-      this.error = 'Podaj ID obu drużyn';
+      this.error = this.translate.instant('optimizer.enterBothTeamIds');
       return;
     }
 
@@ -49,7 +56,7 @@ export class LineupOptimizerComponent {
         this.loading = false;
       },
       error: (err) => {
-        this.error = 'Błąd podczas optymalizacji składu: ' + err.message;
+        this.error = this.translate.instant('optimizer.errorOptimizing') + err.message;
         this.loading = false;
       }
     });
@@ -62,17 +69,17 @@ export class LineupOptimizerComponent {
 
   getPositionLabel(position: string): string {
     const labels: { [key: string]: string } = {
-      'GK': 'Bramkarz',
-      'RWB': 'Prawy obrońca',
-      'RCD': 'Prawy środkowy obrońca',
-      'LCD': 'Lewy środkowy obrońca',
-      'LWB': 'Lewy obrońca',
-      'RW': 'Prawy pomocnik',
-      'CM': 'Środkowy pomocnik',
-      'LW': 'Lewy pomocnik',
-      'RFW': 'Prawy napastnik',
-      'CFW': 'Środkowy napastnik',
-      'LFW': 'Lewy napastnik'
+      'GK': this.translate.instant('optimizer.positions.GK'),
+      'RWB': this.translate.instant('optimizer.positions.RWB'),
+      'RCD': this.translate.instant('optimizer.positions.RCD'),
+      'LCD': this.translate.instant('optimizer.positions.LCD'),
+      'LWB': this.translate.instant('optimizer.positions.LWB'),
+      'RW': this.translate.instant('optimizer.positions.RW'),
+      'CM': this.translate.instant('optimizer.positions.CM'),
+      'LW': this.translate.instant('optimizer.positions.LW'),
+      'RFW': this.translate.instant('optimizer.positions.RFW'),
+      'CFW': this.translate.instant('optimizer.positions.CFW'),
+      'LFW': this.translate.instant('optimizer.positions.LFW')
     };
     return labels[position] || position;
   }

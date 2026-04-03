@@ -1,23 +1,23 @@
 <div class="oauth-container">
   <div class="header">
-    <h1>🔐 Konfiguracja OAuth Hattrick</h1>
-    <button class="btn-back" routerLink="/">← Powrót</button>
+    <h1>🔐 {{ 'oauth.title' | translate }}</h1>
+    <button class="btn-back" routerLink="/">      {{ 'common.back' | translate }}</button>
   </div>
 
   <div class="steps-indicator">
     <div class="step" [class.active]="step >= 1" [class.completed]="step > 1">
       <div class="step-number">1</div>
-      <div class="step-label">Start</div>
+      <div class="step-label">{{ 'oauth.steps.start' | translate }}</div>
     </div>
     <div class="step-line" [class.completed]="step > 1"></div>
     <div class="step" [class.active]="step >= 2" [class.completed]="step > 2">
       <div class="step-number">2</div>
-      <div class="step-label">Autoryzacja</div>
+      <div class="step-label">{{ 'oauth.steps.authorization' | translate }}</div>
     </div>
     <div class="step-line" [class.completed]="step > 2"></div>
     <div class="step" [class.active]="step >= 3">
       <div class="step-number">3</div>
-      <div class="step-label">Gotowe</div>
+      <div class="step-label">{{ 'oauth.steps.ready' | translate }}</div>
     </div>
   </div>
 
@@ -27,43 +27,43 @@
 
   <div class="step-content">
     <div *ngIf="step === 1" class="step-1">
-      <h2>Krok 1: Rozpocznij autoryzację</h2>
-      <p>Kliknij poniższy przycisk, aby rozpocząć proces autoryzacji z Hattrick API.</p>
+      <h2>{{ 'oauth.step1.title' | translate }}</h2>
+      <p>{{ 'oauth.step1.description' | translate }}</p>
       <button 
         (click)="startAuthorization()" 
         [disabled]="loading"
         class="btn-primary">
-        {{ loading ? 'Inicjalizacja...' : 'Rozpocznij autoryzację OAuth' }}
+        {{ loading ? ('oauth.step1.initializing' | translate) : ('oauth.step1.button' | translate) }}
       </button>
     </div>
 
     <div *ngIf="step === 2" class="step-2">
-      <h2>Krok 2: Autoryzuj aplikację</h2>
-      <p>1. Kliknij poniższy przycisk, aby otworzyć stronę Hattrick w nowej karcie:</p>
+      <h2>{{ 'oauth.step2.title' | translate }}</h2>
+      <p>{{ 'oauth.step2.instruction1' | translate }}</p>
       <button (click)="openAuthUrl()" class="btn-secondary">
-        Otwórz stronę autoryzacji Hattrick
+        {{ 'oauth.step2.openAuthPage' | translate }}
       </button>
 
       <div class="info-box">
-        <p><strong>Lub skopiuj ten link:</strong></p>
+        <p><strong>{{ 'oauth.step2.copyLink' | translate }}</strong></p>
         <div class="url-box">
           <input type="text" [value]="authorizationUrl" readonly>
-          <button (click)="copyToClipboard(authorizationUrl)" class="btn-copy">Kopiuj</button>
+          <button (click)="copyToClipboard(authorizationUrl)" class="btn-copy">{{ 'common.copy' | translate }}</button>
         </div>
       </div>
 
-      <p>2. Zaloguj się na Hattrick (jeśli nie jesteś zalogowany)</p>
-      <p>3. Zatwierdź dostęp dla aplikacji</p>
-      <p>4. Skopiuj kod PIN, który otrzymasz</p>
-      <p>5. Wklej kod PIN poniżej:</p>
+      <p>{{ 'oauth.step2.instruction2' | translate }}</p>
+      <p>{{ 'oauth.step2.instruction3' | translate }}</p>
+      <p>{{ 'oauth.step2.instruction4' | translate }}</p>
+      <p>{{ 'oauth.step2.instruction5' | translate }}</p>
 
       <div class="form-group">
-        <label for="verifier">Kod PIN z Hattrick:</label>
+        <label for="verifier">{{ 'oauth.step2.pinLabel' | translate }}</label>
         <input 
           type="text" 
           id="verifier" 
           [(ngModel)]="verifier" 
-          placeholder="np. 1234567"
+          placeholder="{{ 'oauth.step2.pinPlaceholder' | translate }}"
           class="form-control">
       </div>
 
@@ -71,32 +71,32 @@
         (click)="completeAuthorization()" 
         [disabled]="loading || !verifier"
         class="btn-primary">
-        {{ loading ? 'Weryfikacja...' : 'Zakończ autoryzację' }}
+        {{ loading ? ('oauth.step2.verifying' | translate) : ('oauth.step2.completeButton' | translate) }}
       </button>
     </div>
 
     <div *ngIf="step === 3" class="step-3">
       <div class="success-message">
-        <h2>✅ Autoryzacja zakończona pomyślnie!</h2>
-        <p>Twoja aplikacja jest teraz połączona z Hattrick API.</p>
-        <p>Session ID: <code>{{ sessionId }}</code></p>
-        <p>Możesz teraz korzystać z optymalizatora składu z prawdziwymi danymi z Hattrick!</p>
+        <h2>✅ {{ 'oauth.step3.title' | translate }}</h2>
+        <p>{{ 'oauth.step3.description' | translate }}</p>
+        <p>{{ 'oauth.step3.sessionId' | translate }} <code>{{ sessionId }}</code></p>
+        <p>{{ 'oauth.step3.readyMessage' | translate }}</p>
       </div>
 
       <div class="action-buttons">
-        <a routerLink="/" class="btn-primary">Przejdź do optymalizatora</a>
-        <button (click)="reset()" class="btn-secondary">Skonfiguruj ponownie</button>
+        <a routerLink="/" class="btn-primary">{{ 'oauth.step3.goToOptimizer' | translate }}</a>
+        <button (click)="reset()" class="btn-secondary">{{ 'oauth.step3.configureAgain' | translate }}</button>
       </div>
     </div>
   </div>
 
   <div class="help-section">
-    <h3>❓ Potrzebujesz pomocy?</h3>
+    <h3>❓ {{ 'oauth.help.title' | translate }}</h3>
     <ul>
-      <li>Upewnij się, że masz konto na <a href="https://www.hattrick.org" target="_blank">Hattrick.org</a></li>
-      <li>Musisz być zalogowany na Hattrick podczas autoryzacji</li>
-      <li>Kod PIN jest ważny tylko przez kilka minut</li>
-      <li>Jeśli masz problemy, spróbuj ponownie od początku</li>
+      <li>{{ 'oauth.help.tip1' | translate }}</li>
+      <li>{{ 'oauth.help.tip2' | translate }}</li>
+      <li>{{ 'oauth.help.tip3' | translate }}</li>
+      <li>{{ 'oauth.help.tip4' | translate }}</li>
     </ul>
   </div>
 </div>

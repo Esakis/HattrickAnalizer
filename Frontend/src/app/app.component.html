@@ -1,1 +1,21 @@
-<router-outlet></router-outlet>
+<div class="app-container">
+  <header class="app-header">
+    <div class="language-switcher">
+      <button 
+        class="lang-btn" 
+        [class.active]="getCurrentLanguage() === 'pl'"
+        (click)="switchLanguage('pl')">
+        PL
+      </button>
+      <button 
+        class="lang-btn" 
+        [class.active]="getCurrentLanguage() === 'en'"
+        (click)="switchLanguage('en')">
+        EN
+      </button>
+    </div>
+  </header>
+  <main class="app-content">
+    <router-outlet></router-outlet>
+  </main>
+</div>

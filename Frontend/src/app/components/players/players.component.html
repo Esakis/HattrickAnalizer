@@ -1,36 +1,36 @@
 <div class="players-container">
   <div class="header">
     <div class="header-content">
-      <h1>👥 Moi Zawodnicy</h1>
-      <p class="subtitle">Przeglądaj i analizuj swoją kadrę</p>
+      <h1>👥 {{ 'players.title' | translate }}</h1>
+      <p class="subtitle">{{ 'players.subtitle' | translate }}</p>
     </div>
     <button class="btn-back" routerLink="/">
-      ← Powrót do optymalizatora
+      {{ 'navigation.backToOptimizer' | translate }}
     </button>
   </div>
 
   <div class="controls-section">
     <div class="form-group">
-      <label for="teamId">ID Twojej Drużyny:</label>
+      <label for="teamId">{{ 'players.teamIdLabel' | translate }}</label>
       <div class="input-with-button">
         <input 
           type="number" 
           id="teamId" 
           [(ngModel)]="teamId" 
-          placeholder="np. 123456"
+          placeholder="{{ 'players.teamIdPlaceholder' | translate }}"
           (keyup.enter)="loadPlayers()">
         <button 
           (click)="loadPlayers()" 
           [disabled]="loading"
           class="btn-load">
-          {{ loading ? 'Ładowanie...' : 'Pokaż zawodników' }}
+          {{ loading ? ('players.optimizing' | translate) : ('players.showPlayers' | translate) }}
         </button>
       </div>
     </div>
 
     <div class="filters" *ngIf="players.length > 0">
       <div class="form-group">
-        <label for="filterPosition">Pozycja:</label>
+        <label for="filterPosition">{{ 'players.positionFilter' | translate }}</label>
         <select id="filterPosition" [(ngModel)]="filterPosition">
           <option *ngFor="let pos of positions" [value]="pos.value">
             {{ pos.label }}
@@ -39,7 +39,7 @@
       </div>
 
       <div class="form-group">
-        <label for="sortBy">Sortuj według:</label>
+        <label for="sortBy">{{ 'players.sortBy' | translate }}</label>
         <select id="sortBy" [(ngModel)]="sortBy">
           <option *ngFor="let sort of sortOptions" [value]="sort.value">
             {{ sort.label }}
@@ -54,22 +54,22 @@
   </div>
 
   <div *ngIf="loading" class="loading">
-    Ładowanie zawodników...
+    {{ 'players.loadingPlayers' | translate }}
   </div>
 
   <div *ngIf="!loading && players.length > 0" class="players-section">
     <div class="players-stats">
       <div class="stat-box">
         <div class="stat-value">{{ filteredPlayers.length }}</div>
-        <div class="stat-label">Zawodników</div>
+        <div class="stat-label">{{ 'players.playersCount' | translate }}</div>
       </div>
       <div class="stat-box">
         <div class="stat-value">{{ averageAge }}</div>
-        <div class="stat-label">Średni wiek</div>
+        <div class="stat-label">{{ 'players.averageAge' | translate }}</div>
       </div>
       <div class="stat-box">
         <div class="stat-value">{{ averageForm }}</div>
-        <div class="stat-label">Średnia forma</div>
+        <div class="stat-label">{{ 'players.averageForm' | translate }}</div>
       </div>
     </div>
 
@@ -86,53 +86,53 @@
         <div class="player-basic-stats">
           <div class="stat">
             <span class="stat-icon">🎂</span>
-            <span class="stat-text">{{ player.age }} lat</span>
+            <span class="stat-text">{{ player.age }} {{ 'players.age' | translate }}</span>
           </div>
           <div class="stat">
             <span class="stat-icon">📊</span>
             <span class="stat-text" [class]="getFormClass(player.form)">
-              Forma: {{ player.form }}
+              {{ 'players.form' | translate }}: {{ player.form }}
             </span>
           </div>
           <div class="stat">
             <span class="stat-icon">⚡</span>
-            <span class="stat-text">Kondycja: {{ player.stamina }}</span>
+            <span class="stat-text">{{ 'players.stamina' | translate }}: {{ player.stamina }}</span>
           </div>
         </div>
 
         <div class="player-skills">
           <div class="skill-row" *ngIf="player.skills.keeper > 0">
-            <span class="skill-name">Bramkarstwo:</span>
+            <span class="skill-name">{{ 'players.skills.keeper' | translate }}:</span>
             <span class="skill-value">{{ player.skills.keeper }}</span>
             <span class="skill-level">{{ getSkillLevel(player.skills.keeper) }}</span>
           </div>
           <div class="skill-row" *ngIf="player.skills.defending > 0">
-            <span class="skill-name">Obrona:</span>
+            <span class="skill-name">{{ 'players.skills.defending' | translate }}:</span>
             <span class="skill-value">{{ player.skills.defending }}</span>
             <span class="skill-level">{{ getSkillLevel(player.skills.defending) }}</span>
           </div>
           <div class="skill-row" *ngIf="player.skills.playmaking > 0">
-            <span class="skill-name">Rozgrywanie:</span>
+            <span class="skill-name">{{ 'players.skills.playmaking' | translate }}:</span>
             <span class="skill-value">{{ player.skills.playmaking }}</span>
             <span class="skill-level">{{ getSkillLevel(player.skills.playmaking) }}</span>
           </div>
           <div class="skill-row" *ngIf="player.skills.winger > 0">
-            <span class="skill-name">Skrzydło:</span>
+            <span class="skill-name">{{ 'players.skills.winger' | translate }}:</span>
             <span class="skill-value">{{ player.skills.winger }}</span>
             <span class="skill-level">{{ getSkillLevel(player.skills.winger) }}</span>
           </div>
           <div class="skill-row" *ngIf="player.skills.passing > 0">
-            <span class="skill-name">Podania:</span>
+            <span class="skill-name">{{ 'players.skills.passing' | translate }}:</span>
             <span class="skill-value">{{ player.skills.passing }}</span>
             <span class="skill-level">{{ getSkillLevel(player.skills.passing) }}</span>
           </div>
           <div class="skill-row" *ngIf="player.skills.scoring > 0">
-            <span class="skill-name">Strzelanie:</span>
+            <span class="skill-name">{{ 'players.skills.scoring' | translate }}:</span>
             <span class="skill-value">{{ player.skills.scoring }}</span>
             <span class="skill-level">{{ getSkillLevel(player.skills.scoring) }}</span>
           </div>
           <div class="skill-row" *ngIf="player.skills.setPieces > 0">
-            <span class="skill-name">Stałe fragmenty:</span>
+            <span class="skill-name">{{ 'players.skills.setPieces' | translate }}:</span>
             <span class="skill-value">{{ player.skills.setPieces }}</span>
             <span class="skill-level">{{ getSkillLevel(player.skills.setPieces) }}</span>
           </div>
@@ -148,7 +148,7 @@
 
   <div *ngIf="!loading && players.length === 0 && teamId" class="no-data">
     <div class="no-data-icon">🤷‍♂️</div>
-    <p>Nie znaleziono zawodników dla tej drużyny.</p>
-    <p class="hint">Sprawdź czy ID drużyny jest poprawne lub skonfiguruj OAuth.</p>
+    <p>{{ 'players.noPlayersFound' | translate }}</p>
+    <p class="hint">{{ 'players.checkTeamId' | translate }}</p>
   </div>
 </div>

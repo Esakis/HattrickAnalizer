@@ -1,0 +1,19 @@
+## Backend
+Backend/bin/
+Backend/obj/
+Backend/appsettings.json
+Backend/appsettings.Development.json
+*.user
+*.suo
+.vs/
+
+## Frontend
+Frontend/node_modules/
+Frontend/dist/
+Frontend/.angular/
+Frontend/.env
+
+## General
+*.log
+.DS_Store
+Thumbs.db

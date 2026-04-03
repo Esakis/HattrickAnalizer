@@ -1,0 +1,302 @@
+.oauth-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+
+    h1 {
+      margin: 0;
+      color: #2c3e50;
+    }
+
+    .btn-back {
+      background: #66bb6a;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+
+      &:hover {
+        background: #43a047;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(67, 160, 71, 0.3);
+      }
+    }
+  }
+
+  h2 {
+    color: #34495e;
+    margin-bottom: 20px;
+  }
+
+  h3 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+  }
+}
+
+.steps-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 40px;
+
+  .step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+
+    .step-number {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #ddd;
+      color: #666;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      transition: all 0.3s;
+    }
+
+    .step-label {
+      font-size: 14px;
+      color: #666;
+    }
+
+    &.active .step-number {
+      background: #3498db;
+      color: white;
+    }
+
+    &.completed .step-number {
+      background: #27ae60;
+      color: white;
+    }
+  }
+
+  .step-line {
+    width: 100px;
+    height: 2px;
+    background: #ddd;
+    margin: 0 10px;
+    margin-bottom: 28px;
+    transition: all 0.3s;
+
+    &.completed {
+      background: #27ae60;
+    }
+  }
+}
+
+.step-content {
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  margin-bottom: 30px;
+
+  p {
+    margin-bottom: 15px;
+    line-height: 1.6;
+  }
+
+  .form-group {
+    margin: 20px 0;
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #2c3e50;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 5px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+
+      &:focus {
+        outline: none;
+        border-color: #3498db;
+      }
+    }
+  }
+}
+
+.info-box {
+  background: #e8f4f8;
+  padding: 20px;
+  border-radius: 8px;
+  margin: 20px 0;
+  border-left: 4px solid #3498db;
+
+  .url-box {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+
+    input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+
+    .btn-copy {
+      padding: 10px 20px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.3s;
+
+      &:hover {
+        background: #2980b9;
+      }
+    }
+  }
+}
+
+.btn-primary {
+  background: #3498db;
+  color: white;
+  padding: 15px 40px;
+  border: none;
+  border-radius: 5px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s;
+  text-decoration: none;
+  display: inline-block;
+
+  &:hover:not(:disabled) {
+    background: #2980b9;
+  }
+
+  &:disabled {
+    background: #95a5a6;
+    cursor: not-allowed;
+  }
+}
+
+.btn-secondary {
+  background: #95a5a6;
+  color: white;
+  padding: 15px 40px;
+  border: none;
+  border-radius: 5px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s;
+  margin-left: 10px;
+
+  &:hover {
+    background: #7f8c8d;
+  }
+}
+
+.error-message {
+  background: #e74c3c;
+  color: white;
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+
+.success-message {
+  background: #d5f4e6;
+  padding: 30px;
+  border-radius: 8px;
+  border-left: 4px solid #27ae60;
+  margin-bottom: 20px;
+
+  h2 {
+    color: #27ae60;
+    margin-bottom: 15px;
+  }
+
+  code {
+    background: white;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-family: monospace;
+    color: #2c3e50;
+  }
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.help-section {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+
+  ul {
+    list-style: none;
+    padding: 0;
+
+    li {
+      padding: 8px 0;
+      padding-left: 25px;
+      position: relative;
+
+      &:before {
+        content: "•";
+        position: absolute;
+        left: 0;
+        color: #3498db;
+        font-weight: bold;
+      }
+
+      a {
+        color: #3498db;
+        text-decoration: none;
+
+        &:hover {
+          text-decoration: underline;
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .steps-indicator {
+    .step-line {
+      width: 50px;
+    }
+  }
+
+  .action-buttons {
+    flex-direction: column;
+
+    .btn-secondary {
+      margin-left: 0;
+      margin-top: 10px;
+    }
+  }
+}

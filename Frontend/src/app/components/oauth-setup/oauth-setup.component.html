@@ -1,0 +1,102 @@
+<div class="oauth-container">
+  <div class="header">
+    <h1>🔐 Konfiguracja OAuth Hattrick</h1>
+    <button class="btn-back" routerLink="/">← Powrót</button>
+  </div>
+
+  <div class="steps-indicator">
+    <div class="step" [class.active]="step >= 1" [class.completed]="step > 1">
+      <div class="step-number">1</div>
+      <div class="step-label">Start</div>
+    </div>
+    <div class="step-line" [class.completed]="step > 1"></div>
+    <div class="step" [class.active]="step >= 2" [class.completed]="step > 2">
+      <div class="step-number">2</div>
+      <div class="step-label">Autoryzacja</div>
+    </div>
+    <div class="step-line" [class.completed]="step > 2"></div>
+    <div class="step" [class.active]="step >= 3">
+      <div class="step-number">3</div>
+      <div class="step-label">Gotowe</div>
+    </div>
+  </div>
+
+  <div *ngIf="error" class="error-message">
+    {{ error }}
+  </div>
+
+  <div class="step-content">
+    <div *ngIf="step === 1" class="step-1">
+      <h2>Krok 1: Rozpocznij autoryzację</h2>
+      <p>Kliknij poniższy przycisk, aby rozpocząć proces autoryzacji z Hattrick API.</p>
+      <button 
+        (click)="startAuthorization()" 
+        [disabled]="loading"
+        class="btn-primary">
+        {{ loading ? 'Inicjalizacja...' : 'Rozpocznij autoryzację OAuth' }}
+      </button>
+    </div>
+
+    <div *ngIf="step === 2" class="step-2">
+      <h2>Krok 2: Autoryzuj aplikację</h2>
+      <p>1. Kliknij poniższy przycisk, aby otworzyć stronę Hattrick w nowej karcie:</p>
+      <button (click)="openAuthUrl()" class="btn-secondary">
+        Otwórz stronę autoryzacji Hattrick
+      </button>
+
+      <div class="info-box">
+        <p><strong>Lub skopiuj ten link:</strong></p>
+        <div class="url-box">
+          <input type="text" [value]="authorizationUrl" readonly>
+          <button (click)="copyToClipboard(authorizationUrl)" class="btn-copy">Kopiuj</button>
+        </div>
+      </div>
+
+      <p>2. Zaloguj się na Hattrick (jeśli nie jesteś zalogowany)</p>
+      <p>3. Zatwierdź dostęp dla aplikacji</p>
+      <p>4. Skopiuj kod PIN, który otrzymasz</p>
+      <p>5. Wklej kod PIN poniżej:</p>
+
+      <div class="form-group">
+        <label for="verifier">Kod PIN z Hattrick:</label>
+        <input 
+          type="text" 
+          id="verifier" 
+          [(ngModel)]="verifier" 
+          placeholder="np. 1234567"
+          class="form-control">
+      </div>
+
+      <button 
+        (click)="completeAuthorization()" 
+        [disabled]="loading || !verifier"
+        class="btn-primary">
+        {{ loading ? 'Weryfikacja...' : 'Zakończ autoryzację' }}
+      </button>
+    </div>
+
+    <div *ngIf="step === 3" class="step-3">
+      <div class="success-message">
+        <h2>✅ Autoryzacja zakończona pomyślnie!</h2>
+        <p>Twoja aplikacja jest teraz połączona z Hattrick API.</p>
+        <p>Session ID: <code>{{ sessionId }}</code></p>
+        <p>Możesz teraz korzystać z optymalizatora składu z prawdziwymi danymi z Hattrick!</p>
+      </div>
+
+      <div class="action-buttons">
+        <a routerLink="/" class="btn-primary">Przejdź do optymalizatora</a>
+        <button (click)="reset()" class="btn-secondary">Skonfiguruj ponownie</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="help-section">
+    <h3>❓ Potrzebujesz pomocy?</h3>
+    <ul>
+      <li>Upewnij się, że masz konto na <a href="https://www.hattrick.org" target="_blank">Hattrick.org</a></li>
+      <li>Musisz być zalogowany na Hattrick podczas autoryzacji</li>
+      <li>Kod PIN jest ważny tylko przez kilka minut</li>
+      <li>Jeśli masz problemy, spróbuj ponownie od początku</li>
+    </ul>
+  </div>
+</div>

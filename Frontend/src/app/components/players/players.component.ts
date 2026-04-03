@@ -132,68 +132,55 @@ export class PlayersComponent implements OnInit {
   }
 
   getSkillLevel(value: number): string {
-    const levels = Object.values(SkillLevel);
-    return levels[value] !== undefined ? levels[value] as string : this.translate.instant('players.unknown');
+    return this.translate.instant(`playerAbilities.${value}`);
   }
 
   getFormLevel(value: number): string {
-    const levels = Object.values(FormLevel);
-    return levels[value] !== undefined ? levels[value] as string : this.translate.instant('players.unknown');
+    return this.translate.instant(`form.${value}`);
   }
 
   getLeaderLevel(value: number): string {
-    const levels = Object.values(LeaderLevel);
-    return levels[value] !== undefined ? levels[value] as string : this.translate.instant('players.unknown');
+    return this.translate.instant(`leadership.${value}`);
   }
 
   getFormationExperienceLevel(value: number): string {
-    const levels = Object.values(FormationExperienceLevel);
-    return levels[value] !== undefined ? levels[value] as string : this.translate.instant('players.unknown');
+    return this.translate.instant(`formationExperience.${value}`);
   }
 
   getSponsorLevel(value: number): string {
-    const levels = Object.values(SponsorLevel);
-    return levels[value] !== undefined ? levels[value] as string : this.translate.instant('players.unknown');
+    return this.translate.instant(`sponsors.${value}`);
   }
 
   getFanMoodLevel(value: number): string {
-    const levels = Object.values(FanMoodLevel);
-    return levels[value] !== undefined ? levels[value] as string : this.translate.instant('players.unknown');
+    return this.translate.instant(`fanMood.${value}`);
   }
 
   getMatchExpectationLevel(value: number): string {
-    const levels = Object.values(MatchExpectationLevel);
-    return levels[value] !== undefined ? levels[value] as string : this.translate.instant('players.unknown');
+    return this.translate.instant(`fanMatchExpectations.${value}`);
   }
 
   getSeasonExpectationLevel(value: number): string {
-    const levels = Object.values(SeasonExpectationLevel);
-    return levels[value] !== undefined ? levels[value] as string : this.translate.instant('players.unknown');
+    return this.translate.instant(`fanSeasonExpectations.${value}`);
   }
 
   getPersonalityLevel(value: number): string {
-    const levels = Object.values(PersonalityLevel);
-    return levels[value] !== undefined ? levels[value] as string : this.translate.instant('players.unknown');
+    return this.translate.instant(`agreeability.${value}`);
   }
 
   getHonestyLevel(value: number): string {
-    const levels = Object.values(HonestyLevel);
-    return levels[value] !== undefined ? levels[value] as string : this.translate.instant('players.unknown');
+    return this.translate.instant(`honesty.${value}`);
   }
 
   getAggressivenessLevel(value: number): string {
-    const levels = Object.values(AggressivenessLevel);
-    return levels[value] !== undefined ? levels[value] as string : this.translate.instant('players.unknown');
+    return this.translate.instant(`aggressiveness.${value}`);
   }
 
   getTeamMoraleLevel(value: number): string {
-    const levels = Object.values(TeamMoraleLevel);
-    return levels[value] !== undefined ? levels[value] as string : this.translate.instant('players.unknown');
+    return this.translate.instant(`teamSpirit.${value}`);
   }
 
   getTeamConfidenceLevel(value: number): string {
-    const levels = Object.values(TeamConfidenceLevel);
-    return levels[value] !== undefined ? levels[value] as string : this.translate.instant('players.unknown');
+    return this.translate.instant(`teamConfidence.${value}`);
   }
 
   getFormClass(form: number): string {

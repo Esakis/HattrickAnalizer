@@ -1,0 +1,15 @@
+<aside class="load-sidebar">
+  <h3 class="load-sidebar__title">{{ 'loadStatus.title' | translate }}</h3>
+  <ul class="load-sidebar__list">
+    <li *ngFor="let item of items$ | async"
+        class="load-sidebar__item"
+        [class.is-loading]="item.state === 'loading'"
+        [class.is-success]="item.state === 'success'"
+        [class.is-error]="item.state === 'error'"
+        [title]="item.message || ''">
+      <span class="load-sidebar__icon">{{ icon(item.state) }}</span>
+      <span class="load-sidebar__label">{{ item.label }}</span>
+      <span *ngIf="item.state === 'error' && item.message" class="load-sidebar__msg">{{ item.message }}</span>
+    </li>
+  </ul>
+</aside>

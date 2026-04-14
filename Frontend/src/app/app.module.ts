@@ -10,6 +10,7 @@ import { AppComponent } from './app.component';
 import { LineupOptimizerComponent } from './components/lineup-optimizer/lineup-optimizer.component';
 import { OAuthSetupComponent } from './components/oauth-setup/oauth-setup.component';
 import { PlayersComponent } from './components/players/players.component';
+import { LoadStatusSidebarComponent } from './components/load-status-sidebar/load-status-sidebar.component';
 
 export class CustomTranslateLoader implements TranslateLoader {
   constructor(private http: HttpClient) {}
@@ -28,7 +29,8 @@ export function HttpLoaderFactory(http: HttpClient) {
     AppComponent,
     LineupOptimizerComponent,
     OAuthSetupComponent,
-    PlayersComponent
+    PlayersComponent,
+    LoadStatusSidebarComponent
   ],
   imports: [
     BrowserModule,

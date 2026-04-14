@@ -2,6 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { HattrickApiService } from '../../services/hattrick-api.service';
 import { Player } from '../../models/player.model';
 import { TranslateService } from '@ngx-translate/core';
+import { DataCacheService } from '../../services/data-cache.service';
+import { LoadStatusService } from '../../services/load-status.service';
 import {
   SkillLevel,
   FormLevel,
@@ -36,11 +38,44 @@ export class PlayersComponent implements OnInit {
   positions: { value: string; label: string }[] = [];
   sortOptions: { value: string; label: string }[] = [];
 
-  constructor(private hattrickApi: HattrickApiService, private translate: TranslateService) {}
+  constructor(
+    private hattrickApi: HattrickApiService,
+    private translate: TranslateService,
+    private cache: DataCacheService,
+    private loadStatus: LoadStatusService
+  ) {}
 
   ngOnInit(): void {
     this.sessionId = localStorage.getItem('hattrick_session_id');
     this.initializeTranslations();
+
+    const cachedTeam = this.cache.ownTeam$.value;
+    if (cachedTeam?.players?.length) {
+      this.teamId = cachedTeam.teamId;
+      this.players = cachedTeam.players;
+      return;
+    }
+
+    const auth = this.cache.auth$.value;
+    if (auth.authorized && auth.ownTeamId) {
+      this.teamId = auth.ownTeamId;
+      this.loading = true;
+    }
+
+    this.cache.ownTeam$.subscribe(team => {
+      if (team?.players?.length) {
+        this.teamId = team.teamId;
+        this.players = team.players;
+        this.loading = false;
+      }
+    });
+
+    this.cache.auth$.subscribe(a => {
+      if (a.authorized && a.ownTeamId && !this.teamId) {
+        this.teamId = a.ownTeamId;
+        this.loadPlayers();
+      }
+    });
   }
 
   private initializeTranslations(): void {

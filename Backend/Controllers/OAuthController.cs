@@ -1,3 +1,4 @@
+using System.Xml.Linq;
 using Microsoft.AspNetCore.Mvc;
 using HattrickAnalizer.Services;
 using HattrickAnalizer.Models;
@@ -9,11 +10,13 @@ namespace HattrickAnalizer.Controllers;
 public class OAuthController : ControllerBase
 {
     private readonly OAuthService _oauthService;
+    private readonly TokenStore _tokenStore;
     private static readonly Dictionary<string, OAuthSession> _sessions = new();
 
-    public OAuthController(OAuthService oauthService)
+    public OAuthController(OAuthService oauthService, TokenStore tokenStore)
     {
         _oauthService = oauthService;
+        _tokenStore = tokenStore;
     }
 
     [HttpGet("start")]
@@ -22,7 +25,7 @@ public class OAuthController : ControllerBase
         try
         {
             var (token, tokenSecret, authUrl) = await _oauthService.GetRequestTokenAsync();
-            
+
             var session = new OAuthSession
             {
                 RequestToken = token,
@@ -69,11 +72,24 @@ public class OAuthController : ControllerBase
             session.AccessTokenSecret = accessTokenSecret;
             session.AuthorizedAt = DateTime.UtcNow;
 
+            var (ownTeamId, ownTeamName) = await FetchOwnTeamInfoAsync(accessToken, accessTokenSecret);
+
+            _tokenStore.Save(new StoredToken
+            {
+                AccessToken = accessToken,
+                AccessTokenSecret = accessTokenSecret,
+                OwnTeamId = ownTeamId,
+                OwnTeamName = ownTeamName,
+                AuthorizedAt = DateTime.UtcNow
+            });
+
             return Ok(new
             {
                 sessionId = session.SessionId,
-                accessToken = accessToken,
-                message = "Autoryzacja zakończona pomyślnie! Możesz teraz używać API."
+                accessToken,
+                ownTeamId,
+                ownTeamName,
+                message = "Autoryzacja zakończona pomyślnie! Token zapisany."
             });
         }
         catch (Exception ex)
@@ -99,6 +115,30 @@ public class OAuthController : ControllerBase
             createdAt = session.CreatedAt,
             authorizedAt = session.AuthorizedAt
         });
+    }
+
+    [HttpGet("current")]
+    public IActionResult GetCurrent()
+    {
+        var stored = _tokenStore.Get();
+        if (stored == null || !_tokenStore.IsAuthorized())
+        {
+            return Ok(new { authorized = false });
+        }
+        return Ok(new
+        {
+            authorized = true,
+            ownTeamId = stored.OwnTeamId,
+            ownTeamName = stored.OwnTeamName,
+            authorizedAt = stored.AuthorizedAt
+        });
+    }
+
+    [HttpPost("logout")]
+    public IActionResult Logout()
+    {
+        _tokenStore.Clear();
+        return Ok(new { success = true });
     }
 
     [HttpPost("test")]
@@ -149,6 +189,22 @@ public class OAuthController : ControllerBase
     {
         _sessions.TryGetValue(sessionId, out var session);
         return session;
+    }
+
+    private async Task<(int teamId, string teamName)> FetchOwnTeamInfoAsync(string accessToken, string accessTokenSecret)
+    {
+        var queryParams = new Dictionary<string, string>
+        {
+            { "file", "teamdetails" },
+            { "version", "3.6" }
+        };
+        var xml = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
+        var doc = XDocument.Parse(xml);
+
+        var teamElement = doc.Descendants("Team").FirstOrDefault();
+        var teamId = int.Parse(teamElement?.Element("TeamID")?.Value ?? "0");
+        var teamName = teamElement?.Element("TeamName")?.Value ?? string.Empty;
+        return (teamId, teamName);
     }
 }
 

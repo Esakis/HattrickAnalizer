@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { Team } from '../models/team.model';
 import { Player } from '../models/player.model';
 import { OptimizerRequest, OptimizerResponse } from '../models/lineup.model';
+import { AuthInfo, NextOpponent } from './data-cache.service';
 
 @Injectable({
   providedIn: 'root'
@@ -21,6 +22,10 @@ export class HattrickApiService {
     return this.http.get<Player[]>(`${this.apiUrl}/team/${teamId}/players`);
   }
 
+  getNextOpponent(): Observable<NextOpponent> {
+    return this.http.get<NextOpponent>(`${this.apiUrl}/team/next-opponent`);
+  }
+
   optimizeLineup(request: OptimizerRequest): Observable<OptimizerResponse> {
     return this.http.post<OptimizerResponse>(`${this.apiUrl}/optimizer/optimize`, request);
   }
@@ -35,5 +40,13 @@ export class HattrickApiService {
 
   getOAuthStatus(sessionId: string): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/oauth/status/${sessionId}`);
+  }
+
+  getCurrentOAuth(): Observable<AuthInfo> {
+    return this.http.get<AuthInfo>(`${this.apiUrl}/oauth/current`);
+  }
+
+  logoutOAuth(): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/oauth/logout`, {});
   }
 }

@@ -1,26 +1,44 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { HattrickApiService } from '../../services/hattrick-api.service';
 import { OptimizerRequest, OptimizerResponse } from '../../models/lineup.model';
 import { TranslateService } from '@ngx-translate/core';
+import { DataCacheService } from '../../services/data-cache.service';
 
 @Component({
   selector: 'app-lineup-optimizer',
   templateUrl: './lineup-optimizer.component.html',
   styleUrls: ['./lineup-optimizer.component.scss']
 })
-export class LineupOptimizerComponent {
+export class LineupOptimizerComponent implements OnInit {
   myTeamId: number = 0;
   opponentTeamId: number = 0;
   preferredTactic: string = 'Normal';
-  
+
   result: OptimizerResponse | null = null;
   loading: boolean = false;
   error: string | null = null;
 
   tactics: { value: string; label: string }[] = [];
 
-  constructor(private hattrickApi: HattrickApiService, private translate: TranslateService) {
+  constructor(
+    private hattrickApi: HattrickApiService,
+    private translate: TranslateService,
+    private cache: DataCacheService
+  ) {
     this.initializeTranslations();
+  }
+
+  ngOnInit(): void {
+    this.cache.auth$.subscribe(auth => {
+      if (auth.authorized && auth.ownTeamId && !this.myTeamId) {
+        this.myTeamId = auth.ownTeamId;
+      }
+    });
+    this.cache.nextOpponent$.subscribe(opp => {
+      if (opp?.opponentTeamId && !this.opponentTeamId) {
+        this.opponentTeamId = opp.opponentTeamId;
+      }
+    });
   }
 
   private initializeTranslations(): void {

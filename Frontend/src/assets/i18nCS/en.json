@@ -1,4 +1,13 @@
 {
+  "loadStatus": {
+    "title": "Load status",
+    "auth": "OAuth authorization",
+    "ownTeam": "My team",
+    "nextOpponent": "Next match",
+    "opponentTeam": "Opponent team",
+    "notAuthorized": "Not authorized — click to start",
+    "goToOAuth": "Go to authorization"
+  },
   "common": {
     "loading": "Loading...",
     "error": "Error",

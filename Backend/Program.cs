@@ -10,6 +10,7 @@ builder.Services.AddHttpClient<HattrickApiService>();
 builder.Services.AddHttpClient<OAuthService>();
 builder.Services.AddScoped<LineupOptimizerService>();
 builder.Services.AddSingleton<OAuthService>();
+builder.Services.AddSingleton<TokenStore>();
 
 builder.Services.AddCors(options =>
 {

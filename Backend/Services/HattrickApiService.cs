@@ -1,21 +1,34 @@
+using System.Globalization;
 using System.Xml.Linq;
 using HattrickAnalizer.Models;
 using HattrickAnalizer.Controllers;
 
 namespace HattrickAnalizer.Services;
 
+public class NextOpponentInfo
+{
+    public long MatchId { get; set; }
+    public int OpponentTeamId { get; set; }
+    public string OpponentTeamName { get; set; } = string.Empty;
+    public DateTime? MatchDate { get; set; }
+    public string MatchType { get; set; } = string.Empty;
+    public bool IsHomeMatch { get; set; }
+}
+
 public class HattrickApiService
 {
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
     private readonly OAuthService _oauthService;
+    private readonly TokenStore _tokenStore;
     private readonly string _baseUrl;
 
-    public HattrickApiService(HttpClient httpClient, IConfiguration configuration, OAuthService oauthService)
+    public HattrickApiService(HttpClient httpClient, IConfiguration configuration, OAuthService oauthService, TokenStore tokenStore)
     {
         _httpClient = httpClient;
         _configuration = configuration;
         _oauthService = oauthService;
+        _tokenStore = tokenStore;
         _baseUrl = _configuration["HattrickApi:BaseUrl"] ?? "https://chpp.hattrick.org/chppxml.ashx";
     }
 
@@ -27,103 +40,170 @@ public class HattrickApiService
             TeamName = $"Team {teamId}"
         };
 
-        var players = await GetTeamPlayersAsync(teamId, sessionId);
-        team.Players = players;
+        var (accessToken, accessTokenSecret) = ResolveTokens(sessionId);
+        if (accessToken != null && accessTokenSecret != null)
+        {
+            try
+            {
+                var queryParams = new Dictionary<string, string>
+                {
+                    { "file", "teamdetails" },
+                    { "teamId", teamId.ToString() },
+                    { "version", "3.6" }
+                };
+                var xml = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
+                var doc = XDocument.Parse(xml);
+                var teamElement = doc.Descendants("Team").FirstOrDefault(t => int.Parse(t.Element("TeamID")?.Value ?? "0") == teamId)
+                                  ?? doc.Descendants("Team").FirstOrDefault();
+                if (teamElement != null)
+                {
+                    team.TeamName = teamElement.Element("TeamName")?.Value ?? team.TeamName;
+                }
+            }
+            catch
+            {
+            }
+        }
 
+        team.Players = await GetTeamPlayersAsync(teamId, sessionId);
         return team;
     }
 
     public async Task<List<Player>> GetTeamPlayersAsync(int teamId, string? sessionId = null)
     {
+        var (accessToken, accessTokenSecret) = ResolveTokens(sessionId);
+        if (accessToken == null || accessTokenSecret == null)
+        {
+            return GenerateMockPlayers();
+        }
+
         try
         {
-            string response;
-            
-            if (!string.IsNullOrEmpty(sessionId))
+            var queryParams = new Dictionary<string, string>
             {
-                var session = OAuthController.GetSession(sessionId);
-                if (session?.AccessToken != null && session?.AccessTokenSecret != null)
-                {
-                    var queryParams = new Dictionary<string, string>
-                    {
-                        { "file", "players" },
-                        { "teamId", teamId.ToString() },
-                        { "version", "2.8" }
-                    };
-                    response = await _oauthService.MakeAuthenticatedRequestAsync(
-                        session.AccessToken,
-                        session.AccessTokenSecret,
-                        queryParams
-                    );
-                }
-                else
-                {
-                    return GenerateMockPlayers();
-                }
-            }
-            else
-            {
-                return GenerateMockPlayers();
-            }
-            
+                { "file", "players" },
+                { "teamId", teamId.ToString() },
+                { "version", "2.8" }
+            };
+            var response = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
+
             var doc = XDocument.Parse(response);
             var players = new List<Player>();
-
-            var playerElements = doc.Descendants("Player");
-            foreach (var playerElement in playerElements)
+            foreach (var playerElement in doc.Descendants("Player"))
             {
-                var player = ParsePlayer(playerElement);
-                players.Add(player);
+                players.Add(ParsePlayer(playerElement));
             }
-
             return players;
         }
-        catch (Exception ex)
+        catch
         {
             return GenerateMockPlayers();
         }
     }
 
+    public async Task<NextOpponentInfo?> GetNextOpponentAsync(int teamId, string? sessionId = null)
+    {
+        var (accessToken, accessTokenSecret) = ResolveTokens(sessionId);
+        if (accessToken == null || accessTokenSecret == null)
+        {
+            throw new InvalidOperationException("Brak autoryzacji OAuth — autoryzuj aplikację najpierw.");
+        }
+
+        var queryParams = new Dictionary<string, string>
+        {
+            { "file", "matches" },
+            { "teamId", teamId.ToString() },
+            { "version", "2.8" }
+        };
+        var xml = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
+        var doc = XDocument.Parse(xml);
+
+        var upcoming = doc.Descendants("Match")
+            .Select(m => new
+            {
+                Element = m,
+                Status = m.Element("Status")?.Value ?? "",
+                Date = ParseDate(m.Element("MatchDate")?.Value)
+            })
+            .Where(x => x.Status.Equals("UPCOMING", StringComparison.OrdinalIgnoreCase) || x.Date > DateTime.UtcNow)
+            .OrderBy(x => x.Date)
+            .FirstOrDefault();
+
+        if (upcoming == null) return null;
+
+        var home = upcoming.Element.Element("HomeTeam");
+        var away = upcoming.Element.Element("AwayTeam");
+        var homeId = int.Parse(home?.Element("HomeTeamID")?.Value ?? "0");
+        var awayId = int.Parse(away?.Element("AwayTeamID")?.Value ?? "0");
+        var isHome = homeId == teamId;
+        var opponent = isHome ? away : home;
+        var opponentId = isHome ? awayId : homeId;
+        var opponentName = isHome
+            ? (away?.Element("AwayTeamName")?.Value ?? "")
+            : (home?.Element("HomeTeamName")?.Value ?? "");
+
+        return new NextOpponentInfo
+        {
+            MatchId = long.Parse(upcoming.Element.Element("MatchID")?.Value ?? "0"),
+            OpponentTeamId = opponentId,
+            OpponentTeamName = opponentName,
+            MatchDate = upcoming.Date,
+            MatchType = upcoming.Element.Element("MatchType")?.Value ?? "",
+            IsHomeMatch = isHome
+        };
+    }
+
     public async Task<TeamRatings> GetOpponentRatingsAsync(int teamId, int matchId, string? sessionId = null)
     {
-        try
-        {
-            string response;
-            
-            if (!string.IsNullOrEmpty(sessionId))
-            {
-                var session = OAuthController.GetSession(sessionId);
-                if (session?.AccessToken != null && session?.AccessTokenSecret != null)
-                {
-                    var queryParams = new Dictionary<string, string>
-                    {
-                        { "file", "matchdetails" },
-                        { "matchId", matchId.ToString() },
-                        { "version", "3.1" }
-                    };
-                    response = await _oauthService.MakeAuthenticatedRequestAsync(
-                        session.AccessToken,
-                        session.AccessTokenSecret,
-                        queryParams
-                    );
-                }
-                else
-                {
-                    return GenerateMockRatings();
-                }
-            }
-            else
-            {
-                return GenerateMockRatings();
-            }
-            
-            var doc = XDocument.Parse(response);
-            return ParseTeamRatings(doc, teamId);
-        }
-        catch (Exception ex)
+        var (accessToken, accessTokenSecret) = ResolveTokens(sessionId);
+        if (accessToken == null || accessTokenSecret == null)
         {
             return GenerateMockRatings();
         }
+
+        try
+        {
+            var queryParams = new Dictionary<string, string>
+            {
+                { "file", "matchdetails" },
+                { "matchId", matchId.ToString() },
+                { "version", "3.1" }
+            };
+            var response = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
+            var doc = XDocument.Parse(response);
+            return ParseTeamRatings(doc, teamId);
+        }
+        catch
+        {
+            return GenerateMockRatings();
+        }
+    }
+
+    private (string? AccessToken, string? AccessTokenSecret) ResolveTokens(string? sessionId)
+    {
+        if (!string.IsNullOrEmpty(sessionId))
+        {
+            var session = OAuthController.GetSession(sessionId);
+            if (session?.AccessToken != null && session.AccessTokenSecret != null)
+            {
+                return (session.AccessToken, session.AccessTokenSecret);
+            }
+        }
+
+        var stored = _tokenStore.Get();
+        if (stored != null && !string.IsNullOrEmpty(stored.AccessToken))
+        {
+            return (stored.AccessToken, stored.AccessTokenSecret);
+        }
+        return (null, null);
+    }
+
+    private static DateTime? ParseDate(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return null;
+        if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt))
+            return dt;
+        return null;
     }
 
     private Player ParsePlayer(XElement element)

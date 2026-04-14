@@ -1,4 +1,13 @@
 {
+  "loadStatus": {
+    "title": "Status ładowania",
+    "auth": "Autoryzacja OAuth",
+    "ownTeam": "Moja drużyna",
+    "nextOpponent": "Najbliższy mecz",
+    "opponentTeam": "Drużyna przeciwnika",
+    "notAuthorized": "Brak autoryzacji — kliknij, aby rozpocząć",
+    "goToOAuth": "Przejdź do autoryzacji"
+  },
   "common": {
     "loading": "Ładowanie...",
     "error": "Błąd",

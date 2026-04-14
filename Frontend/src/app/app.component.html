@@ -1,21 +1,30 @@
 <div class="app-container">
   <header class="app-header">
     <div class="language-switcher">
-      <button 
-        class="lang-btn" 
+      <button
+        class="lang-btn"
         [class.active]="getCurrentLanguage() === 'pl'"
         (click)="switchLanguage('pl')">
         PL
       </button>
-      <button 
-        class="lang-btn" 
+      <button
+        class="lang-btn"
         [class.active]="getCurrentLanguage() === 'en'"
         (click)="switchLanguage('en')">
         EN
       </button>
     </div>
   </header>
-  <main class="app-content">
-    <router-outlet></router-outlet>
-  </main>
+  <div class="app-body">
+    <main class="app-content">
+      <div *ngIf="showAuthBanner" class="auth-banner">
+        <span>{{ 'loadStatus.notAuthorized' | translate }}</span>
+        <button class="auth-banner__btn" (click)="goToOAuth()">
+          {{ 'loadStatus.goToOAuth' | translate }}
+        </button>
+      </div>
+      <router-outlet></router-outlet>
+    </main>
+    <app-load-status-sidebar class="app-sidebar"></app-load-status-sidebar>
+  </div>
 </div>

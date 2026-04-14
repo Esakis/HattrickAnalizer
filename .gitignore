@@ -3,6 +3,7 @@ Backend/bin/
 Backend/obj/
 Backend/appsettings.json
 Backend/appsettings.Development.json
+Backend/oauth_tokens.json
 *.user
 *.suo
 .vs/

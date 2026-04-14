@@ -47,7 +47,49 @@
   }
 }
 
-.app-content {
+.app-body {
   flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1.5rem;
   padding: 2rem;
+  align-items: start;
+
+  @media (max-width: 960px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.app-content {
+  min-width: 0;
+}
+
+.app-sidebar {
+  position: sticky;
+  top: 1rem;
+}
+
+.auth-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: #fff3cd;
+  border: 1px solid #ffecb5;
+  color: #664d03;
+  border-radius: 6px;
+
+  &__btn {
+    margin-left: auto;
+    padding: 0.4rem 0.9rem;
+    background: #3498db;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+
+    &:hover { background: #2380c5; }
+  }
 }

@@ -18,3 +18,5 @@ Frontend/.env
 *.log
 .DS_Store
 Thumbs.db
+poradniki.txt
+a.txt

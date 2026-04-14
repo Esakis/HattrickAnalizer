@@ -15,109 +15,183 @@
   </div>
 
   <div class="input-section">
-    <div class="form-group">
-      <label for="myTeamId">{{ 'optimizer.myTeamIdLabel' | translate }}</label>
-      <input 
-        type="number" 
-        id="myTeamId" 
-        [(ngModel)]="myTeamId" 
-        placeholder="{{ 'optimizer.teamIdPlaceholder' | translate }}"
-        class="form-control">
-    </div>
+    <div class="three-column-input">
+      <div class="input-form">
+        <h3>⚙️ {{ 'optimizer.settings' | translate }}</h3>
+        <div class="form-group">
+          <label for="myTeamId">{{ 'optimizer.myTeamIdLabel' | translate }}</label>
+          <input 
+            type="number" 
+            id="myTeamId" 
+            [(ngModel)]="myTeamId" 
+            (change)="onMyTeamIdChange()"
+            placeholder="{{ 'optimizer.teamIdPlaceholder' | translate }}"
+            class="form-control">
+        </div>
 
-    <div class="form-group">
-      <label for="opponentTeamId">{{ 'optimizer.opponentTeamIdLabel' | translate }}</label>
-      <input 
-        type="number" 
-        id="opponentTeamId" 
-        [(ngModel)]="opponentTeamId" 
-        placeholder="{{ 'optimizer.teamIdPlaceholder' | translate }}"
-        class="form-control">
-    </div>
+        <div class="form-group">
+          <label for="opponentTeamId">{{ 'optimizer.opponentTeamIdLabel' | translate }}</label>
+          <input 
+            type="number" 
+            id="opponentTeamId" 
+            [(ngModel)]="opponentTeamId" 
+            (change)="onOpponentTeamIdChange()"
+            placeholder="{{ 'optimizer.teamIdPlaceholder' | translate }}"
+            class="form-control">
+        </div>
 
-    <div class="form-group">
-      <label for="tactic">{{ 'optimizer.tacticLabel' | translate }}</label>
-      <select 
-        id="tactic" 
-        [(ngModel)]="preferredTactic"
-        class="form-control">
-        <option *ngFor="let tactic of tactics" [value]="tactic.value">
-          {{ tactic.label }}
-        </option>
-      </select>
-    </div>
+        <div class="form-group">
+          <label for="tactic">{{ 'optimizer.tacticLabel' | translate }}</label>
+          <select 
+            id="tactic" 
+            [(ngModel)]="preferredTactic"
+            class="form-control">
+            <option *ngFor="let tactic of tactics" [value]="tactic.value">
+              {{ tactic.label }}
+            </option>
+          </select>
+        </div>
 
-    <button 
-      (click)="optimizeLineup()" 
-      [disabled]="loading"
-      class="btn-primary">
-      {{ loading ? ('optimizer.optimizing' | translate) : ('optimizer.optimizeLineup' | translate) }}
-    </button>
+        <button 
+          (click)="optimizeLineup()" 
+          [disabled]="loading"
+          class="btn-primary">
+          {{ loading ? ('optimizer.optimizing' | translate) : ('optimizer.optimizeLineup' | translate) }}
+        </button>
 
-    <div *ngIf="error" class="error-message">
-      {{ error }}
+        <div *ngIf="error" class="error-message">
+          {{ error }}
+        </div>
+      </div>
+
+      <div class="team-info my-team-info">
+        <h3>🏠 {{ 'optimizer.myTeam' | translate }}</h3>
+        <div *ngIf="loadingMyTeam" class="loading-indicator">
+          {{ 'common.loading' | translate }}...
+        </div>
+        <div *ngIf="!loadingMyTeam && myTeamPlayers.length > 0" class="team-stats">
+          <div class="stat-item">
+            <span class="stat-label">{{ 'players.playerCount' | translate }}:</span>
+            <span class="stat-value">{{ myTeamPlayers.length }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">{{ 'players.averageAge' | translate }}:</span>
+            <span class="stat-value">{{ myTeamAverageAge }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">{{ 'players.averageForm' | translate }}:</span>
+            <span class="stat-value">{{ myTeamAverageForm }}</span>
+          </div>
+          <div class="players-preview">
+            <div class="player-mini" *ngFor="let player of myTeamPlayers.slice(0, 5)">
+              <span class="player-name">{{ player.firstName.charAt(0) }}. {{ player.lastName }}</span>
+              <span class="player-form">{{ player.form }}</span>
+            </div>
+            <div *ngIf="myTeamPlayers.length > 5" class="more-players">
+              +{{ myTeamPlayers.length - 5 }} {{ 'common.more' | translate }}
+            </div>
+          </div>
+        </div>
+        <div *ngIf="!loadingMyTeam && myTeamPlayers.length === 0" class="no-data-small">
+          {{ 'optimizer.enterTeamId' | translate }}
+        </div>
+      </div>
+
+      <div class="team-info opponent-team-info">
+        <h3>⚔️ {{ 'optimizer.opponentTeam' | translate }}</h3>
+        <div *ngIf="loadingOpponentTeam" class="loading-indicator">
+          {{ 'common.loading' | translate }}...
+        </div>
+        <div *ngIf="!loadingOpponentTeam && opponentTeamPlayers.length > 0" class="team-stats">
+          <div class="stat-item">
+            <span class="stat-label">{{ 'players.playerCount' | translate }}:</span>
+            <span class="stat-value">{{ opponentTeamPlayers.length }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">{{ 'players.averageAge' | translate }}:</span>
+            <span class="stat-value">{{ opponentTeamAverageAge }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">{{ 'players.averageForm' | translate }}:</span>
+            <span class="stat-value">{{ opponentTeamAverageForm }}</span>
+          </div>
+          <div class="players-preview">
+            <div class="player-mini" *ngFor="let player of opponentTeamPlayers.slice(0, 5)">
+              <span class="player-name">{{ player.firstName.charAt(0) }}. {{ player.lastName }}</span>
+              <span class="player-form">{{ player.form }}</span>
+            </div>
+            <div *ngIf="opponentTeamPlayers.length > 5" class="more-players">
+              +{{ opponentTeamPlayers.length - 5 }} {{ 'common.more' | translate }}
+            </div>
+          </div>
+        </div>
+        <div *ngIf="!loadingOpponentTeam && opponentTeamPlayers.length === 0" class="no-data-small">
+          {{ 'optimizer.enterTeamId' | translate }}
+        </div>
+      </div>
     </div>
   </div>
 
   <div *ngIf="result" class="results-section">
-    <div class="comparison-section">
-      <h2>{{ 'optimizer.comparison.title' | translate }}</h2>
-      <div class="ratings-comparison">
-        <div class="rating-row">
-          <span class="rating-label">{{ 'optimizer.comparison.midfield' | translate }}</span>
-          <div class="rating-bars">
-            <div class="bar my-team" [style.width.%]="(result.comparison.myTeamRatings.midfield / (result.comparison.myTeamRatings.midfield + result.comparison.opponentRatings.midfield)) * 100">
-              {{ result.comparison.myTeamRatings.midfield | number:'1.0-0' }}
+    <div class="two-column-layout">
+      <div class="comparison-section">
+        <h2>{{ 'optimizer.comparison.title' | translate }}</h2>
+        <div class="ratings-comparison">
+          <div class="rating-row">
+            <span class="rating-label">{{ 'optimizer.comparison.midfield' | translate }}</span>
+            <div class="rating-bars">
+              <div class="bar my-team" [style.width.%]="(result.comparison.myTeamRatings.midfield / (result.comparison.myTeamRatings.midfield + result.comparison.opponentRatings.midfield)) * 100">
+                {{ result.comparison.myTeamRatings.midfield | number:'1.0-0' }}
+              </div>
+              <div class="bar opponent" [style.width.%]="(result.comparison.opponentRatings.midfield / (result.comparison.myTeamRatings.midfield + result.comparison.opponentRatings.midfield)) * 100">
+                {{ result.comparison.opponentRatings.midfield | number:'1.0-0' }}
+              </div>
             </div>
-            <div class="bar opponent" [style.width.%]="(result.comparison.opponentRatings.midfield / (result.comparison.myTeamRatings.midfield + result.comparison.opponentRatings.midfield)) * 100">
-              {{ result.comparison.opponentRatings.midfield | number:'1.0-0' }}
+          </div>
+
+          <div class="rating-row">
+            <span class="rating-label">{{ 'optimizer.comparison.centralDefense' | translate }}</span>
+            <div class="rating-bars">
+              <div class="bar my-team" [style.width.%]="(result.comparison.myTeamRatings.centralDefense / (result.comparison.myTeamRatings.centralDefense + result.comparison.opponentRatings.centralDefense)) * 100">
+                {{ result.comparison.myTeamRatings.centralDefense | number:'1.0-0' }}
+              </div>
+              <div class="bar opponent" [style.width.%]="(result.comparison.opponentRatings.centralDefense / (result.comparison.myTeamRatings.centralDefense + result.comparison.opponentRatings.centralDefense)) * 100">
+                {{ result.comparison.opponentRatings.centralDefense | number:'1.0-0' }}
+              </div>
+            </div>
+          </div>
+
+          <div class="rating-row">
+            <span class="rating-label">{{ 'optimizer.comparison.centralAttack' | translate }}</span>
+            <div class="rating-bars">
+              <div class="bar my-team" [style.width.%]="(result.comparison.myTeamRatings.centralAttack / (result.comparison.myTeamRatings.centralAttack + result.comparison.opponentRatings.centralAttack)) * 100">
+                {{ result.comparison.myTeamRatings.centralAttack | number:'1.0-0' }}
+              </div>
+              <div class="bar opponent" [style.width.%]="(result.comparison.opponentRatings.centralAttack / (result.comparison.myTeamRatings.centralAttack + result.comparison.opponentRatings.centralAttack)) * 100">
+                {{ result.comparison.opponentRatings.centralAttack | number:'1.0-0' }}
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="rating-row">
-          <span class="rating-label">{{ 'optimizer.comparison.centralDefense' | translate }}</span>
-          <div class="rating-bars">
-            <div class="bar my-team" [style.width.%]="(result.comparison.myTeamRatings.centralDefense / (result.comparison.myTeamRatings.centralDefense + result.comparison.opponentRatings.centralDefense)) * 100">
-              {{ result.comparison.myTeamRatings.centralDefense | number:'1.0-0' }}
-            </div>
-            <div class="bar opponent" [style.width.%]="(result.comparison.opponentRatings.centralDefense / (result.comparison.myTeamRatings.centralDefense + result.comparison.opponentRatings.centralDefense)) * 100">
-              {{ result.comparison.opponentRatings.centralDefense | number:'1.0-0' }}
-            </div>
+        <div class="strengths-weaknesses">
+          <div class="strengths" *ngIf="result.comparison.strengths.length > 0">
+            <h3>💪 {{ 'optimizer.strengths' | translate }}</h3>
+            <ul>
+              <li *ngFor="let strength of result.comparison.strengths">{{ strength }}</li>
+            </ul>
           </div>
-        </div>
 
-        <div class="rating-row">
-          <span class="rating-label">{{ 'optimizer.comparison.centralAttack' | translate }}</span>
-          <div class="rating-bars">
-            <div class="bar my-team" [style.width.%]="(result.comparison.myTeamRatings.centralAttack / (result.comparison.myTeamRatings.centralAttack + result.comparison.opponentRatings.centralAttack)) * 100">
-              {{ result.comparison.myTeamRatings.centralAttack | number:'1.0-0' }}
-            </div>
-            <div class="bar opponent" [style.width.%]="(result.comparison.opponentRatings.centralAttack / (result.comparison.myTeamRatings.centralAttack + result.comparison.opponentRatings.centralAttack)) * 100">
-              {{ result.comparison.opponentRatings.centralAttack | number:'1.0-0' }}
-            </div>
+          <div class="weaknesses" *ngIf="result.comparison.weaknesses.length > 0">
+            <h3>⚠️ {{ 'optimizer.weaknesses' | translate }}</h3>
+            <ul>
+              <li *ngFor="let weakness of result.comparison.weaknesses">{{ weakness }}</li>
+            </ul>
           </div>
         </div>
       </div>
 
-      <div class="strengths-weaknesses">
-        <div class="strengths" *ngIf="result.comparison.strengths.length > 0">
-          <h3>💪 {{ 'optimizer.strengths' | translate }}</h3>
-          <ul>
-            <li *ngFor="let strength of result.comparison.strengths">{{ strength }}</li>
-          </ul>
-        </div>
-
-        <div class="weaknesses" *ngIf="result.comparison.weaknesses.length > 0">
-          <h3>⚠️ {{ 'optimizer.weaknesses' | translate }}</h3>
-          <ul>
-            <li *ngFor="let weakness of result.comparison.weaknesses">{{ weakness }}</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="lineup-section">
+      <div class="lineup-section">
       <h2>{{ 'optimizer.optimalLineup' | translate }}</h2>
       <div class="lineup-field">
         <div class="position-row">
@@ -169,6 +243,7 @@
           </div>
         </div>
       </div>
+    </div>
     </div>
 
     <div class="recommendations-section">

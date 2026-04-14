@@ -21,7 +21,8 @@
     "confirm": "Potwierdź",
     "close": "Zamknij",
     "copy": "Kopiuj",
-    "copiedToClipboard": "Skopiowano do schowka!"
+    "copiedToClipboard": "Skopiowano do schowka!",
+    "more": "więcej"
   },
   "navigation": {
     "players": "Moi Zawodnicy",
@@ -58,6 +59,7 @@
     "age": "wiek",
     "form": "Forma",
     "stamina": "Kondycja",
+    "playerCount": "Liczba zawodników",
     "skills": {
       "keeper": "Bramkarstwo",
       "defending": "Obrona",
@@ -110,7 +112,11 @@
       "counter": "Kontratak",
       "attackMiddle": "Atak środkiem",
       "attackWings": "Atak skrzydłami"
-    }
+    },
+    "settings": "Ustawienia",
+    "myTeam": "Moja Drużyna",
+    "opponentTeam": "Drużyna Przeciwnika",
+    "enterTeamId": "Wprowadź ID drużyny"
   },
   "oauth": {
     "title": "Konfiguracja OAuth Hattrick",

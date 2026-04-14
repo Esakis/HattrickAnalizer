@@ -1,18 +1,18 @@
 .load-sidebar {
   background: #1e2430;
   color: #e7ecf5;
-  padding: 16px;
-  border-radius: 8px;
-  min-width: 240px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
-  font-size: 0.9rem;
+  padding: 10px;
+  border-radius: 6px;
+  min-width: 200px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+  font-size: 0.8rem;
 
   &__title {
-    margin: 0 0 12px;
-    font-size: 1rem;
+    margin: 0 0 8px;
+    font-size: 0.85rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
     opacity: 0.85;
   }
 
@@ -22,18 +22,18 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
   }
 
   &__item {
     display: grid;
-    grid-template-columns: 22px 1fr;
-    column-gap: 8px;
+    grid-template-columns: 18px 1fr;
+    column-gap: 6px;
     align-items: center;
-    padding: 8px 10px;
+    padding: 6px 8px;
     background: rgba(255, 255, 255, 0.04);
-    border-radius: 6px;
-    border-left: 3px solid transparent;
+    border-radius: 4px;
+    border-left: 2px solid transparent;
     transition: border-color 120ms ease, background 120ms ease;
 
     &.is-loading { border-left-color: #f5b841; background: rgba(245, 184, 65, 0.08); }
@@ -51,8 +51,8 @@
 
   &__msg {
     grid-column: 2;
-    margin-top: 4px;
-    font-size: 0.78rem;
+    margin-top: 3px;
+    font-size: 0.7rem;
     color: #ffb4b4;
     word-break: break-word;
   }

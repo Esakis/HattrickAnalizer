@@ -21,7 +21,8 @@
     "confirm": "Confirm",
     "close": "Close",
     "copy": "Copy",
-    "copiedToClipboard": "Copied to clipboard!"
+    "copiedToClipboard": "Copied to clipboard!",
+    "more": "more"
   },
   "navigation": {
     "players": "My Players",
@@ -58,6 +59,7 @@
     "age": "years old",
     "form": "Form",
     "stamina": "Stamina",
+    "playerCount": "Player count",
     "skills": {
       "keeper": "Goalkeeping",
       "defending": "Defending",
@@ -110,7 +112,11 @@
       "counter": "Counter",
       "attackMiddle": "Attack Middle",
       "attackWings": "Attack Wings"
-    }
+    },
+    "settings": "Settings",
+    "myTeam": "My Team",
+    "opponentTeam": "Opponent Team",
+    "enterTeamId": "Enter team ID"
   },
   "oauth": {
     "title": "Hattrick OAuth Configuration",

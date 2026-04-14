@@ -22,6 +22,7 @@ public class HattrickApiService
     private readonly OAuthService _oauthService;
     private readonly TokenStore _tokenStore;
     private readonly string _baseUrl;
+    private readonly Dictionary<int, TeamRatings> _mockRatingsCache = new();
 
     public HattrickApiService(HttpClient httpClient, IConfiguration configuration, OAuthService oauthService, TokenStore tokenStore)
     {
@@ -158,7 +159,7 @@ public class HattrickApiService
         var (accessToken, accessTokenSecret) = ResolveTokens(sessionId);
         if (accessToken == null || accessTokenSecret == null)
         {
-            return GenerateMockRatings();
+            return GenerateMockRatings(teamId);
         }
 
         try
@@ -175,7 +176,7 @@ public class HattrickApiService
         }
         catch
         {
-            return GenerateMockRatings();
+            return GenerateMockRatings(teamId);
         }
     }
 
@@ -237,7 +238,7 @@ public class HattrickApiService
             .FirstOrDefault(t => int.Parse(t.Element("TeamID")?.Value ?? "0") == teamId);
 
         if (teamElement == null)
-            return GenerateMockRatings();
+            return GenerateMockRatings(teamId);
 
         return new TeamRatings
         {
@@ -284,10 +285,17 @@ public class HattrickApiService
         return players;
     }
 
-    private TeamRatings GenerateMockRatings()
+    private TeamRatings GenerateMockRatings(int teamId)
     {
-        var random = new Random();
-        return new TeamRatings
+        // Sprawdź czy mamy już wygenerowane wartości dla tego teamId
+        if (_mockRatingsCache.TryGetValue(teamId, out var cachedRatings))
+        {
+            return cachedRatings;
+        }
+
+        // Użyj teamId jako seed dla Random, aby wartości były deterministyczne
+        var random = new Random(teamId);
+        var ratings = new TeamRatings
         {
             MidfieldRating = random.Next(30, 80),
             RightDefenseRating = random.Next(20, 60),
@@ -297,5 +305,9 @@ public class HattrickApiService
             CentralAttackRating = random.Next(20, 60),
             LeftAttackRating = random.Next(15, 50)
         };
+
+        // Cachuj wygenerowane wartości
+        _mockRatingsCache[teamId] = ratings;
+        return ratings;
     }
 }

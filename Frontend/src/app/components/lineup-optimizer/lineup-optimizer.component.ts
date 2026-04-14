@@ -3,6 +3,7 @@ import { HattrickApiService } from '../../services/hattrick-api.service';
 import { OptimizerRequest, OptimizerResponse } from '../../models/lineup.model';
 import { TranslateService } from '@ngx-translate/core';
 import { DataCacheService } from '../../services/data-cache.service';
+import { Player } from '../../models/player.model';
 
 @Component({
   selector: 'app-lineup-optimizer',
@@ -18,6 +19,13 @@ export class LineupOptimizerComponent implements OnInit {
   loading: boolean = false;
   error: string | null = null;
 
+  myTeamPlayers: Player[] = [];
+  opponentTeamPlayers: Player[] = [];
+  loadingMyTeam: boolean = false;
+  loadingOpponentTeam: boolean = false;
+  lastLoadedMyTeamId: number | null = null;
+  lastLoadedOpponentId: number | null = null;
+
   tactics: { value: string; label: string }[] = [];
 
   constructor(
@@ -32,13 +40,20 @@ export class LineupOptimizerComponent implements OnInit {
     this.cache.auth$.subscribe(auth => {
       if (auth.authorized && auth.ownTeamId && !this.myTeamId) {
         this.myTeamId = auth.ownTeamId;
+        this.loadMyTeam();
       }
     });
     this.cache.nextOpponent$.subscribe(opp => {
       if (opp?.opponentTeamId && !this.opponentTeamId) {
         this.opponentTeamId = opp.opponentTeamId;
+        this.loadOpponentTeam();
       }
     });
+
+    const cachedTeam = this.cache.ownTeam$.value;
+    if (cachedTeam?.players?.length) {
+      this.myTeamPlayers = cachedTeam.players;
+    }
   }
 
   private initializeTranslations(): void {
@@ -100,5 +115,91 @@ export class LineupOptimizerComponent implements OnInit {
       'LFW': this.translate.instant('optimizer.positions.LFW')
     };
     return labels[position] || position;
+  }
+
+  loadMyTeam(): void {
+    if (!this.myTeamId) return;
+    
+    // Nie pobieraj ponownie jeśli dane są już załadowane dla tego samego ID
+    if (this.myTeamPlayers.length > 0 && this.lastLoadedMyTeamId === this.myTeamId) {
+      return;
+    }
+    
+    this.loadingMyTeam = true;
+    this.hattrickApi.getPlayers(this.myTeamId).subscribe({
+      next: (players) => {
+        this.myTeamPlayers = players;
+        this.lastLoadedMyTeamId = this.myTeamId;
+        this.loadingMyTeam = false;
+      },
+      error: () => {
+        this.loadingMyTeam = false;
+      }
+    });
+  }
+
+  loadOpponentTeam(): void {
+    if (!this.opponentTeamId) return;
+    
+    // Nie pobieraj ponownie jeśli dane są już załadowane dla tego samego ID
+    if (this.opponentTeamPlayers.length > 0 && this.lastLoadedOpponentId === this.opponentTeamId) {
+      return;
+    }
+    
+    this.loadingOpponentTeam = true;
+    this.hattrickApi.getPlayers(this.opponentTeamId).subscribe({
+      next: (players) => {
+        this.opponentTeamPlayers = players;
+        this.lastLoadedOpponentId = this.opponentTeamId;
+        this.loadingOpponentTeam = false;
+      },
+      error: () => {
+        this.loadingOpponentTeam = false;
+      }
+    });
+  }
+
+  onMyTeamIdChange(): void {
+    if (this.myTeamId) {
+      // Wyczyść dane jeśli ID się zmieniło
+      if (this.lastLoadedMyTeamId !== this.myTeamId) {
+        this.myTeamPlayers = [];
+      }
+      this.loadMyTeam();
+    }
+  }
+
+  onOpponentTeamIdChange(): void {
+    if (this.opponentTeamId) {
+      // Wyczyść dane jeśli ID się zmieniło
+      if (this.lastLoadedOpponentId !== this.opponentTeamId) {
+        this.opponentTeamPlayers = [];
+      }
+      this.loadOpponentTeam();
+    }
+  }
+
+  get myTeamAverageAge(): string {
+    if (this.myTeamPlayers.length === 0) return '0.0';
+    const sum = this.myTeamPlayers.reduce((acc, p) => acc + p.age, 0);
+    return (sum / this.myTeamPlayers.length).toFixed(1);
+  }
+
+  get myTeamAverageForm(): string {
+    if (this.myTeamPlayers.length === 0) return '0.0';
+    const sum = this.myTeamPlayers.reduce((acc, p) => acc + p.form, 0);
+    return (sum / this.myTeamPlayers.length).toFixed(1);
+  }
+
+  get opponentTeamAverageAge(): string {
+    if (this.opponentTeamPlayers.length === 0) return '0.0';
+    const sum = this.opponentTeamPlayers.reduce((acc, p) => acc + p.age, 0);
+    return (sum / this.opponentTeamPlayers.length).toFixed(1);
+  }
+
+  get opponentTeamAverageForm(): string {
+    if (this.opponentTeamPlayers.length === 0) return '0.0';
+    const sum = this.opponentTeamPlayers.reduce((acc, p) => acc + p.form, 0);
+    return (sum / this.opponentTeamPlayers.length).toFixed(1);
   }
 }

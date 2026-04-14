@@ -5,6 +5,7 @@ export interface Lineup {
   tacticType: string;
   tacticSkill: string;
   predictedRatings: LineupRatings;
+  formation?: string;
 }
 
 export interface LineupPosition {

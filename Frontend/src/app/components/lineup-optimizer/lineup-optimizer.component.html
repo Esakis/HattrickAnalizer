@@ -193,10 +193,18 @@
 
       <div class="lineup-section">
       <h2>{{ 'optimizer.optimalLineup' | translate }}</h2>
+      <div *ngIf="result.optimalLineup.formation" class="formation-info">
+        <span class="formation-label">{{ 'optimizer.formation' | translate }}:</span>
+        <span class="formation-value">{{ result.optimalLineup.formation }}</span>
+      </div>
+      <div *ngIf="result.optimalLineup.tacticType" class="tactic-info">
+        <span class="tactic-label">{{ 'optimizer.tactic' | translate }}:</span>
+        <span class="tactic-value">{{ result.optimalLineup.tacticType }}</span>
+      </div>
       <div class="lineup-field">
         <div class="position-row">
           <div class="position" *ngFor="let pos of ['GK']">
-            <div class="position-label">{{ getPositionLabel(pos) }}</div>
+            <div class="position-label tooltip" [attr.data-tooltip]="getPositionDescription(pos)">{{ getPositionLabel(pos) }}</div>
             <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
               <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
               <div class="player-stats">
@@ -208,8 +216,8 @@
         </div>
 
         <div class="position-row">
-          <div class="position" *ngFor="let pos of ['RWB', 'RCD', 'LCD', 'LWB']">
-            <div class="position-label">{{ getPositionLabel(pos) }}</div>
+          <div class="position" *ngFor="let pos of ['RWB', 'RCD', 'CD', 'LCD', 'LWB']">
+            <div class="position-label tooltip" [attr.data-tooltip]="getPositionDescription(pos)">{{ getPositionLabel(pos) }}</div>
             <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
               <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
               <div class="player-stats">
@@ -220,8 +228,8 @@
         </div>
 
         <div class="position-row">
-          <div class="position" *ngFor="let pos of ['RW', 'CM', 'LW']">
-            <div class="position-label">{{ getPositionLabel(pos) }}</div>
+          <div class="position" *ngFor="let pos of ['RW', 'RIM', 'IM', 'LIM', 'LW']">
+            <div class="position-label tooltip" [attr.data-tooltip]="getPositionDescription(pos)">{{ getPositionLabel(pos) }}</div>
             <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
               <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
               <div class="player-stats">
@@ -232,8 +240,8 @@
         </div>
 
         <div class="position-row">
-          <div class="position" *ngFor="let pos of ['RFW', 'CFW', 'LFW']">
-            <div class="position-label">{{ getPositionLabel(pos) }}</div>
+          <div class="position" *ngFor="let pos of ['RFW', 'FW', 'LFW']">
+            <div class="position-label tooltip" [attr.data-tooltip]="getPositionDescription(pos)">{{ getPositionLabel(pos) }}</div>
             <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
               <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
               <div class="player-stats">

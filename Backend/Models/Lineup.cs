@@ -3,9 +3,10 @@ namespace HattrickAnalizer.Models;
 public class Lineup
 {
     public Dictionary<string, LineupPosition> Positions { get; set; } = new();
-    public string TacticType { get; set; } = "Normal";
-    public string TacticSkill { get; set; } = "None";
+    public string TacticType { get; set; } = "";
+    public string TacticSkill { get; set; } = "";
     public LineupRatings PredictedRatings { get; set; } = new();
+    public string? Formation { get; set; }
 }
 
 public class LineupPosition

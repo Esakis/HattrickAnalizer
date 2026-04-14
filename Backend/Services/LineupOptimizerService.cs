@@ -5,37 +5,18 @@ namespace HattrickAnalizer.Services;
 public class LineupOptimizerService
 {
     private readonly HattrickApiService _hattrickApi;
+    private readonly AdvancedLineupOptimizer _advancedOptimizer;
 
     public LineupOptimizerService(HattrickApiService hattrickApi)
     {
         _hattrickApi = hattrickApi;
+        _advancedOptimizer = new AdvancedLineupOptimizer(hattrickApi);
     }
 
     public async Task<OptimizerResponse> OptimizeLineupAsync(OptimizerRequest request)
     {
-        var myTeam = await _hattrickApi.GetTeamDetailsAsync(request.MyTeamId);
-        var opponentRatings = await _hattrickApi.GetOpponentRatingsAsync(request.OpponentTeamId, 0);
-
-        var lineup = GenerateOptimalLineup(myTeam.Players, opponentRatings, request.PreferredTactic);
-        var myRatings = CalculateLineupRatings(lineup);
-        var opponentLineupRatings = ConvertToLineupRatings(opponentRatings);
-
-        var comparison = new TeamComparison
-        {
-            MyTeamRatings = myRatings,
-            OpponentRatings = opponentLineupRatings,
-            Strengths = IdentifyStrengths(myRatings, opponentLineupRatings),
-            Weaknesses = IdentifyWeaknesses(myRatings, opponentLineupRatings)
-        };
-
-        var recommendations = GenerateRecommendations(comparison, lineup);
-
-        return new OptimizerResponse
-        {
-            OptimalLineup = lineup,
-            Recommendations = recommendations,
-            Comparison = comparison
-        };
+        // Uyj zaawansowanego optymalizatora opartego na wiedzy z poradników
+        return await _advancedOptimizer.OptimizeLineupAsync(request);
     }
 
     private Lineup GenerateOptimalLineup(List<Player> players, TeamRatings opponentRatings, string tactic)

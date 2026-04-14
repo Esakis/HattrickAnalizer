@@ -32,11 +32,13 @@ export class LineupOptimizerComponent implements OnInit {
     private hattrickApi: HattrickApiService,
     private translate: TranslateService,
     private cache: DataCacheService
-  ) {
-    this.initializeTranslations();
-  }
+  ) {}
 
   ngOnInit(): void {
+    this.initializeTranslations();
+    this.translate.onLangChange.subscribe(() => this.initializeTranslations());
+    this.translate.onTranslationChange.subscribe(() => this.initializeTranslations());
+
     this.cache.auth$.subscribe(auth => {
       if (auth.authorized && auth.ownTeamId && !this.myTeamId) {
         this.myTeamId = auth.ownTeamId;
@@ -105,16 +107,62 @@ export class LineupOptimizerComponent implements OnInit {
       'GK': this.translate.instant('optimizer.positions.GK'),
       'RWB': this.translate.instant('optimizer.positions.RWB'),
       'RCD': this.translate.instant('optimizer.positions.RCD'),
+      'CD': this.translate.instant('optimizer.positions.CD'),
       'LCD': this.translate.instant('optimizer.positions.LCD'),
       'LWB': this.translate.instant('optimizer.positions.LWB'),
       'RW': this.translate.instant('optimizer.positions.RW'),
-      'CM': this.translate.instant('optimizer.positions.CM'),
+      'RIM': this.translate.instant('optimizer.positions.RIM'),
+      'IM': this.translate.instant('optimizer.positions.IM'),
+      'LIM': this.translate.instant('optimizer.positions.LIM'),
       'LW': this.translate.instant('optimizer.positions.LW'),
       'RFW': this.translate.instant('optimizer.positions.RFW'),
-      'CFW': this.translate.instant('optimizer.positions.CFW'),
-      'LFW': this.translate.instant('optimizer.positions.LFW')
+      'FW': this.translate.instant('optimizer.positions.FW'),
+      'LFW': this.translate.instant('optimizer.positions.LFW'),
+      // Dodatkowe pozycje z formacji
+      'CDO': this.translate.instant('optimizer.positions.CDO') || 'CDO',
+      'CDTW': this.translate.instant('optimizer.positions.CDTW') || 'CDTW',
+      'WBD': this.translate.instant('optimizer.positions.WBD') || 'WBD',
+      'WBN': this.translate.instant('optimizer.positions.WBN') || 'WBN',
+      'WBO': this.translate.instant('optimizer.positions.WBO') || 'WBO',
+      'WBTM': this.translate.instant('optimizer.positions.WBTM') || 'WBTM',
+      'WO': this.translate.instant('optimizer.positions.WO') || 'WO',
+      'WD': this.translate.instant('optimizer.positions.WD') || 'WD',
+      'WTM': this.translate.instant('optimizer.positions.WTM') || 'WTM',
+      'FTW': this.translate.instant('optimizer.positions.FTW') || 'FTW',
+      'DF': this.translate.instant('optimizer.positions.DF') || 'DF'
     };
     return labels[position] || position;
+  }
+
+  getPositionDescription(position: string): string {
+    const descriptions: { [key: string]: string } = {
+      'GK': 'Bramkarz',
+      'RWB': 'Prawy Boczny Obroca',
+      'RCD': 'Prawy rodkowy Obroca',
+      'CD': 'rodkowy Obroca',
+      'LCD': 'Lewy rodkowy Obroca',
+      'LWB': 'Lewy Boczny Obroca',
+      'RW': 'Prawy Pomocnik',
+      'RIM': 'Prawy Wewntrzny Pomocnik',
+      'IM': 'rodkowy Pomocnik',
+      'LIM': 'Lewy Wewntrzny Pomocnik',
+      'LW': 'Lewy Pomocnik',
+      'RFW': 'Prawy Napastnik',
+      'FW': 'rodkowy Napastnik',
+      'LFW': 'Lewy Napastnik',
+      'CDO': 'rodkowy Obroca Ofensywny',
+      'CDTW': 'rodkowy Obroca do Skrzyda',
+      'WBD': 'Prawy Boczny Obroca Defensywny',
+      'WBN': 'Prawy Boczny Obroca Normalny',
+      'WBO': 'Prawy Boczny Obroca Ofensywny',
+      'WBTM': 'Prawy Boczny Obroca do rodka',
+      'WO': 'Prawy Skrzydowy Ofensywny',
+      'WD': 'Prawy Skrzydowy Defensywny',
+      'WTM': 'Prawy Skrzydowy do rodka',
+      'FTW': 'Napastnik do Skrzyda',
+      'DF': 'Napastnik Defensywny'
+    };
+    return descriptions[position] || position;
   }
 
   loadMyTeam(): void {

@@ -82,13 +82,33 @@
             <span class="stat-label">{{ 'players.averageForm' | translate }}:</span>
             <span class="stat-value">{{ myTeamAverageForm }}</span>
           </div>
-          <div class="players-preview">
-            <div class="player-mini" *ngFor="let player of myTeamPlayers.slice(0, 5)">
-              <span class="player-name">{{ player.firstName.charAt(0) }}. {{ player.lastName }}</span>
-              <span class="player-form">{{ player.form }}</span>
+          
+          <!-- Statystyki druzy -->
+          <div *ngIf="loadingMyTeamStats" class="loading-indicator">
+            {{ 'common.loading' | translate }} {{ 'teamStats.stats' | translate }}...
+          </div>
+          <div *ngIf="!loadingMyTeamStats && myTeamStats" class="team-match-stats">
+            <div class="stat-item">
+              <span class="stat-label">{{ 'teamStats.winRate' | translate }}:</span>
+              <span class="stat-value">{{ winRate }}%</span>
             </div>
-            <div *ngIf="myTeamPlayers.length > 5" class="more-players">
-              +{{ myTeamPlayers.length - 5 }} {{ 'common.more' | translate }}
+            <div class="stat-item">
+              <span class="stat-label">{{ 'teamStats.goalDifference' | translate }}:</span>
+              <span class="stat-value">{{ goalDifference }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">{{ 'teamStats.formation' | translate }}:</span>
+              <span class="stat-value">{{ myTeamStats.statistics?.mostCommonFormation }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">{{ 'teamStats.form' | translate }}:</span>
+              <div class="form-display">
+                <span *ngFor="let result of myTeamStats.statistics?.recentResults" 
+                      class="form-result" 
+                      [class]="result === 'W' ? 'win' : result === 'D' ? 'draw' : 'loss'">
+                  {{ result }}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -115,13 +135,33 @@
             <span class="stat-label">{{ 'players.averageForm' | translate }}:</span>
             <span class="stat-value">{{ opponentTeamAverageForm }}</span>
           </div>
-          <div class="players-preview">
-            <div class="player-mini" *ngFor="let player of opponentTeamPlayers.slice(0, 5)">
-              <span class="player-name">{{ player.firstName.charAt(0) }}. {{ player.lastName }}</span>
-              <span class="player-form">{{ player.form }}</span>
+          
+          <!-- Statystyki druzy przeciwnika -->
+          <div *ngIf="loadingOpponentTeamStats" class="loading-indicator">
+            {{ 'common.loading' | translate }} {{ 'teamStats.stats' | translate }}...
+          </div>
+          <div *ngIf="!loadingOpponentTeamStats && opponentTeamStats" class="team-match-stats">
+            <div class="stat-item">
+              <span class="stat-label">{{ 'teamStats.winRate' | translate }}:</span>
+              <span class="stat-value">{{ opponentTeamStats.statistics?.totalMatches ? opponentTeamStats.statistics.winRate.toFixed(1) : '0.0' }}%</span>
             </div>
-            <div *ngIf="opponentTeamPlayers.length > 5" class="more-players">
-              +{{ opponentTeamPlayers.length - 5 }} {{ 'common.more' | translate }}
+            <div class="stat-item">
+              <span class="stat-label">{{ 'teamStats.goalDifference' | translate }}:</span>
+              <span class="stat-value">{{ opponentTeamStats.statistics?.goalDifference }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">{{ 'teamStats.formation' | translate }}:</span>
+              <span class="stat-value">{{ opponentTeamStats.statistics?.mostCommonFormation }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">{{ 'teamStats.form' | translate }}:</span>
+              <div class="form-display">
+                <span *ngFor="let result of opponentTeamStats.statistics?.recentResults" 
+                      class="form-result" 
+                      [class]="result === 'W' ? 'win' : result === 'D' ? 'draw' : 'loss'">
+                  {{ result }}
+                </span>
+              </div>
             </div>
           </div>
         </div>

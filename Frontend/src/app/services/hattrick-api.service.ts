@@ -22,6 +22,10 @@ export class HattrickApiService {
     return this.http.get<Player[]>(`${this.apiUrl}/team/${teamId}/players`);
   }
 
+  getTeamMatchStats(teamId: number): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/team/${teamId}/match-stats`);
+  }
+
   getNextOpponent(): Observable<NextOpponent> {
     return this.http.get<NextOpponent>(`${this.apiUrl}/team/next-opponent`);
   }

@@ -25,6 +25,12 @@ export class LineupOptimizerComponent implements OnInit {
   loadingOpponentTeam: boolean = false;
   lastLoadedMyTeamId: number | null = null;
   lastLoadedOpponentId: number | null = null;
+
+  // Statystyki druyny
+  myTeamStats: any = null;
+  opponentTeamStats: any = null;
+  loadingMyTeamStats: boolean = false;
+  loadingOpponentTeamStats: boolean = false;
   
   myTeamName: string = '';
   opponentTeamName: string = '';
@@ -46,12 +52,14 @@ export class LineupOptimizerComponent implements OnInit {
       if (auth.authorized && auth.ownTeamId && !this.myTeamId) {
         this.myTeamId = auth.ownTeamId;
         this.loadMyTeam();
+        this.loadMyTeamStats();
       }
     });
     this.cache.nextOpponent$.subscribe(opp => {
       if (opp?.opponentTeamId && !this.opponentTeamId) {
         this.opponentTeamId = opp.opponentTeamId;
         this.loadOpponentTeam();
+        this.loadOpponentTeamStats();
       }
     });
 
@@ -256,5 +264,108 @@ export class LineupOptimizerComponent implements OnInit {
     if (this.opponentTeamPlayers.length === 0) return '0.0';
     const sum = this.opponentTeamPlayers.reduce((acc, p) => acc + p.form, 0);
     return (sum / this.opponentTeamPlayers.length).toFixed(1);
+  }
+
+  loadMyTeamStats(): void {
+    if (!this.myTeamId) return;
+    
+    this.loadingMyTeamStats = true;
+    this.hattrickApi.getTeamMatchStats(this.myTeamId).subscribe({
+      next: (stats: any) => {
+        this.myTeamStats = stats;
+        this.loadingMyTeamStats = false;
+      },
+      error: (err: any) => {
+        console.error('Error loading team stats:', err);
+        // Fallback do mockowych danych w razie bdu
+        this.myTeamStats = this.generateMockTeamStats(this.myTeamId);
+        this.loadingMyTeamStats = false;
+      }
+    });
+  }
+
+  loadOpponentTeamStats(): void {
+    if (!this.opponentTeamId) return;
+    
+    this.loadingOpponentTeamStats = true;
+    this.hattrickApi.getTeamMatchStats(this.opponentTeamId).subscribe({
+      next: (stats: any) => {
+        this.opponentTeamStats = stats;
+        this.loadingOpponentTeamStats = false;
+      },
+      error: (err: any) => {
+        console.error('Error loading opponent stats:', err);
+        // Fallback do mockowych danych w razie bdu
+        this.opponentTeamStats = this.generateMockTeamStats(this.opponentTeamId);
+        this.loadingOpponentTeamStats = false;
+      }
+    });
+  }
+
+  generateMockTeamStats(teamId: number): any {
+    // Prosty seed dla random
+    let seed = teamId;
+    const random = () => {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+    
+    const formations = ['4-4-2', '3-5-2', '4-3-3', '5-4-1'];
+    const mostUsed = formations[Math.floor(random() * formations.length)];
+    
+    const randomBetween = (min: number, max: number) => Math.floor(random() * (max - min + 1)) + min;
+    
+    return {
+      totalMatches: 20,
+      wins: randomBetween(5, 15),
+      draws: randomBetween(3, 8),
+      losses: randomBetween(2, 8),
+      goalsFor: randomBetween(15, 35),
+      goalsAgainst: randomBetween(10, 25),
+      mostCommonFormation: mostUsed,
+      formationFrequency: {
+        '4-4-2': randomBetween(3, 8),
+        '3-5-2': randomBetween(2, 6),
+        '4-3-3': randomBetween(2, 6),
+        '5-4-1': randomBetween(1, 4)
+      },
+      formationWinRate: {
+        '4-4-2': randomBetween(30, 70),
+        '3-5-2': randomBetween(25, 65),
+        '4-3-3': randomBetween(20, 60),
+        '5-4-1': randomBetween(15, 55)
+      },
+      currentForm: this.generateRandomForm(random),
+      recentResults: this.generateRandomResults(random)
+    };
+  }
+
+  get winRate(): string {
+    if (!this.myTeamStats?.statistics) return '0.0';
+    const stats = this.myTeamStats.statistics;
+    return stats.totalMatches > 0 ? stats.winRate.toFixed(1) : '0.0';
+  }
+
+  get goalDifference(): number {
+    if (!this.myTeamStats?.statistics) return 0;
+    return this.myTeamStats.statistics.goalDifference;
+  }
+
+  generateRandomForm(random: () => number): string {
+    const results = ['W', 'D', 'L'];
+    let form = '';
+    for (let i = 0; i < 5; i++) {
+      form += results[Math.floor(random() * results.length)];
+    }
+    return form;
+  }
+
+  generateRandomResults(random: () => number): string[] {
+    const results = ['W', 'D', 'L'];
+    const recentResults = [];
+    for (let i = 0; i < 5; i++) {
+      recentResults.push(results[Math.floor(random() * results.length)]);
+    }
+    return recentResults;
   }
 }

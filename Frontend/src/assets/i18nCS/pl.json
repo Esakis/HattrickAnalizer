@@ -465,6 +465,14 @@
     "poor": "kiepska",
     "wretched": "marna",
     "disastrous": "katastrofalna",
-    "nonExistent": "nieistniejąca"
+    "nonExistent": "nieistniejea"
+  },
+  "teamStats": {
+    "stats": "statystyk",
+    "winRate": "Procent wygranych",
+    "goalDifference": "Róznica bramek",
+    "formation": "Formacja",
+    "form": "Forma",
+    "matches": "mecze"
   }
 }

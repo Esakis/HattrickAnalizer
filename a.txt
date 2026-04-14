@@ -1,0 +1,1283 @@
+Important!
+As a CHPP developer you may ONLY access interfaces documented here, nothing else. It's strictly forbidden to develop products that works with any other part of the site. Violation of these rules might render you to lose your team.
+Changelog
+2026-02-26
+managercompendium - 1.7
+Note: Add team LeagueSystemID
+Added Output: LeagueSystemID
+teamdetails - 3.9
+Note: Added team LeagueSystemId.
+Added Output: LeagueSystemID
+youthleaguedetails - 1.1
+Note: Added team LeagueSystemId.
+Added Output: LeagueSystemID
+youthteamdetails - 1.4
+Note: Added team LeagueSystemId.
+Added Output: LeagueSystemID
+2026-02-11
+2026-02-10
+2026-02-09
+2025-09-17
+Files
+Link	Description	Versions
+achievements	The achievements of a specific user.	1.0 {default}
+1.1 (2010-11-24)
+1.2 (2021-08-03)
+arenadetails	Information about specific arenas, supporter statistics and the largest arenas in Hattrick.	1.3 {default}
+1.4
+1.5 (2013-06-11)
+1.6 (2013-06-11)
+1.7 (2023-02-08)
+alliances	Alliance / Federation search	1.1 {default}
+1.2
+1.3 (2011-05-30)
+1.4 (2013-03-04)
+alliancedetails	Alliance / Federation information	1.2 {default}
+1.3
+1.4
+1.5 (2013-03-04)
+avatars	Avatars for all players of user's team	1.0 {default}
+1.1 (2013-01-08)
+bookmarks	User bookmarks	1.0 {default}
+challenges	Challenges	1.2 (2010-11-08) {default}
+1.3 (2011-02-17)
+1.4 (2013-05-02)
+1.5 (2015-03-02)
+1.6 (2016-10-27)
+club	Information about specialists and youth	1.1 {default}
+1.2 (2010-11-08)
+1.3 (2013-05-02)
+1.4 (2014-04-09)
+1.5 (2015-09-22)
+cupmatches	Information about cup matches	1.2 {default}
+1.3 (2011-02-01)
+1.4 (2011-06-03)
+currentbids	Shows the current transfer activity for a team.	1.0 (2014-02-10) {default}
+economy	Economy	1.1 {default}
+1.2 (2011-04-13)
+1.3 (2013-05-02)
+1.4 (2022-03-09)
+fans	Fanclub information	1.0 {default}
+1.1 (2011-04-13)
+1.2 (2013-05-02)
+1.3 (2018-06-01)
+hofplayers	Hall of Fame Players	1.0 (2011-04-13) {default}
+1.1 (2014-07-23)
+1.2 (2020-06-02)
+ladderdetails	Information about teams in the ladder and posistions in it	1.0 (2013-11-20) {default}
+ladderlist	Information about ladder that the user is currently playing in.	1.0 (2013-11-08) {default}
+leaguedetails	Information about a League Level Unit (series)	1.2 {default}
+1.3 (2012-02-12)
+1.4 (2012-02-15)
+1.5 (2017-01-05)
+1.6 (2022-03-03)
+leaguefixtures	Fixtures for a League Level Unit (series)	1.2 {default}
+leaguelevels	Shows league level units (series) information for a specific league.	1.0 (2024-08-26) {default}
+live	Get (live) match ticker	1.3 {default}
+1.4
+1.5
+1.6 (2011-09-26)
+1.7 (2011-11-14)
+1.8 (2012-09-01)
+1.9 (2016-08-02)
+2.0 (2020-09-01)
+2.1 (2021-08-25)
+2.3 (2022-03-03)
+2.3 (2022-05-04)
+managercompendium	The manager compendium of the logged in user.	1.0 (2013-12-10) {default}
+1.1 (2016-05-17)
+1.2 (2018-03-01)
+1.3 (2019-12-03)
+1.4 (2022-03-04)
+1.5 (2023-01-18)
+1.6 (2026-02-11)
+1.7 (2026-02-26)
+matches	The most recent and upcoming matches for a particular team (Senior or Youth).	2.3 {default}
+2.4
+2.5
+2.6
+2.7 (2013-11-20)
+2.8 (2015-02-09)
+2.9 (2022-03-03)
+matchesarchive	Matches Archive	1.1 {default}
+1.2 (2013-11-21)
+1.3 (2015-02-09)
+1.4 (2018-04-03)
+1.5 (2022-03-03)
+matchdetails	Detailed match information	1.5 {default}
+1.6
+1.7
+1.8
+1.9 (2010-11-08)
+2.0 (2011-01-11)
+2.1 (2012-02-01)
+2.2 (2012-02-15)
+2.3 (2012-03-06)
+2.4 (2013-03-04)
+2.5 (2013-05-02)
+2.6 (2014-10-20)
+2.7 (2015-02-09)
+2.8 (2016-08-02)
+2.9 (2016-08-15)
+3.0 (2017-12-14)
+3.1 (2022-03-03)
+matchlineup	Match lineup for finished matches	1.2 {default}
+1.3
+1.5 (2011-09-12)
+1.6 (2011-09-20)
+1.7 (2012-02-13)
+1.8 (2012-03-06)
+1.9 (2015-10-01)
+2.0 (2016-08-02)
+2.1 (2022-03-03)
+matchorders	Match orders for upcoming matches	1.3 {default}
+1.4
+1.5
+1.6 (2010-11-08)
+1.7 (2011-06-22)
+1.8 (2011-08-30)
+1.9 (2011-12-15)
+2.0 (2012-03-06)
+2.1 (2012-03-15)
+2.2 (2013-05-02)
+2.3 (2013-11-29)
+2.4 (2015-09-22)
+3.0 (2017-05-18)
+3.1 (2022-03-03)
+nationalteams	National teams	1.2
+1.3 {default}
+1.4 (2011-02-12)
+1.5 (2013-03-04)
+1.6 (2021-01-18)
+nationalteamdetails	National Team information	1.2
+1.3 {default}
+1.4 (2010-11-08)
+1.5 (2011-01-13)
+1.6 (2011-04-13)
+1.7 (2011-06-16)
+1.8 (2013-03-04)
+1.9 (2016-06-28)
+nationalteammatches	National team matches	1.2 {default}
+1.3 (2013-03-04)
+1.4 (2022-03-03)
+nationalplayers	National team players	1.2 {default}
+1.3 (2013-03-04)
+1.4 (2021-04-09)
+1.5 (2022-03-04)
+players	Players	1.4 {default}
+1.5
+1.6
+1.7
+1.8 (2011-02-03)
+1.9 (2011-02-25)
+2.0 (2011-05-12)
+2.1 (2011-10-13)
+2.2 (2011-10-21)
+2.3 (2013-03-04)
+2.4 (2019-11-04)
+2.5 (2021-01-19)
+2.6 (2023-09-07)
+2.7 (2025-02-25)
+2.8 (2026-02-11)
+playerdetails	Detailed information for a player	1.2 {default}
+1.3
+1.4
+1.5
+1.6 (2010-12-16)
+1.7 (2011-02-03)
+1.8 (2011-02-25)
+1.9 (2011-05-12)
+2.0 (2011-10-13)
+2.1 (2011-10-21)
+2.2 (2011-12-05)
+2.3 (2012-04-12)
+2.4 (2013-03-04)
+2.5 (2013-12-12)
+2.6 (2014-02-05)
+2.7 (2016-05-17)
+2.8 (2019-11-04)
+2.9 (2022-03-04)
+3.0 (2023-09-07)
+3.1 (2025-02-25)
+3.2 (2026-02-09)
+playerevents	Player events	1.1 {default}
+1.2
+1.3 (2013-03-04)
+regiondetails	Detailed information about a region	1.2 {default}
+search	Search	1.2 {default}
+staffavatars	Avatars for all staff members.	1.0 (2014-04-03) {default}
+1.1 (2023-09-07)
+stafflist	A list of all staff members	1.0 (2014-04-03) {default}
+1.1 (2015-04-07)
+1.2 (2023-09-07)
+supporters	Information about teams supported and teams supporting.	1.0 (2013-12-16) {default}
+teamdetails	Team information	1.9 {default}
+2.0
+2.1
+2.2
+2.3
+2.4 (2010-11-08)
+2.5 (2011-02-03)
+2.6 (2011-04-13)
+2.7 (2013-03-04)
+2.8 (2013-05-02)
+2.9 (2013-05-20)
+3.0 (2013-09-03)
+3.1 (2013-12-16)
+3.2 (2014-07-21)
+3.3 (2015-08-04)
+3.4 (2016-12-19)
+3.5 (2020-07-02)
+3.6 (2022-03-03)
+3.7 (2024-09-16)
+3.8 (2026-02-10)
+3.9 (2026-02-26)
+tournamentdetails	Information about a tournament. This is only available for the current season.	1.0 (2013-10-17) {default}
+tournamentfixtures	Information about matches for a tournament. This is only available for the current season. For non-restarted tournaments this is available for 2 seasons after the tournament finished.	1.0 (2013-10-17) {default}
+1.1 (2025-09-17)
+tournamentleaguetables	League tables for a tournament. This is only available for the current season. For non-restarted tournaments this is available for 2 seasons after the tournament finished.	1.0 (2013-10-17) {default}
+1.1 (2021-06-01)
+tournamentlist	Information about tournaments that the user is currently playing in.	1.0 (2013-10-17) {default}
+training	Training	1.3 {default}
+1.4
+1.5
+1.6 (2010-11-08)
+1.7 (2011-01-17)
+1.8 (2011-02-03)
+1.9 (2011-02-12)
+2.0 (2013-03-04)
+2.1 (2013-05-02)
+2.2 (2013-11-21)
+trainingevents	Get training events for a player.	1.1 {default}
+1.2
+1.3 (2013-03-04)
+transfersearch	Search the transfer market. This file is NOT meant to be fetched by bots to automatically scan the transfer market, but instead upon manual user request.	1.0 (2013-12-12) {default}
+1.1 (2022-03-03)
+transfersteam	Get the transfer history of a team	1.2 (2011-04-13) {default}
+transfersplayer	Get all transfers of a player	1.1 {default}
+translations	Translations for the denominations in the game. This file is NOT meant to be fetched on each user session, but instead every certain period of time, like once a week, and store the values in the app.	1.0 (2013-11-27) {default}
+1.1 (2014-08-18)
+1.2 (2022-03-04)
+worldcup	World cup groups and matches	1.1 {default}
+worlddetails	General Information about all countries in HT World	1.2 {default}
+1.3 (2011-02-12) {default}
+1.4 (2011-10-07)
+1.5 (2013-09-03)
+1.6 (2014-07-21)
+1.7 (2015-08-03)
+1.8 (2016-12-13)
+1.9 (2022-03-03)
+2.0 (2026-02-09)
+worldlanguages	Available languages	1.2 {default}
+youthavatars	Avatars for all players of user's youthteam	1.0 {default}
+1.1 (2013-05-02)
+1.2 (2021-01-19)
+youthleaguedetails	The youth league information.	1.0 (2013-12-02) {default}
+1.1 (2026-02-26)
+youthleaguefixtures	Fixtures for a Youthe League (series).	1.0 (2013-12-02) {default}
+youthplayerdetails	Detailed information for a youth player	1.0 (2011-11-15) {default}
+1.1 (2014-01-23)
+1.2 (2022-03-03)
+1.3 (2026-02-10)
+youthplayerlist	Youth Players.	1.0 (2011-11-15) {default}
+1.1 (2014-01-23)
+1.2 (2022-03-03)
+1.3 (2026-02-11)
+youthteamdetails	Youth team information.	1.0 {default}
+1.1 (2015-04-15)
+1.2 (2022-03-03)
+1.3 (2026-02-10)
+1.4 (2026-02-26)
+Output
+The output container 'HattrickData' always contains the following elements:
+Element	Description
+FileName	The name of the file that your request was sent to.
+Version	The delivered version of the XML output.
+UserID	The logged on User's UserID (not to be confused with TeamID). If not logged on, it defaults to 0.
+FetchedDate	Date and time when the XML file was fetched. Format is DateTime
+Data types
+For a list of all data types look here.
+Error
+Any error casued by a internal error is caught. If such an error occurs you'll always get an XML result back but not the file you requested.
+ErrorCodes
+Code	Description
+-1	No information
+0	Not logged in
+1	Access Denied
+2	File Not Specified
+3	File not supported
+4	POST not supported
+5	Must use POST for this action
+6	Only for Supporters
+7	Not supported version
+10	Invalid parameter
+50	Unknown TeamID
+51	Unknown MatchID
+52	Unknown ActionType
+53	MatchID not subscribed to
+54	Unknown YouthTeamID
+55	Unknown YouthPlayerID
+56	Unknown PlayerID
+57	Unknown LeagueID
+58	Unknown LeagueLevelUnitID
+59	This request is only allowed for teams owned by the requesting user himself, and the requested team is not owned by this user
+60	Unknown TournamentId
+61	Unknown LadderId
+62	The youth player is now a senior player. The senior player ID is available in the SeniorPlayerID element for the error.
+63	Missing required parameters.
+64	The player has become a coach.
+70	Challenge failed
+71	Bid failed
+80	Banned from international friendly
+81	Banned from transfers
+90	Hattrick is down for maintenance, please try again later
+91	Hattrick youth academy is down for maintenance, please try again later
+92	Hattrick transfer market is down for maintenance, please try again later
+93	HTOIntegrated platform is down for maintenance, please try again later
+99	Other undefined error
+Anything else	Internal .NET error. Please specify this errorcode whenever you report a problem.
+Good to know
+For testing purpose you can set supporter to Off (X=-1), Silver (X=0), Gold (X=1), Platinum (X=2) or Diamond (X=3) for a single call by appending overrideIsSupporter=X to the url. (This does not work for file 'teamdetails')
+Unique IDs
+The new World Cup format (after January 2021) uses the Tournament system and each Cup has its own tournament id
+
+Cup	Tournament ID
+U21 Europe Cup	4878483
+U21 America Cup	4878490
+U21 Africa Cup	4878492
+U21 Asia-Oceania Cup	4878493
+U21 Wildcard Rounds	4891573
+U21 World Cup	4892549
+U21 Nations Cup	4892615
+U21 Friendlies	4894807
+
+CHPP DataTypes
+Boolean
+Boolean*
+Bit
+Char
+DateTime
+DateTime*
+Decimal
+Float
+Integer
+unsigned Integer
+unsigned Integer*
+String
+String*
+String (HTML encoded)
+URI
+Money
+AchievementCategoryID
+ArenaMatchType
+BookmarkTypeID
+MatchRoleOldID
+MatchRoleID
+MatchPositionID
+MatchBehaviourID
+MatchTypeID
+MatchStatus
+MatchRating
+MatchTacticType
+MatchTeamAttitude
+PlayerCategoryID
+PlayerAgreeability
+PlayerAggressiveness
+PlayerHonesty
+SelfConfidenceID
+SupportersPopularityID
+SpecialtyID
+SkillID
+SkillLevel
+TeamSpiritID
+WeatherID
+WorldCupID
+CupID
+trophyID
+matchOrderTypeID
+ScoutCommentTypeID
+ScoutCommentSkillTypeID
+StaffType
+YouthLeagueStatusID
+YouthLeagueType
+ScoutSearchTypeID
+ScoutTravelTypeID
+sourceSystem
+supporterTier
+lineup
+TournamentType
+trainingType
+positionChange
+trackingTypeId
+coachModifier
+matchPart
+MatchRuleID
+NationalTeamStaffType
+CupLevel
+CupLevelIndex
+GenderID
+LeagueSystemID
+Boolean
+Value	Description
+true	True
+false	False
+Boolean*
+Value	Description
+true	True
+false	False
+(empty)	not given
+Bit
+Value	Description
+0	False
+1	True
+Char
+Value	Description
+[a-Z,0-9]	A character literal represents a single character.
+DateTime
+Value	Description
+YYYY-MM-DD HH:MM:SS	Internet Date/Time Format in CE(ST), see rfc3339 chapter 5.6 / [ISO8601]
+DateTime*
+Value	Description
+YYYY-MM-DD HH:MM:SS	Internet Date/Time Format in CE(ST), see rfc3339 chapter 5.6 / [ISO8601]
+0001-01-01 00:00:00	empty Date
+Decimal
+Value	Description
+decimal.MIN_VALUE - decimal.MAX_VALUE	Compared to floating-point types, the decimal type has more precision and a smaller range, which makes it appropriate for financial and monetary calculations.
+Float
+Value	Description
+float.MIN_VALUE - float.MAX_VALUE	Float
+Integer
+Value	Description
+int.MIN_VALUE - int.MAX_VALUE	Integer
+unsigned Integer
+Value	Description
+0 - uint.MAX_VALUE	unsigned Integer
+unsigned Integer*
+Value	Description
+0 - uint.MAX_VALUE	unsigned Integer
+(empty)	empty
+String
+Value	Description
+Array of chars	String
+String*
+Value	Description
+Array of chars	String
+(empty)	empty
+String (HTML encoded)
+Value	Description
+Array of chars	HTML encoded String
+URI
+Value	Description
+URI	Uniform Resource Identifier
+Money
+Value	Description
+Integer	Amount of money in SEK (swedish krona)
+AchievementCategoryID
+Value	Description
+1	Ranking
+2	Team
+3	Matches
+4	Manager
+5	Special Awards
+6	Supporter
+ArenaMatchType
+Value	Description
+All	Show statistics for all types of games.
+CompOnly	Shows statistics for all competition games.
+LeagueOnly	Shows statistics only for series games.
+FriendlyOnly	Shows statistics only for friendly games.
+BookmarkTypeID
+Value	Description
+1	Teams and Users
+2	Players
+3	Matches
+4	Forum Users
+5	League Units
+6	Youth Teams
+7	Youth Players
+8	Youth Matches
+9	Youth Leagues
+10	Forum Posts
+11	Forum Threads
+MatchRoleOldID
+Value	Description
+1	Keeper
+2	Right back
+3	Central defender #1
+4	Central defender #2
+5	Left back
+6	Right winger
+7	Inner midfield #1
+8	Inner midfield #2
+9	Left winger
+10	Forward #1
+11	Forward #2
+12	Substitution (Keeper)
+13	Substitution (Defender)
+14	Substitution (Inner midfield)
+15	Substitution (Winger)
+16	Substitution (Forward)
+17	Set pieces
+18	Captain
+19	Replaced Player #1
+20	Replaced Player #2
+21	Replaced Player #3
+MatchRoleID
+Value	Description
+100	Keeper
+101	Right back
+102	Right central defender
+103	Middle central defender
+104	Left central defender
+105	Left back
+106	Right winger
+107	Right inner midfield
+108	Middle inner midfield
+109	Left inner midfield
+110	Left winger
+111	Right forward
+112	Middle forward
+113	Left forward
+114	Substitution (Keeper)
+115	Substitution (Defender)
+116	Substitution (Inner midfield)
+117	Substitution (Winger)
+118	Substitution (Forward)
+119	Substitution (Wing back)
+120	Substitution (Extra)
+200	Substitution (Keeper)
+201	Substitution (Central defender)
+202	Substitution (Wing back)
+203	Substitution (Inner midfielder)
+204	Substitution (Forward)
+205	Substitution (Winger)
+206	Substitution (Extra)
+207	Backup (Keeper)
+208	Backup (Central defender)
+209	Backup (Wing back)
+210	Backup (Inner midfielder)
+211	Backup (Forward)
+212	Backup (Winger)
+213	Backup (Extra)
+17	Set pieces
+18	Captain
+19	Replaced Player #1
+20	Replaced Player #2
+21	Replaced Player #3
+22	Penalty taker (1)
+23	Penalty taker (2)
+24	Penalty taker (3)
+25	Penalty taker (4)
+26	Penalty taker (5)
+27	Penalty taker (6)
+28	Penalty taker (7)
+29	Penalty taker (8)
+30	Penalty taker (9)
+31	Penalty taker (10)
+32	Penalty taker (11)
+33	Red Carded Player #1
+34	Red Carded Player #2
+35	Red Carded Player #3
+MatchPositionID
+Value	Description
+1	Keeper
+2	Right back
+3	Central defender #1
+4	Central defender #2
+5	Left back
+6	Right winger
+7	Inner midfield #1
+8	Inner midfield #2
+9	Left winger
+10	Forward #1
+11	Forward #2
+MatchBehaviourID
+Value	Description
+-1	No change
+0	Normal
+1	Offensive
+2	Defensive
+3	Towards middle
+4	Towards wing
+5	Extra forward
+6	Extra inner midfield
+7	Extra defender
+MatchTypeID
+Value	Description
+1	League match
+2	Qualification match
+3	Cup match (standard league match)
+4	Friendly (normal rules)
+5	Friendly (cup rules)
+6	Not currently in use, but reserved for international competition matches with normal rules (may or may not be implemented at some future point).
+7	Hattrick Masters
+8	International friendly (normal rules)
+9	Internation friendly (cup rules)
+10	National teams competition match (normal rules)
+11	National teams competition match (cup rules)
+12	National teams friendly
+50	Tournament League match
+51	Tournament Playoff match
+61	Duel
+62	Ladder match
+80	Preparation match
+100	Youth league match
+101	Youth friendly match
+102	RESERVED
+103	Youth friendly match (cup rules)
+104	RESERVED
+105	Youth international friendly match
+106	Youth international friendly match (Cup rules)
+107	RESERVED
+MatchStatus
+Value	Description
+0	Not Started
+1	Ongoing
+2	Finished
+MatchRating
+Value	Description
+1	very low disastrous
+2	low disastrous
+...	...
+80	very high divine
+MatchTacticType
+Value	Description
+0	Normal
+1	Pressing
+2	Counter-attacks
+3	Attack in the middle
+4	Attack in wings
+7	Play creatively
+8	Long shots
+MatchTeamAttitude
+Value	Description
+-1	Play it cool
+0	Normal
+1	Match of the season
+PlayerCategoryID
+Value	Description
+1	Keeper
+2	Wing back
+3	Central defender
+4	Winger
+5	Inner midfielder
+6	Forward
+7	Substitute
+8	Reserve
+9	Extra 1
+10	Extra 2
+0	No category set
+PlayerAgreeability
+Value	Description
+5	Beloved team member
+4	Popular guy
+3	Sympathetic guy
+2	Pleasant guy
+1	Controversial person
+0	Nasty fellow
+PlayerAggressiveness
+Value	Description
+5	Unstable
+4	Fiery
+3	Temperamental
+2	Balanced
+1	Calm
+0	Tranquil
+PlayerHonesty
+Value	Description
+5	Saintly
+4	Righteous
+3	Upright
+2	Honest
+1	Dishonest
+0	Infamous
+SelfConfidenceID
+Value	Description
+9	completely exaggerated
+8	exaggerated
+7	slightly exaggerated
+6	wondeful
+5	strong
+4	decent
+3	poor
+2	wretched
+1	disastrours
+0	non-existent
+SupportersPopularityID
+Value	Description
+9	sending you love poems
+8	dancing in the streets
+7	high on life
+6	delirious
+5	satisfied
+4	content
+3	calm
+2	irritated
+1	furious
+0	murderous
+SpecialtyID
+Value	Description
+0	No specialty
+1	Technical
+2	Quick
+3	Powerful
+4	Unpredictable
+5	Head specialist
+6	resilient
+8	support
+SkillID
+Value	Description
+1	Goaltending
+2	Stamina
+3	Set pieces
+4	Defending
+5	Scoring
+6	Winger
+7	Passing
+8	Playmaking
+9	Trainer
+10	Leadership
+11	Experience
+SkillLevel
+Value	Description
+0	non-existent
+1	disastrous
+2	wretched
+...	...
+19	utopian
+20	divine
+TeamSpiritID
+Value	Description
+10	Paradise on Earth!
+9	walking on clouds
+8	delirious
+7	satisfied
+6	content
+5	calm
+4	composed
+3	irritated
+2	furious
+1	murderous
+0	like the Cold War
+WeatherID
+Value	Description
+0	Rain
+1	Overcast
+2	Partially cloudy
+3	Sunny
+WorldCupID
+Value	Description
+39	World Cup (old format)
+45	U-20 World Cup (old format)
+137	World Cup (new format)
+149	U-20 World Cup (new format)
+CupID
+Value	Description
+183	Hattrick Masters
+x	See worlddetails file for IDs
+trophyID
+Value	Description
+16	Cup win
+17	Series win
+18	League win
+78	World cup Gold
+79	World cup Silver
+80	World cup Bronze
+91	Hattrick masters win
+93	Hattrick Masters top scorer
+103	Tournament winner
+203	Tutorial Tournament
+matchOrderTypeID
+Value	Description
+1	Normal substitution / Behaviour change
+3	Player swap
+ScoutCommentTypeID
+Value	Description
+0	Hello
+1	Found player
+2	(not in use)
+3	Talented in one skill
+4	Current skill level
+5	Potential skill level
+6	Average skill level
+7	Sign player to team
+8	(not in use)
+9	Player has speciality
+ScoutCommentSkillTypeID
+Value	Description
+1	Keeper
+2	(not in use)
+3	Defending
+4	Playmaker
+5	Winger
+6	Scorer
+7	Set Pieces
+8	Passing
+StaffType
+Value	Description
+1	Assistant Trainer
+2	Medic
+3	Spokesperson
+4	Sport Psycologist
+5	Form coach
+6	Financial Director
+7	Tactical Assistant
+YouthLeagueStatusID
+Value	Description
+0	Not full
+1	About to create matches
+3	Matches created, league is running
+10	League is finished
+YouthLeagueType
+Value	Description
+1	Regional
+2	National
+3	International
+ScoutSearchTypeID
+Value	Description
+0	Any
+1	Keeper
+2	Defender
+3	Wingback
+4	Midfielder
+5	Winger
+6	Forward
+ScoutTravelTypeID
+Value	Description
+1	Plane
+2	Car
+sourceSystem
+Value	Description
+hattrick	Hattrick main system
+youth	Youth system
+htointegrated	Hattrick integrated used for ex turnaments
+supporterTier
+Value	Description
+silver	Supporter Silver
+gold	Supporter Gold
+platinum	Supporter Platinum
+diamond	Supporter Diamond
+lineup
+Value	Description
+{
+ "positions": [
+  {"id":"283974499", "behaviour":"0"},
+  {"id":"227622136", "behaviour":"1"},
+  {"id":"0", "behaviour":"0"},
+  {"id":"226747085", "behaviour":"0"},
+  {"id":"0", "behaviour":"0"},
+  {"id":"285319569", "behaviour":"2"},
+  {"id":"234525976", "behaviour":"1"},
+  {"id":"190611685", "behaviour":"0"},
+  {"id":"255908009", "behaviour":"0"},
+  {"id":"98722167", "behaviour":"0"},
+  {"id":"0", "behaviour":"0"},
+  {"id":"327345682", "behaviour":"4"},
+  {"id":"312263029", "behaviour":"0"},
+  {"id":"327875363", "behaviour":"0"},
+  
+  {"id":"319107771", "behaviour":"0"},
+  {"id":"224242073", "behaviour":"0"},
+  {"id":"266402745", "behaviour":"0"},
+  {"id":"304433518", "behaviour":"0"},
+  {"id":"214058496", "behaviour":"0"},
+  
+  {"id":"190611685", "behaviour":"0"},
+  {"id":"226747085", "behaviour":"0"},
+  
+  {"id":"226747085", "behaviour":"0"},
+  {"id":"190611685", "behaviour":"0"},
+  {"id":"98722167", "behaviour":"0"},
+  {"id":"283974499", "behaviour":"0"},
+  {"id":"227622136", "behaviour":"0"},
+  {"id":"234525976", "behaviour":"0"},
+  {"id":"327345682", "behaviour":"0"},
+  {"id":"312263029", "behaviour":"0"},
+  {"id":"327875363", "behaviour":"0"},
+  {"id":"285319569", "behaviour":"0"},
+  {"id":"255908009", "behaviour":"0"}
+ ],
+ "settings": {tactic:"0", speechLevel:"0", newLineup:""},
+ "substitutions": [
+  {
+   "playerin":"304433518",
+   "playerout":"327875363",
+   "orderType":"1",
+   "min":"80",
+   "pos":"-1",
+   "beh":"-1",
+   "card":"-1",
+   "standing":"0"
+  },
+  {
+   "playerin":"319107771",
+   "playerout":"283974499",
+   "orderType":"1",
+   "min":"89",
+   "pos":"-1",
+   "beh":"-1",
+   "card":"-1",
+   "standing":"3"
+  }
+ ]
+}	This is a JSON-formatted string.
+
+positions
+An array of all positions.
+
+First 14 positionslots (0-13) represent the players on the field, starting with the goalkeeper (0), followed by right defender (1), right central defender (2) and so on up to left forward (13).
+The next 5 slots are substitutes in the following order: goalkeeper, defender, midfielder, forward, winger.
+Line 20 and 21 is captain and set pieces taker.
+The last 11 slots are penalty takers.
+The id is the playerId of the player you want.
+The behaviour is the matchBehaviourID
+The order is very important and concequently its very important that you send id:0 on slots where no player is placed!
+settings
+tactic is matchTacticType.
+speechLevel is the matchTeamAttitude.
+newLineup should always be empty.
+substitutions
+An array of all substitutions. You can have 0-5 of these (send an empty array for 0).
+
+playerin is the playerId of the player in the "in" box.
+playerout is consequently the playerId of the player in the "out" box, this should be same as playerin if its a behaviour change.
+orderType: 1 = substitution or behaviour change, 3 = position swap.
+min: MatchMinuteCriteria
+pos: the position the player should take after the substitution, 0-13, see positions above for the order.
+behaviour: see matchBehaviourID.
+card: RedCardCriteria
+standing: GoalDiffCriteria
+TournamentType
+Value	Description
+1	Single match
+2	League
+3	League with playoffs
+4	Cup
+5	Double elimination cup
+6	Ladder
+8	Swiss tournament
+10	Division battle
+11	Wildcards
+12	World Cup
+trainingType
+Value	Description
+0	General (Deprecated)
+1	Stamina (Deprecated)
+2	Set Pieces
+3	Defending
+4	Scoring
+5	Winger
+6	Scoring and Set Pieces
+7	Passing
+8	Playmaking
+9	Keeper
+10	Passing (Defenders + Midfielders)
+11	Defending (Defenders + Midfielders)
+12	Winger (Winger + Attackers)
+positionChange
+Value	Description
+0	No change
+1	Up
+2	Down
+trackingTypeId
+Value	Description
+1	Selling
+2	Buying
+3	Mother club
+4	Previous team
+5	Hotlisted (Supporter only)
+8	Losing bids (Supporter only)
+9	Finished (Supporter only)
+10	Transfer prospects (Supporter only)
+coachModifier
+Value	Description
+-10	100% defensive
+-9	90% defensive
+-8	80% defensive
+-7	70% defensive
+-6	60% defensive
+-5	50% defensive
+-4	40% defensive
+-3	30% defensive
+-2	20% defensive
+-1	10% defensive
+0	Neutral
+1	10% offensive
+2	20% offensive
+3	30% offensive
+4	40% offensive
+5	50% offensive
+6	60% offensive
+7	70% offensive
+8	80% offensive
+9	90% offensive
+10	100% offensive
+matchPart
+Value	Description
+0	Before the match started
+1	First half
+2	Second half (incl. added time)
+3	Overtime
+4	Penalty contest
+MatchRuleID
+Value	Description
+0	No rules
+1	Homegrown players
+2	Under 20 (incl. 20)
+3	Over 33 (incl. 33)
+NationalTeamStaffType
+Value	Description
+0	National Team Coach
+1	Assistant Coach
+2	Scout
+CupLevel
+Value	Description
+1	National cup
+2	Challenger cup
+3	Consolation cup
+CupLevelIndex
+Value	Description
+1	Emerald
+2	Ruby
+3	Sapphire
+GenderID
+Value	Description
+1	Male
+2	Female
+LeagueSystemID
+Value	Description
+1	Male
+2	Female
+
+Matches
+The most recent and upcoming matches for a particular team (Senior or Youth).
+Changelog (show)
+
+Input
+The following input parameters exist:
+SimpleDetailed
+Only available inputs in this file version are shown.
+required file = matches
+optional version = 
+2.9
+optional teamID : unsigned Integer{Default:Your senior or youth teamID}
+What team to show the matches for: Either teamID or youthTeamID depending on isYouth.
+optional isYouth : Boolean{Default:false}
+Is request for youth or not.
+optional LastMatchDate : DateTime{Default:Datetime.Now + 28 days}
+Last date to show matches to. If more than 50 matches are affected, only the 50 first will be returned.
+Output
+Here you can see the output, based on the values of the input parameters and selected action type.
+SimpleDetailedXMLExample
+All containers and elements for the selected file version and action type are shown.
+-HattrickData
+Hattrick Data Container
+-Team
+The team that the list applies to.
+TeamID : unsigned Integer
+The team's TeamID.
+TeamName : String
+The full name of the team.
+ShortTeamName : String
+The short team name. Only available when isYouth is false.
+-League
+Container for the data about the league ('Sverige', 'England' and so on) the team is part of.
+LeagueID : unsigned Integer
+The globally unique LeagueID.
+LeagueName : String
+The league name.
+-LeagueLevelUnit
+Data about the team's LeagueLevelUnit ('series'). If the team is playing a qualification match the tag will be empty. Only available when isYouth is false.
+LeagueLevelUnitID : unsigned Integer
+The globally unique LeagueLevelUnitID.
+LeagueLevelUnitName : String
+The name of the LeagueLevelUnit.
+LeagueLevel : unsigned Integer
+Integer value stating the relative level of the LeagueLevelUnit, with 1 indicating the league's top series.
+-MatchList
+Container for the matches.
+-Match
+A match.
+MatchID : unsigned Integer
+The globally unique identifier of the match.
+-HomeTeam
+The Home (formal, not taking arena location into account) team of the match.
+HomeTeamID : Integer
+The teamID of the Home team in the match. (Negative for street teams)
+HomeTeamName : String
+The team name of the Home team in the match.
+HomeTeamShortName : String
+The short team name of the Home team in the match.
+-AwayTeam
+The Away (formal, not taking arena location into account) team of the match.
+AwayTeamID : Integer
+The teamID of the Away team in the match. (Negative for street teams)
+AwayTeamName : String
+The team name of the Away team in the match.
+AwayTeamShortName : String
+The short team name of the Away team in the match.
+MatchDate : DateTime
+The start date and time (kick-off) of the match.
+SourceSystem : sourceSystem
+SourceSytem tells from witch system the match is ex: hattrick, youth, htointegrated
+MatchType : MatchTypeID
+Integer defining the type of match.
+MatchContextId : unsigned Integer
+This will be either LeagueLevelUnitId (for League), CupId (Cup, Hattrick Masters, World Cup and U-20 World Cup), LadderId, TournamentId, or 0 for friendly, qualification, single matches and preparation matches.
+CupLevel : unsigned Integer
+1 = National/Divisional cup, 2 = Challenger cup, 3 = Consolation cup. 0 if MatchType is not 3.
+CupLevelIndex : unsigned Integer
+In Challenger cups: 1 = Emerald (start week 2), 2 = Ruby (start week 3), 3 = Sapphire (start week 4). Always 1 for National/Divisional (main cups) and Consolation cups. 0 if MatchType is not 3.
+HomeGoals : unsigned Integer
+The current number of goals in the match for the home team.
+AwayGoals : unsigned Integer
+The current number of goals in the match for the away team.
+Status : MatchStatus
+Specifying whether the match is FINISHED, ONGOING or UPCOMING.
+OrdersGiven : Boolean*
+A boolean value only supplied for upcoming matches (haven't started yet) of your own team that signifies whether you have given orders or not. If the request is for another team than your own (even if it is for your opponent), this data is not sent.
+
+===============================================================================
+HATTRICK API - SCHEMAT OTRZYMYWANIA DANYCH O FORMACJI
+===============================================================================
+
+## Schemat pobierania i analizy danych o formacjach z Hattrick API
+
+### 1. ENDPOINTS API:
+```
+matchlineup - file=matchlineup&version=2.1
+teamdetails - file=teamdetails&version=3.6
+matches - file=matches&version=2.8
+players - file=players&version=2.8
+105 = Lewy obroñca (Left Back)
+106 = Prawy skrzyd³owy (Right Winger)
+107-109 = Pomocnicy (Inner Midfield + Wingers)
+110-113 = Napastnicy (Forwards)
+17 = Captain, 18 = Set Pieces, 19,33,34 = Substitute
+```
+
+#### 3. PRZEP£YW DANYCH:
+1. Pobierz listê meczów (matches)
+2. Dla ka¿dego meczu pobierz szczegó³y (matchlineup)
+3. Przeanalizuj sk³ady obu zespo³ów
+4. Wykryj formacje na podstawie RoleID
+5. Zwróæ dane statystyczne
+
+#### 4. STRUKTURA DANYCH matchlineup:
+```xml
+<HattrickData>
+  <FileName>matchlineup.xml</FileName>
+  <Version>2.1</Version>
+  <MatchID>[id]</MatchID>
+  <MatchType>[type]</MatchType>
+  <HomeTeam>
+    <HomeTeamID>[id]</HomeTeamID>
+    <HomeTeamName>[name]</HomeTeamName>
+  </HomeTeam>
+  <AwayTeam>
+    <AwayTeamID>[id]</AwayTeamID>
+    <AwayTeamName>[name]</AwayTeamName>
+  </AwayTeam>
+  <Team>
+    <TeamID>[id]</TeamID>
+    <TeamName>[name]</TeamName>
+    <StartingLineup>
+      <Player>
+        <PlayerID>[id]</PlayerID>
+        <RoleID>[100-113]</RoleID>
+        <FirstName>[name]</FirstName>
+        <LastName>[name]</LastName>
+        <RatingStars>[X.X]</RatingStars>
+        <Behaviour>[0-4]</Behaviour>
+      </Player>
+      <!-- Wiêcej graczy... -->
+    </StartingLineup>
+    <Rating>
+      <Midfield>[0-100]</Midfield>
+      <RightDefense>[0-100]</RightDefense>
+      <CentralDefense>[0-100]</CentralDefense>
+      <LeftDefense>[0-100]</LeftDefense>
+      <RightAttack>[0-100]</RightAttack>
+      <CentralAttack>[0-100]</CentralAttack>
+      <LeftAttack>[0-100]</LeftAttack>
+    </Rating>
+    <Attitude>[Normal/CA/MOTS/PIC]</Attitude>
+    <TeamSpirit>[calm/normal/psyched]</TeamSpirit>
+  </Team>
+</HattrickData>
+```
+
+#### 5. ALGORYTM WYKRYWANIA FORMACJI:
+1. **Filtrowanie graczy:**
+   - Tylko gracze z RatingStars > 0 (prawdziwi zawodnicy)
+   - Wyklucz role specjalne (17, 18, 19, 33, 34)
+
+2. **Zliczanie pozycji:**
+   - Defenders: RoleID 101, 102, 103, 104, 105
+   - Midfielders: RoleID 106, 107, 108, 109
+   - Forwards: RoleID 110, 111, 112, 113
+   - Wingers: RoleID 106, 109
+
+3. **Mapowanie formacji:**
+   - Specyficzne regu³y (z wingers) - pierwsze w kolejno¶ci
+   - Ogólne regu³y (bez wingers) - fallback
+
+#### 6. MODELE DANYCH:
+```csharp
+public class MatchRecord
+{
+    long MatchId
+    DateTime MatchDate
+    string MatchType
+    string OpponentTeam
+    bool IsHomeMatch
+    int GoalsFor
+    int GoalsAgainst
+    int TeamPoints
+    string MatchResult
+    string FormationUsed
+    int MidfieldRating
+    int RightDefenseRating
+    int CentralDefenseRating
+    int LeftDefenseRating
+    int RightAttackRating
+    int CentralAttackRating
+    int LeftAttackRating
+    int Possession
+    string Attitude
+    string TeamSpirit
+}
+
+public class MatchDetails
+{
+    string Formation
+    int MidfieldRating
+    int RightDefenseRating
+    int CentralDefenseRating
+    int LeftDefenseRating
+    int RightAttackRating
+    int CentralAttackRating
+    int LeftAttackRating
+    int Possession
+    string Attitude
+    string TeamSpirit
+}
+```
+
+#### 7. PRZEP£YW OCEN:
+- **Midfield:** 0-100 (wp³ywa na possession)
+- **Defense:** 0-100 (right/central/left)
+- **Attack:** 0-100 (right/central/left)
+- **Possession:** 0-100% (z Arena element)
+- **Behaviour:** 0-4 (styl gry zawodnika)
+
+#### 8. UWAGI IMPLEMENTACYJNE:
+- Bramkarz (RoleID=100) nie jest liczony do nazwy formacji
+- Formacja nazwana jest bez bramkarza: 2-5-3 zamiast 1-2-5-3
+- Ka¿dy mecz ma dwa zespo³y do analizy (mój + przeciwnik)
+- Rating 0 oznacza rezerwê lub gracza nie graj¹cego
+- Behaviour wp³ywa na taktykê meczu
+
+===============================================================================
+KONIEC GUIDE
+===============================================================================

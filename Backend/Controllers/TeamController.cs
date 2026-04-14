@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using HattrickAnalizer.Services;
+using HattrickAnalizer.Models;
 
 namespace HattrickAnalizer.Controllers;
 
@@ -37,6 +38,20 @@ public class TeamController : ControllerBase
         {
             var players = await _hattrickApi.GetTeamPlayersAsync(teamId);
             return Ok(players);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("{teamId}/match-stats")]
+    public async Task<IActionResult> GetTeamMatchStats(int teamId)
+    {
+        try
+        {
+            var teamStats = await _hattrickApi.GetTeamMatchStatsAsync(teamId);
+            return Ok(teamStats);
         }
         catch (Exception ex)
         {

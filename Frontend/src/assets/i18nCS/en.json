@@ -465,5 +465,13 @@
     "wretched": "wretched",
     "disastrous": "disastrous",
     "nonExistent": "non-existent"
+  },
+  "teamStats": {
+    "stats": "stats",
+    "winRate": "Win Rate",
+    "goalDifference": "Goal Difference",
+    "formation": "Formation",
+    "form": "Form",
+    "matches": "matches"
   }
 }

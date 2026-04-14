@@ -33,7 +33,7 @@
         <label for="filterPosition">{{ 'players.positionFilter' | translate }}</label>
         <select id="filterPosition" [(ngModel)]="filterPosition">
           <option *ngFor="let pos of positions" [value]="pos.value">
-            {{ pos.label }}
+            {{ pos.label | translate }}
           </option>
         </select>
       </div>
@@ -42,7 +42,7 @@
         <label for="sortBy">{{ 'players.sortBy' | translate }}</label>
         <select id="sortBy" [(ngModel)]="sortBy">
           <option *ngFor="let sort of sortOptions" [value]="sort.value">
-            {{ sort.label }}
+            {{ sort.label | translate }}
           </option>
         </select>
       </div>

@@ -6,7 +6,11 @@
     "nextOpponent": "Next match",
     "opponentTeam": "Opponent team",
     "notAuthorized": "Not authorized — click to start",
-    "goToOAuth": "Go to authorization"
+    "goToOAuth": "Go to authorization",
+    "loading": "Loading...",
+    "success": "Success",
+    "error": "Error",
+    "idle": "Idle"
   },
   "common": {
     "loading": "Loading...",

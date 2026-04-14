@@ -24,10 +24,10 @@ export class AppComponent implements OnInit {
     private cache: DataCacheService,
     private router: Router
   ) {
-    this.loadStatus.register('auth', this.translate.instant('loadStatus.auth'));
-    this.loadStatus.register('ownTeam', this.translate.instant('loadStatus.ownTeam'));
-    this.loadStatus.register('nextOpponent', this.translate.instant('loadStatus.nextOpponent'));
-    this.loadStatus.register('opponentTeam', this.translate.instant('loadStatus.opponentTeam'));
+    this.loadStatus.register('auth', 'loadStatus.auth');
+    this.loadStatus.register('ownTeam', 'loadStatus.ownTeam');
+    this.loadStatus.register('nextOpponent', 'loadStatus.nextOpponent');
+    this.loadStatus.register('opponentTeam', 'loadStatus.opponentTeam');
   }
 
   ngOnInit(): void {

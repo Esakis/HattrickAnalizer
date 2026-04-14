@@ -80,18 +80,18 @@ export class PlayersComponent implements OnInit {
 
   private initializeTranslations(): void {
     this.positions = [
-      { value: 'all', label: this.translate.instant('players.allPositions') },
-      { value: 'GK', label: this.translate.instant('players.goalkeeper') },
-      { value: 'DEF', label: this.translate.instant('players.defender') },
-      { value: 'MID', label: this.translate.instant('players.midfielder') },
-      { value: 'FW', label: this.translate.instant('players.forward') }
+      { value: 'all', label: 'players.allPositions' },
+      { value: 'GK', label: 'players.goalkeeper' },
+      { value: 'DEF', label: 'players.defender' },
+      { value: 'MID', label: 'players.midfielder' },
+      { value: 'FW', label: 'players.forward' }
     ];
 
     this.sortOptions = [
-      { value: 'name', label: this.translate.instant('players.sortByName') },
-      { value: 'age', label: this.translate.instant('players.sortByAge') },
-      { value: 'form', label: this.translate.instant('players.sortByForm') },
-      { value: 'stamina', label: this.translate.instant('players.sortByStamina') }
+      { value: 'name', label: 'players.sortByName' },
+      { value: 'age', label: 'players.sortByAge' },
+      { value: 'form', label: 'players.sortByForm' },
+      { value: 'stamina', label: 'players.sortByStamina' }
     ];
   }
 
@@ -163,7 +163,7 @@ export class PlayersComponent implements OnInit {
 
   getPositionLabel(position: string): string {
     const pos = this.positions.find(p => p.value === position);
-    return pos ? pos.label : position;
+    return pos ? this.translate.instant(pos.label) : position;
   }
 
   getSkillLevel(value: number): string {

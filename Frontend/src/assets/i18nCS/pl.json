@@ -6,7 +6,11 @@
     "nextOpponent": "Najbliższy mecz",
     "opponentTeam": "Drużyna przeciwnika",
     "notAuthorized": "Brak autoryzacji — kliknij, aby rozpocząć",
-    "goToOAuth": "Przejdź do autoryzacji"
+    "goToOAuth": "Przejdź do autoryzacji",
+    "loading": "Ładowanie...",
+    "success": "Sukces",
+    "error": "Błąd",
+    "idle": "Oczekuje"
   },
   "common": {
     "loading": "Ładowanie...",

@@ -65,7 +65,7 @@
       </div>
 
       <div class="team-info my-team-info">
-        <h3>🏠 {{ 'optimizer.myTeam' | translate }}</h3>
+        <h3>🏠 {{ myTeamName || ('optimizer.myTeam' | translate) }}</h3>
         <div *ngIf="loadingMyTeam" class="loading-indicator">
           {{ 'common.loading' | translate }}...
         </div>
@@ -98,7 +98,7 @@
       </div>
 
       <div class="team-info opponent-team-info">
-        <h3>⚔️ {{ 'optimizer.opponentTeam' | translate }}</h3>
+        <h3>⚔️ {{ opponentTeamName || ('optimizer.opponentTeam' | translate) }}</h3>
         <div *ngIf="loadingOpponentTeam" class="loading-indicator">
           {{ 'common.loading' | translate }}...
         </div>

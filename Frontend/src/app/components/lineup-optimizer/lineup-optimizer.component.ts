@@ -25,6 +25,9 @@ export class LineupOptimizerComponent implements OnInit {
   loadingOpponentTeam: boolean = false;
   lastLoadedMyTeamId: number | null = null;
   lastLoadedOpponentId: number | null = null;
+  
+  myTeamName: string = '';
+  opponentTeamName: string = '';
 
   tactics: { value: string; label: string }[] = [];
 
@@ -174,9 +177,10 @@ export class LineupOptimizerComponent implements OnInit {
     }
     
     this.loadingMyTeam = true;
-    this.hattrickApi.getPlayers(this.myTeamId).subscribe({
-      next: (players) => {
-        this.myTeamPlayers = players;
+    this.hattrickApi.getTeam(this.myTeamId).subscribe({
+      next: (team) => {
+        this.myTeamPlayers = team.players;
+        this.myTeamName = team.teamName;
         this.lastLoadedMyTeamId = this.myTeamId;
         this.loadingMyTeam = false;
       },
@@ -195,9 +199,10 @@ export class LineupOptimizerComponent implements OnInit {
     }
     
     this.loadingOpponentTeam = true;
-    this.hattrickApi.getPlayers(this.opponentTeamId).subscribe({
-      next: (players) => {
-        this.opponentTeamPlayers = players;
+    this.hattrickApi.getTeam(this.opponentTeamId).subscribe({
+      next: (team) => {
+        this.opponentTeamPlayers = team.players;
+        this.opponentTeamName = team.teamName;
         this.lastLoadedOpponentId = this.opponentTeamId;
         this.loadingOpponentTeam = false;
       },
@@ -212,6 +217,7 @@ export class LineupOptimizerComponent implements OnInit {
       // Wyczyść dane jeśli ID się zmieniło
       if (this.lastLoadedMyTeamId !== this.myTeamId) {
         this.myTeamPlayers = [];
+        this.myTeamName = '';
       }
       this.loadMyTeam();
     }
@@ -222,6 +228,7 @@ export class LineupOptimizerComponent implements OnInit {
       // Wyczyść dane jeśli ID się zmieniło
       if (this.lastLoadedOpponentId !== this.opponentTeamId) {
         this.opponentTeamPlayers = [];
+        this.opponentTeamName = '';
       }
       this.loadOpponentTeam();
     }

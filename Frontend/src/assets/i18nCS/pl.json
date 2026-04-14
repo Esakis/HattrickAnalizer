@@ -91,6 +91,8 @@
     "strengths": "Twoje Mocne Strony",
     "weaknesses": "Słabe Punkty",
     "optimalLineup": "Optymalny Skład",
+    "formation": "Formacja",
+    "tactic": "Taktyka",
     "recommendations": "Rekomendacje Taktyczne",
     "positions": {
       "GK": "BR",

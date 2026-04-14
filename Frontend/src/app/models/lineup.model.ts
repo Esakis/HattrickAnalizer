@@ -29,13 +29,31 @@ export interface OptimizerRequest {
   myTeamId: number;
   opponentTeamId: number;
   preferredTactic: string;
+  teamAttitude: string;
   focusAreas: string[];
+  coachType: string;
+  assistantManagerLevel: number;
+  formationExperience: { [formation: string]: number };
+}
+
+export interface FormationAlternative {
+  formation: string;
+  tactic: string;
+  attitude: string;
+  winProbability: number;
+  drawProbability: number;
+  lossProbability: number;
+  expectedGoalsFor: number;
+  expectedGoalsAgainst: number;
+  disorderRisk: number;
+  ratings: LineupRatings;
 }
 
 export interface OptimizerResponse {
   optimalLineup: Lineup;
   recommendations: string[];
   comparison: TeamComparison;
+  alternatives: FormationAlternative[];
 }
 
 export interface TeamComparison {

@@ -3,12 +3,23 @@ using HattrickAnalizer.Models;
 namespace HattrickAnalizer.Services;
 
 /// <summary>
-/// Zaawansowany optymalizator oparty na wiedzy z poradników Hattrick
+/// Optymalizator skladu maksymalizujacy prawdopodobienstwo wygranej.
+/// Iteruje po (formacja x taktyka) i dla kazdej kombinacji robi lokalna optymalizacje
+/// przypisania graczy do slotow + zachowan (WBD/WBN/WBO/WBTM itp.).
+/// Wynik koncowy jest oceniany modelem Poissona: P(win) + 0.5 * P(draw).
 /// </summary>
 public class AdvancedLineupOptimizer
 {
     private readonly HattrickApiService _hattrickApi;
-    
+
+    // Wlasciwe taktyki Hattricka (MatchTacticType)
+    private static readonly string[] AllTactics =
+    {
+        "Normal", "Counter",
+        "AttackInMiddle", "AttackOnWings",
+        "Pressing", "PlayCreatively", "LongShots"
+    };
+
     public AdvancedLineupOptimizer(HattrickApiService hattrickApi)
     {
         _hattrickApi = hattrickApi;
@@ -19,521 +30,842 @@ public class AdvancedLineupOptimizer
         var myTeam = await _hattrickApi.GetTeamDetailsAsync(request.MyTeamId);
         var opponentRatings = await _hattrickApi.GetOpponentRatingsAsync(request.OpponentTeamId, 0);
 
-        // Analiza si przeciwnika i wybór optymalnej formacji
-        var formationAnalysis = AnalyzeOpponentAndSelectFormation(opponentRatings, request.PreferredTactic);
-        
-        // Wybór zawodników na podstawie kontrybucji pozycji
-        var lineup = GenerateOptimalLineup(myTeam.Players, formationAnalysis, request.PreferredTactic);
-        
-        // Obliczenie ratingów
-        var myRatings = CalculateLineupRatings(lineup);
-        var opponentLineupRatings = ConvertToLineupRatings(opponentRatings);
+        var available = myTeam.Players.Where(p => p.InjuryLevel == 0).ToList();
+        if (available.Count < 11)
+        {
+            throw new InvalidOperationException($"Zbyt malo zdrowych graczy ({available.Count}) zeby ulozyc sklad.");
+        }
 
-        // Zastosowanie modyfikatorów taktycznych
-        ApplyTacticModifiers(ref myRatings, request.PreferredTactic, formationAnalysis);
+        var tactics = ResolveTacticCandidates(request.PreferredTactic);
+        var attitude = NormaliseAttitude(request.TeamAttitude);
+        var coach = NormaliseCoachType(request.CoachType);
+
+        OptimizationCandidate? best = null;
+        var allCandidates = new List<OptimizationCandidate>();
+        foreach (var formation in FormationData.Formations.Values)
+        {
+            // Pierwsze przypisanie: niezalezne od taktyki — bazuje na lacznym wkladzie w ratingi.
+            var baseLineup = BuildInitialLineup(formation, available);
+            if (baseLineup == null) continue;
+
+            // Ulepsz przypisanie poprzez 2-opt na sile druzyny
+            baseLineup = LocalSearchPlayerAssignment(formation, baseLineup, available);
+
+            int formExp = request.FormationExperience.GetValueOrDefault(formation.Name, 5);
+            double disorderRisk = ComputeDisorderRisk(formExp);
+
+            OptimizationCandidate? bestForFormation = null;
+            foreach (var tactic in tactics)
+            {
+                var candidate = EvaluateCandidate(formation, tactic, attitude, coach, baseLineup, opponentRatings);
+                candidate = OptimiseBehaviours(candidate, attitude, coach, opponentRatings);
+                // Kara za nielad formacji — proporcjonalnie obniza wszystkie prawdopodobienstwa wygranej.
+                candidate.DisorderRisk = disorderRisk;
+                candidate.Score = (candidate.WinProbability + 0.5 * candidate.DrawProbability) * (1.0 - 0.5 * disorderRisk);
+
+                if (bestForFormation == null || candidate.Score > bestForFormation.Score)
+                {
+                    bestForFormation = candidate;
+                }
+
+                if (best == null || candidate.Score > best.Score)
+                {
+                    best = candidate;
+                }
+            }
+
+            if (bestForFormation != null)
+            {
+                allCandidates.Add(bestForFormation);
+            }
+        }
+
+        if (best == null)
+        {
+            throw new InvalidOperationException("Nie udalo sie zbudowac zadnego skladu.");
+        }
+
+        var lineup = BuildFinalLineup(best);
+        var oppLineupRatings = ConvertToLineupRatings(opponentRatings);
 
         var comparison = new TeamComparison
         {
-            MyTeamRatings = myRatings,
-            OpponentRatings = opponentLineupRatings,
-            Strengths = IdentifyStrengths(myRatings, opponentLineupRatings),
-            Weaknesses = IdentifyWeaknesses(myRatings, opponentLineupRatings)
+            MyTeamRatings = best.Ratings,
+            OpponentRatings = oppLineupRatings,
+            Strengths = IdentifyStrengths(best.Ratings, oppLineupRatings),
+            Weaknesses = IdentifyWeaknesses(best.Ratings, oppLineupRatings)
         };
 
-        var recommendations = GenerateRecommendations(comparison, lineup, formationAnalysis);
+        var recommendations = GenerateRecommendations(best, comparison);
+
+        var alternatives = allCandidates
+            .OrderByDescending(c => c.Score)
+            .Select(c => new FormationAlternative
+            {
+                Formation = c.Lineup.Formation.Name,
+                Tactic = c.Tactic,
+                Attitude = c.Attitude,
+                WinProbability = c.WinProbability,
+                DrawProbability = c.DrawProbability,
+                LossProbability = c.LossProbability,
+                ExpectedGoalsFor = c.ExpectedGoalsFor,
+                ExpectedGoalsAgainst = c.ExpectedGoalsAgainst,
+                DisorderRisk = c.DisorderRisk,
+                Ratings = c.Ratings
+            })
+            .ToList();
 
         return new OptimizerResponse
         {
             OptimalLineup = lineup,
             Recommendations = recommendations,
-            Comparison = comparison
+            Comparison = comparison,
+            Alternatives = alternatives
         };
     }
 
-    private FormationAnalysis AnalyzeOpponentAndSelectFormation(TeamRatings opponentRatings, string preferredTactic)
+    // ======================= Tactics =======================
+
+    private static IEnumerable<string> ResolveTacticCandidates(string preferred)
     {
-        var opponentStrength = AnalyzeOpponentStrength(opponentRatings);
-        var recommendedFormation = SelectOptimalFormation(opponentStrength, preferredTactic);
-        
-        return new FormationAnalysis
+        // "Auto" / pusto -> probuj wszystkie. Konkretna taktyka -> tylko ona.
+        if (string.IsNullOrWhiteSpace(preferred) || preferred == "Auto")
         {
-            SelectedFormation = recommendedFormation,
-            OpponentStrength = opponentStrength,
-            RecommendedTactic = SelectOptimalTactic(opponentStrength, preferredTactic, recommendedFormation),
-            FormationStyle = recommendedFormation.Style
+            return AllTactics;
+        }
+        return AllTactics.Contains(preferred) ? new[] { preferred } : AllTactics;
+    }
+
+    // Postawa druzyny wybierana przez trenera — nie jest dobierana automatycznie.
+    private static string NormaliseAttitude(string attitude)
+    {
+        if (string.IsNullOrWhiteSpace(attitude)) return "Normal";
+        return attitude switch
+        {
+            "PIC" => "PIC",
+            "MOTS" => "MOTS",
+            _ => "Normal"
         };
     }
 
-    private OpponentStrength AnalyzeOpponentStrength(TeamRatings ratings)
+    private static string NormaliseCoachType(string coach)
     {
-        var totalRating = ratings.MidfieldRating + ratings.CentralDefenseRating + ratings.RightDefenseRating + 
-                         ratings.LeftDefenseRating + ratings.CentralAttackRating + ratings.RightAttackRating + ratings.LeftAttackRating;
-        
-        var avgRating = totalRating / 7.0;
-
-        return new OpponentStrength
+        if (string.IsNullOrWhiteSpace(coach)) return "Neutral";
+        return coach switch
         {
-            Midfield = ratings.MidfieldRating,
-            CentralDefense = ratings.CentralDefenseRating,
-            SideDefense = (ratings.RightDefenseRating + ratings.LeftDefenseRating) / 2.0,
-            CentralAttack = ratings.CentralAttackRating,
-            SideAttack = (ratings.RightAttackRating + ratings.LeftAttackRating) / 2.0,
-            Overall = avgRating,
-            WeakSide = ratings.RightDefenseRating < ratings.LeftDefenseRating ? "right" : "left",
-            StrongSide = ratings.RightDefenseRating > ratings.LeftDefenseRating ? "right" : "left"
+            "Offensive" => "Offensive",
+            "Defensive" => "Defensive",
+            _ => "Neutral"
         };
     }
 
-    private FormationDefinition SelectOptimalFormation(OpponentStrength opponentStrength, string preferredTactic)
+    // Prawdopodobienstwo nieladu formacji w funkcji poziomu doswiadczenia (0..7).
+    // 7 (znakomite+) = 0% ryzyka. Nizsze poziomy = rosnace ryzyko.
+    private static double ComputeDisorderRisk(int formationExperience)
     {
-        var formations = FormationData.Formations.Values.ToList();
-
-        // Ocena formacji na podstawie siy przeciwnika
-        var scoredFormations = formations.Select(f => new
+        int e = Math.Clamp(formationExperience, 0, 7);
+        return e switch
         {
-            Formation = f,
-            Score = EvaluateFormationAgainstOpponent(f, opponentStrength, preferredTactic)
-        })
-        .OrderByDescending(x => x.Score)
-        .ToList();
-
-        return scoredFormations.First().Formation;
+            7 => 0.00,
+            6 => 0.05,
+            5 => 0.10,
+            4 => 0.18,
+            3 => 0.28,
+            2 => 0.40,
+            1 => 0.55,
+            _ => 0.70
+        };
     }
 
-    private double EvaluateFormationAgainstOpponent(FormationDefinition formation, OpponentStrength opponentStrength, string preferredTactic)
+    // ======================= Assignment =======================
+
+    private AssignedLineup? BuildInitialLineup(FormationDefinition formation, List<Player> available)
     {
-        double score = 0;
+        var slots = formation.Positions.ToList();
+        var players = available.ToList();
 
-        // Podstawowe punkty za styl formacji vs siy przeciwnika
-        switch (formation.Style)
+        // GK: najlepszy wg keeper-score
+        var gk = players.OrderByDescending(p => EffectiveSkill(p, p.Skills.Keeper)).FirstOrDefault();
+        if (gk == null) return null;
+
+        var result = new AssignedLineup
         {
-            case FormationStyle.UltraDefensive when opponentStrength.Overall > 70:
-                score += 20;
-                break;
-            case FormationStyle.Defensive when opponentStrength.Overall > 60:
-                score += 15;
-                break;
-            case FormationStyle.MidfieldControl when opponentStrength.Midfield < 50:
-                score += 20;
-                break;
-            case FormationStyle.Balanced:
-                score += 10;
-                break;
-            case FormationStyle.Offensive when opponentStrength.Overall < 50:
-                score += 15;
-                break;
-            case FormationStyle.UltraOffensive when opponentStrength.Overall < 40:
-                score += 20;
-                break;
-        }
-
-        // Premia za formacje z odpowiednimi liczbami graczy na pozycjach
-        if (opponentStrength.CentralDefense > 60 && formation.Defenders >= 5)
-            score += 10;
-        
-        if (opponentStrength.Midfield > 50 && formation.Midfielders >= 5)
-            score += 10;
-        
-        if (opponentStrength.CentralAttack < 40 && formation.Forwards <= 2)
-            score += 5;
-
-        // Premia za preferowan taktyk
-        if (preferredTactic == "Counter" && formation.Style <= FormationStyle.Defensive)
-            score += 10;
-        
-        if (preferredTactic == "Normal" && formation.Style == FormationStyle.Balanced)
-            score += 5;
-
-        return score;
-    }
-
-    private string SelectOptimalTactic(OpponentStrength opponentStrength, string preferredTactic, FormationDefinition formation)
-    {
-        // Logika wyboru taktyki na podstawie siy przeciwnika i formacji
-        if (opponentStrength.Overall > 70 && formation.Style <= FormationStyle.Defensive)
-        {
-            return "Counter"; // Kontratak przeciwko silnemu przeciwnikowi
-        }
-        
-        if (opponentStrength.Midfield < 40 && formation.Midfielders >= 5)
-        {
-            return "Normal"; // Dominacja w pomocy
-        }
-        
-        if (opponentStrength.Overall < 50 && formation.Style >= FormationStyle.Offensive)
-        {
-            return "Normal"; // Atak przeciwko slabemu przeciwnikowi
-        }
-
-        return preferredTactic;
-    }
-
-    private Lineup GenerateOptimalLineup(List<Player> players, FormationAnalysis analysis, string tactic)
-    {
-        var availablePlayers = players.Where(p => p.InjuryLevel == 0).ToList();
-        var formation = analysis.SelectedFormation;
-        var lineup = new Lineup 
-        { 
-            TacticType = tactic,
-            Formation = formation.Name
+            Formation = formation,
+            Slots = new Dictionary<string, AssignedSlot>()
         };
 
-        // Wybór zawodników na podstawie kontrybucji pozycji
-        foreach (var position in formation.Positions)
+        result.Slots["GK"] = new AssignedSlot { SlotId = "GK", Player = gk, Behaviour = "GK" };
+        players.Remove(gk);
+
+        var outfieldSlots = slots.Where(s => s != "GK").ToList();
+
+        // Pierwsze pokrycie: zachlannie, sloty od "najmocniejszej preferencji" (najwiekszy spread scoringu).
+        var remaining = new List<Player>(players);
+        var slotScores = new Dictionary<string, Dictionary<int, double>>(); // slot -> playerId -> score
+        foreach (var slot in outfieldSlots)
         {
-            var bestPlayer = SelectBestPlayerForPosition(availablePlayers, position, analysis);
-            if (bestPlayer != null)
+            var d = new Dictionary<int, double>();
+            foreach (var p in remaining)
             {
-                lineup.Positions[position] = new LineupPosition 
-                { 
-                    Position = position, 
-                    Player = bestPlayer 
+                d[p.PlayerId] = BestBehaviourScore(slot, p, null, out _);
+            }
+            slotScores[slot] = d;
+        }
+
+        // Uporzadkuj sloty wg wariancji scoringu (wieksza wariancja = wazniejszy wybor).
+        var slotOrder = outfieldSlots
+            .OrderByDescending(s => Variance(slotScores[s].Values))
+            .ToList();
+
+        foreach (var slot in slotOrder)
+        {
+            var best = remaining
+                .OrderByDescending(p => slotScores[slot][p.PlayerId])
+                .FirstOrDefault();
+            if (best == null) break;
+            _ = BestBehaviourScore(slot, best, null, out var bhv);
+            result.Slots[slot] = new AssignedSlot { SlotId = slot, Player = best, Behaviour = bhv };
+            remaining.Remove(best);
+        }
+
+        if (result.Slots.Count < slots.Count) return null;
+        return result;
+    }
+
+    private AssignedLineup LocalSearchPlayerAssignment(FormationDefinition formation, AssignedLineup lineup, List<Player> available)
+    {
+        var assignedIds = lineup.Slots.Values.Select(s => s.Player.PlayerId).ToHashSet();
+        var bench = available.Where(p => !assignedIds.Contains(p.PlayerId)).ToList();
+
+        // 2-opt: wymieniaj graczy miedzy slotami oraz z lawka, jesli poprawia sile druzyny.
+        // Sila druzyny = suma wazonych ratingow (hatstats-like).
+        bool improved = true;
+        int iterations = 0;
+        while (improved && iterations++ < 12)
+        {
+            improved = false;
+            var slots = lineup.Slots.Keys.Where(k => k != "GK").ToList();
+
+            // Swap miedzy slotami
+            for (int i = 0; i < slots.Count; i++)
+            {
+                for (int j = i + 1; j < slots.Count; j++)
+                {
+                    var sa = slots[i]; var sb = slots[j];
+                    var pa = lineup.Slots[sa]; var pb = lineup.Slots[sb];
+                    var currentScore = TeamStrength(lineup);
+
+                    var na = new AssignedSlot { SlotId = sa, Player = pb.Player, Behaviour = BestBehaviourFor(sa, pb.Player) };
+                    var nb = new AssignedSlot { SlotId = sb, Player = pa.Player, Behaviour = BestBehaviourFor(sb, pa.Player) };
+                    lineup.Slots[sa] = na; lineup.Slots[sb] = nb;
+                    var newScore = TeamStrength(lineup);
+
+                    if (newScore > currentScore + 0.01)
+                    {
+                        improved = true;
+                    }
+                    else
+                    {
+                        lineup.Slots[sa] = pa; lineup.Slots[sb] = pb;
+                    }
+                }
+            }
+
+            // Podmiana z lawka
+            foreach (var slot in slots.ToList())
+            {
+                var current = lineup.Slots[slot];
+                var bestBench = bench
+                    .Select(b => new { P = b, Score = BestBehaviourScore(slot, b, null, out _) })
+                    .OrderByDescending(x => x.Score)
+                    .FirstOrDefault();
+                if (bestBench == null) continue;
+
+                var currentScore = TeamStrength(lineup);
+                var newAssigned = new AssignedSlot
+                {
+                    SlotId = slot,
+                    Player = bestBench.P,
+                    Behaviour = BestBehaviourFor(slot, bestBench.P)
                 };
-                availablePlayers.Remove(bestPlayer);
+                lineup.Slots[slot] = newAssigned;
+                var newScore = TeamStrength(lineup);
+                if (newScore > currentScore + 0.01)
+                {
+                    bench.Remove(bestBench.P);
+                    bench.Add(current.Player);
+                    improved = true;
+                }
+                else
+                {
+                    lineup.Slots[slot] = current;
+                }
             }
         }
 
-        lineup.PredictedRatings = CalculateLineupRatings(lineup);
         return lineup;
     }
 
-    private Player SelectBestPlayerForPosition(List<Player> availablePlayers, string position, FormationAnalysis analysis)
+    private string BestBehaviourFor(string slot, Player p)
     {
-        if (!FormationData.PositionContributions.TryGetValue(position, out var contribution))
-            return null;
-
-        var scoredPlayers = availablePlayers.Select(player => new
-        {
-            Player = player,
-            Score = CalculatePlayerScoreForPosition(player, position, contribution, analysis)
-        })
-        .OrderByDescending(x => x.Score)
-        .ToList();
-
-        return scoredPlayers.FirstOrDefault()?.Player;
+        _ = BestBehaviourScore(slot, p, null, out var bhv);
+        return bhv;
     }
 
-    private double CalculatePlayerScoreForPosition(Player player, string position, PositionContribution contribution, FormationAnalysis analysis)
+    /// <summary>
+    /// Najlepszy wklad gracza na slocie po wszystkich wariantach zachowan.
+    /// Opcjonalne `weights` moga modyfikowac preferencje per typ ratingu.
+    /// </summary>
+    private double BestBehaviourScore(string slot, Player player, RatingWeights? weights, out string bestBehaviour)
     {
-        double score = 0;
-
-        // Wkady z umiejetnosci
-        score += player.Skills.Playmaking * contribution.MidfieldPM;
-        score += player.Skills.Defending * (contribution.CentralDefenseDef + contribution.SideDefenseDef);
-        score += player.Skills.Scoring * (contribution.CentralAttackSc + contribution.SideAttackSc);
-        score += player.Skills.Passing * (contribution.CentralAttackPs + contribution.SideAttackPs);
-        score += player.Skills.Winger * contribution.SideAttackWg;
-        
-        if (position == "GK")
+        bestBehaviour = slot;
+        if (!FormationData.SlotBehaviourOptions.TryGetValue(slot, out var options))
         {
-            score += player.Skills.Keeper * contribution.CentralDefenseGK;
-            score += player.Skills.Keeper * contribution.SideDefenseGK;
+            options = new[] { slot };
         }
 
-        // Wpisy formy
-        if (FormationData.FormPerformance.TryGetValue(player.Form, out var formMultiplier))
+        double best = double.NegativeInfinity;
+        foreach (var bhv in options)
         {
-            score *= formMultiplier;
+            if (!FormationData.PositionContributions.TryGetValue(bhv, out var contrib)) continue;
+            var score = PlayerContributionScore(player, slot, contrib, weights);
+            if (score > best)
+            {
+                best = score;
+                bestBehaviour = bhv;
+            }
+        }
+        return best < double.MinValue / 2 ? 0 : best;
+    }
+
+    private double PlayerContributionScore(Player p, string slot, PositionContribution c, RatingWeights? w)
+    {
+        w ??= RatingWeights.Uniform;
+        double eff = EffectiveMultiplier(p);
+
+        double mid = c.MidfieldPM * p.Skills.Playmaking;
+        double cd = c.CentralDefenseDef * p.Skills.Defending + c.CentralDefenseGK * p.Skills.Keeper;
+        double sd = c.SideDefenseDef * p.Skills.Defending + c.SideDefenseGK * p.Skills.Keeper;
+        double ca = c.CentralAttackSc * p.Skills.Scoring + c.CentralAttackPs * p.Skills.Passing;
+        double sa = c.SideAttackSc * p.Skills.Scoring + c.SideAttackPs * p.Skills.Passing + c.SideAttackWg * p.Skills.Winger;
+
+        // Rozrzuc sd/sa na odpowiednia strone wg slotu
+        double rd = 0, ld = 0, ra = 0, la = 0;
+        var side = FormationData.SlotSide.GetValueOrDefault(slot, "C");
+        if (side == "R") { rd = sd; ra = sa; }
+        else if (side == "L") { ld = sd; la = sa; }
+        else
+        {
+            // Centralnie — rozlaczamy po rowno na obie flanki
+            rd = sd * 0.5; ld = sd * 0.5;
+            ra = sa * 0.5; la = sa * 0.5;
         }
 
-        // Premia za specjalizacje
-        score += GetSpecialtyBonus(player, position, analysis);
-
-        // Premia za dobroczyno i dowiadczenie
-        score += player.Loyalty * 0.5; // Uproszczony bonus
-        score += player.Experience * 0.05; // Uproszczony bonus
+        double score = eff * (
+            w.Midfield * mid +
+            w.CentralDefense * cd +
+            w.RightDefense * rd + w.LeftDefense * ld +
+            w.CentralAttack * ca +
+            w.RightAttack * ra + w.LeftAttack * la);
 
         return score;
     }
 
-    private double GetSpecialtyBonus(Player player, string position, FormationAnalysis analysis)
+    /// <summary>Mnoznik efektywnych umiejetnosci: forma, doswiadczenie, lojalnosc, stamina.</summary>
+    private double EffectiveMultiplier(Player p)
     {
-        double bonus = 0;
-
-        // Atletycy w pressingu
-        if (player.Specialty == "Powerful" && analysis.RecommendedTactic == "Pressing")
-        {
-            bonus += 5;
-        }
-
-        // Szybcy obrocy przeciwko szybkim napastnikom
-        if (player.Specialty == "Quick" && (position.Contains("WB") || position.Contains("CD")))
-        {
-            bonus += 3;
-        }
-
-        // Nieprzewidywalni w pozycjach ofensywnych
-        if (player.Specialty == "Unpredictable" && 
-            (position.Contains("FW") || position.Contains("W") || position.Contains("IM")))
-        {
-            bonus += 2;
-        }
-
-        // Techniczni w deszczu
-        if (player.Specialty == "Technical" && analysis.WeatherCondition == "Rain")
-        {
-            bonus -= 2; // Kara w deszczu
-        }
-
-        return bonus;
+        double form = FormationData.FormPerformance.GetValueOrDefault(p.Form, 0.9);
+        // XP wg poradnika: 1 + 0.0716 * sqrt(xp-1)
+        double xp = 1.0 + 0.0716 * Math.Sqrt(Math.Max(0, p.Experience - 1));
+        // Lojalnosc: max +1 do skilla gdy Motherclub, upraszczamy: 1 + loyalty*0.01 (0-9)
+        double loy = 1.0 + Math.Min(0.1, Math.Max(0, p.Loyalty) * 0.01);
+        // Kondycja: ((stamina+6.5)/14)^0.6 — dla sredniej staminy ~8 daje ~0.98
+        double stamina = p.Stamina > 0 ? Math.Pow((p.Stamina + 6.5) / 14.0, 0.6) : 1.0;
+        // XP ma sens tylko czesciowo — cap tak by nie rosl nadmiernie
+        return form * Math.Min(1.35, xp) * loy * Math.Min(1.05, stamina);
     }
 
-    private LineupRatings CalculateLineupRatings(Lineup lineup)
+    private double EffectiveSkill(Player p, int rawSkill) => rawSkill * EffectiveMultiplier(p);
+
+    // ======================= Ratings & Evaluation =======================
+
+    private OptimizationCandidate EvaluateCandidate(FormationDefinition formation, string tactic, string attitude, string coach, AssignedLineup lineup, TeamRatings opponent)
     {
-        var ratings = new LineupRatings();
+        var ratings = ComputeRatings(lineup);
+        ApplyTacticAndContext(ref ratings, tactic, lineup);
+        ApplyAttitude(ref ratings, attitude);
+        ApplyCoach(ref ratings, coach);
+        var opp = ConvertToLineupRatings(opponent);
 
-        // Obliczanie kontrybucji z uwzgludnieniem kar za aglomeracje
-        var positionCounts = CountCentralPositions(lineup);
-        var centralDefenderPenalty = FormationData.CentralDefenderPenalty.GetValueOrDefault(positionCounts.CentralDefenders, 1.0);
-        var innerMidfielderPenalty = FormationData.InnerMidfielderPenalty.GetValueOrDefault(positionCounts.InnerMidfielders, 1.0);
-        var forwardPenalty = FormationData.ForwardPenalty.GetValueOrDefault(positionCounts.Forwards, 1.0);
+        var (pWin, pDraw, pLoss, lamMe, lamOpp) = PoissonWinProbability(ratings, opp, tactic, lineup);
 
-        foreach (var position in lineup.Positions.Values)
+        return new OptimizationCandidate
         {
-            if (position.Player == null) continue;
+            Lineup = lineup,
+            Tactic = tactic,
+            Attitude = attitude,
+            Coach = coach,
+            Ratings = ratings,
+            WinProbability = pWin,
+            DrawProbability = pDraw,
+            LossProbability = pLoss,
+            ExpectedGoalsFor = lamMe,
+            ExpectedGoalsAgainst = lamOpp,
+            Score = pWin + 0.5 * pDraw
+        };
+    }
 
-            if (FormationData.PositionContributions.TryGetValue(position.Position, out var contribution))
+    private OptimizationCandidate OptimiseBehaviours(OptimizationCandidate cand, string attitude, string coach, TeamRatings opponent)
+    {
+        // Lekka iteracja: dla kazdego slotu sprobuj kazdego zachowania i zachowaj te,
+        // ktore maksymalizuje P(win) + 0.5*P(draw).
+        var lineup = cand.Lineup;
+        double currentScore = cand.Score;
+        bool improved = true;
+        int it = 0;
+        while (improved && it++ < 4)
+        {
+            improved = false;
+            foreach (var kv in lineup.Slots.ToList())
             {
-                // Wkady do ratingów z uwzgludnieniem kar
-                var penalty = GetPenaltyForPosition(position.Position, centralDefenderPenalty, innerMidfielderPenalty, forwardPenalty);
-                
-                ratings.Midfield += position.Player.Skills.Playmaking * contribution.MidfieldPM * penalty;
-                
-                ratings.CentralDefense += position.Player.Skills.Defending * contribution.CentralDefenseDef * penalty;
-                ratings.RightDefense += position.Player.Skills.Defending * contribution.SideDefenseDef * penalty;
-                ratings.LeftDefense += position.Player.Skills.Defending * contribution.SideDefenseDef * penalty;
-                
-                ratings.CentralAttack += position.Player.Skills.Scoring * contribution.CentralAttackSc * penalty;
-                ratings.CentralAttack += position.Player.Skills.Passing * contribution.CentralAttackPs * penalty;
-                
-                ratings.RightAttack += position.Player.Skills.Scoring * contribution.SideAttackSc * penalty;
-                ratings.RightAttack += position.Player.Skills.Passing * contribution.SideAttackPs * penalty;
-                ratings.RightAttack += position.Player.Skills.Winger * contribution.SideAttackWg * penalty;
-                
-                ratings.LeftAttack += position.Player.Skills.Scoring * contribution.SideAttackSc * penalty;
-                ratings.LeftAttack += position.Player.Skills.Passing * contribution.SideAttackPs * penalty;
-                ratings.LeftAttack += position.Player.Skills.Winger * contribution.SideAttackWg * penalty;
+                var slot = kv.Key;
+                var cur = kv.Value;
+                if (!FormationData.SlotBehaviourOptions.TryGetValue(slot, out var options)) continue;
+                string bestBhv = cur.Behaviour;
+                double bestScore = currentScore;
+                foreach (var bhv in options)
+                {
+                    if (bhv == cur.Behaviour) continue;
+                    lineup.Slots[slot] = new AssignedSlot { SlotId = slot, Player = cur.Player, Behaviour = bhv };
+                    var test = EvaluateCandidate(cand.Lineup.Formation, cand.Tactic, attitude, coach, lineup, opponent);
+                    if (test.Score > bestScore + 1e-6)
+                    {
+                        bestScore = test.Score;
+                        bestBhv = bhv;
+                    }
+                }
+                lineup.Slots[slot] = new AssignedSlot { SlotId = slot, Player = cur.Player, Behaviour = bestBhv };
+                if (Math.Abs(bestScore - currentScore) > 1e-6)
+                {
+                    currentScore = bestScore;
+                    improved = true;
+                }
+            }
+        }
+        // Przelicz na koncu dla pewnosci
+        var final = EvaluateCandidate(cand.Lineup.Formation, cand.Tactic, attitude, coach, lineup, opponent);
+        return final;
+    }
+
+    // Typ trenera: ofensywny bumpuje ataki, defensywny bumpuje obrony. Neutralny — bez zmian.
+    private void ApplyCoach(ref LineupRatings r, string coach)
+    {
+        if (coach == "Offensive")
+        {
+            r.CentralAttack *= FormationData.CoachModifiers.OffensiveAttackBonus;
+            r.RightAttack *= FormationData.CoachModifiers.OffensiveAttackBonus;
+            r.LeftAttack *= FormationData.CoachModifiers.OffensiveAttackBonus;
+            r.CentralDefense *= FormationData.CoachModifiers.OffensiveDefensePenalty;
+            r.RightDefense *= FormationData.CoachModifiers.OffensiveDefensePenalty;
+            r.LeftDefense *= FormationData.CoachModifiers.OffensiveDefensePenalty;
+        }
+        else if (coach == "Defensive")
+        {
+            r.CentralDefense *= FormationData.CoachModifiers.DefensiveDefenseBonus;
+            r.RightDefense *= FormationData.CoachModifiers.DefensiveDefenseBonus;
+            r.LeftDefense *= FormationData.CoachModifiers.DefensiveDefenseBonus;
+            r.CentralAttack *= FormationData.CoachModifiers.DefensiveAttackPenalty;
+            r.RightAttack *= FormationData.CoachModifiers.DefensiveAttackPenalty;
+            r.LeftAttack *= FormationData.CoachModifiers.DefensiveAttackPenalty;
+        }
+        else
+        {
+            return;
+        }
+        r.Overall = (r.Midfield + r.CentralDefense + r.RightDefense + r.LeftDefense +
+                     r.CentralAttack + r.RightAttack + r.LeftAttack) / 7.0;
+    }
+
+    // Postawa druzyny (PIC/Normal/MOTS) — wybor trenera, niezalezny od taktyki.
+    private void ApplyAttitude(ref LineupRatings r, string attitude)
+    {
+        double mult = attitude switch
+        {
+            "PIC" => FormationData.TacticModifiers.PICMidfieldPenalty,
+            "MOTS" => FormationData.TacticModifiers.MOTSMidfieldBonus,
+            _ => 1.0
+        };
+        if (Math.Abs(mult - 1.0) > 1e-9)
+        {
+            r.Midfield *= mult;
+            r.Overall = (r.Midfield + r.CentralDefense + r.RightDefense + r.LeftDefense +
+                         r.CentralAttack + r.RightAttack + r.LeftAttack) / 7.0;
+        }
+    }
+
+    private LineupRatings ComputeRatings(AssignedLineup lineup)
+    {
+        var r = new LineupRatings();
+
+        // Aglomeracje: policz graczy na CD / IM / FW
+        int cdCount = 0, imCount = 0, fwCount = 0;
+        foreach (var s in lineup.Slots.Values)
+        {
+            if (IsCentralDefenderSlot(s.SlotId)) cdCount++;
+            else if (IsInnerMidfielderSlot(s.SlotId)) imCount++;
+            else if (IsForwardSlot(s.SlotId)) fwCount++;
+        }
+        double penCD = FormationData.CentralDefenderPenalty.GetValueOrDefault(cdCount, 1.0);
+        double penIM = FormationData.InnerMidfielderPenalty.GetValueOrDefault(imCount, 1.0);
+        double penFW = FormationData.ForwardPenalty.GetValueOrDefault(fwCount, 1.0);
+
+        foreach (var s in lineup.Slots.Values)
+        {
+            if (!FormationData.PositionContributions.TryGetValue(s.Behaviour, out var c)) continue;
+            double eff = EffectiveMultiplier(s.Player);
+
+            double pen = 1.0;
+            if (IsCentralDefenderSlot(s.SlotId)) pen = penCD;
+            else if (IsInnerMidfielderSlot(s.SlotId)) pen = penIM;
+            else if (IsForwardSlot(s.SlotId)) pen = penFW;
+
+            double mid = c.MidfieldPM * s.Player.Skills.Playmaking;
+            double cd = c.CentralDefenseDef * s.Player.Skills.Defending + c.CentralDefenseGK * s.Player.Skills.Keeper;
+            double sd = c.SideDefenseDef * s.Player.Skills.Defending + c.SideDefenseGK * s.Player.Skills.Keeper;
+            double ca = c.CentralAttackSc * s.Player.Skills.Scoring + c.CentralAttackPs * s.Player.Skills.Passing;
+            double sa = c.SideAttackSc * s.Player.Skills.Scoring + c.SideAttackPs * s.Player.Skills.Passing + c.SideAttackWg * s.Player.Skills.Winger;
+
+            var side = FormationData.SlotSide.GetValueOrDefault(s.SlotId, "C");
+            double effPen = eff * pen;
+
+            r.Midfield += mid * effPen;
+            r.CentralDefense += cd * effPen;
+            r.CentralAttack += ca * effPen;
+
+            if (side == "R")
+            {
+                r.RightDefense += sd * effPen;
+                r.RightAttack += sa * effPen;
+            }
+            else if (side == "L")
+            {
+                r.LeftDefense += sd * effPen;
+                r.LeftAttack += sa * effPen;
+            }
+            else
+            {
+                r.RightDefense += sd * 0.5 * effPen;
+                r.LeftDefense += sd * 0.5 * effPen;
+                r.RightAttack += sa * 0.5 * effPen;
+                r.LeftAttack += sa * 0.5 * effPen;
             }
         }
 
-        // Dodanie wkadu bramkarza
-        if (lineup.Positions.TryGetValue("GK", out var gk) && gk.Player != null)
-        {
-            if (FormationData.PositionContributions.TryGetValue("GK", out var gkContribution))
-            {
-                ratings.CentralDefense += gk.Player.Skills.Keeper * gkContribution.CentralDefenseGK;
-                ratings.RightDefense += gk.Player.Skills.Keeper * gkContribution.SideDefenseGK;
-                ratings.LeftDefense += gk.Player.Skills.Keeper * gkContribution.SideDefenseGK;
-            }
-        }
-
-        ratings.Overall = (ratings.Midfield + ratings.CentralDefense + ratings.RightDefense + 
-                          ratings.LeftDefense + ratings.CentralAttack + ratings.RightAttack + 
-                          ratings.LeftAttack) / 7.0;
-
-        return ratings;
+        r.Overall = (r.Midfield + r.CentralDefense + r.RightDefense + r.LeftDefense +
+                     r.CentralAttack + r.RightAttack + r.LeftAttack) / 7.0;
+        return r;
     }
 
-    private PositionCounts CountCentralPositions(Lineup lineup)
-    {
-        var counts = new PositionCounts();
-        
-        foreach (var position in lineup.Positions.Values)
-        {
-            if (position?.Position?.Contains("CD") == true)
-                counts.CentralDefenders++;
-            else if (position?.Position?.Contains("IM") == true)
-                counts.InnerMidfielders++;
-            else if (position?.Position?.Contains("FW") == true)
-                counts.Forwards++;
-        }
-
-        return counts;
-    }
-
-    private double GetPenaltyForPosition(string position, double centralDefenderPenalty, double innerMidfielderPenalty, double forwardPenalty)
-    {
-        if (position.Contains("CD"))
-            return centralDefenderPenalty;
-        else if (position.Contains("IM"))
-            return innerMidfielderPenalty;
-        else if (position.Contains("FW"))
-            return forwardPenalty;
-        
-        return 1.0;
-    }
-
-    private void ApplyTacticModifiers(ref LineupRatings ratings, string tactic, FormationAnalysis analysis)
+    private void ApplyTacticAndContext(ref LineupRatings r, string tactic, AssignedLineup lineup)
     {
         switch (tactic)
         {
             case "Counter":
-                ratings.Midfield *= FormationData.TacticModifiers.CounterAttackMidfieldPenalty;
+                r.Midfield *= FormationData.TacticModifiers.CounterAttackMidfieldPenalty;
                 break;
-            case "PIC":
-                ratings.Midfield *= FormationData.TacticModifiers.PICMidfieldPenalty;
+            case "AttackInMiddle":
+                r.CentralAttack *= FormationData.TacticModifiers.AIMCentralAttackBonus;
+                r.RightAttack *= FormationData.TacticModifiers.AIMSideAttackPenalty;
+                r.LeftAttack *= FormationData.TacticModifiers.AIMSideAttackPenalty;
                 break;
-            case "MOTS":
-                ratings.Midfield *= FormationData.TacticModifiers.MOTSMidfieldBonus;
+            case "AttackOnWings":
+                r.CentralAttack *= FormationData.TacticModifiers.AOWCentralAttackPenalty;
+                r.RightAttack *= FormationData.TacticModifiers.AOWSideAttackBonus;
+                r.LeftAttack *= FormationData.TacticModifiers.AOWSideAttackBonus;
+                break;
+            case "Pressing":
+                r.Midfield *= FormationData.TacticModifiers.PressingMidfieldPenalty;
+                r.CentralAttack *= FormationData.TacticModifiers.PressingAttackPenalty;
+                r.RightAttack *= FormationData.TacticModifiers.PressingAttackPenalty;
+                r.LeftAttack *= FormationData.TacticModifiers.PressingAttackPenalty;
+                r.CentralDefense *= FormationData.TacticModifiers.PressingDefenseBonus;
+                r.RightDefense *= FormationData.TacticModifiers.PressingDefenseBonus;
+                r.LeftDefense *= FormationData.TacticModifiers.PressingDefenseBonus;
+                break;
+            case "PlayCreatively":
+                r.CentralAttack *= FormationData.TacticModifiers.CreativelyAttackBonus;
+                r.RightAttack *= FormationData.TacticModifiers.CreativelyAttackBonus;
+                r.LeftAttack *= FormationData.TacticModifiers.CreativelyAttackBonus;
+                r.CentralDefense *= FormationData.TacticModifiers.CreativelyDefensePenalty;
+                r.RightDefense *= FormationData.TacticModifiers.CreativelyDefensePenalty;
+                r.LeftDefense *= FormationData.TacticModifiers.CreativelyDefensePenalty;
+                break;
+            case "LongShots":
+                r.Midfield *= FormationData.TacticModifiers.LongShotsMidfieldPenalty;
+                r.CentralAttack *= FormationData.TacticModifiers.LongShotsAttackPenalty;
+                r.RightAttack *= FormationData.TacticModifiers.LongShotsAttackPenalty;
+                r.LeftAttack *= FormationData.TacticModifiers.LongShotsAttackPenalty;
                 break;
         }
-
-        // Dodatkowe modyfikatory dla AOW/AIM
-        if (tactic == "AttackInMiddle" || tactic == "AttackOnWings")
-        {
-            // Zastosuj modyfikatory AOW/AIM do ataków
-            ApplyAOWAIMModifiers(ref ratings, tactic);
-        }
+        r.Overall = (r.Midfield + r.CentralDefense + r.RightDefense + r.LeftDefense +
+                     r.CentralAttack + r.RightAttack + r.LeftAttack) / 7.0;
     }
 
-    private void ApplyAOWAIMModifiers(ref LineupRatings ratings, string tactic)
+    // ======================= Win probability =======================
+
+    private (double pWin, double pDraw, double pLoss, double lamMe, double lamOpp)
+        PoissonWinProbability(LineupRatings me, LineupRatings opp, string tactic, AssignedLineup lineup)
     {
-        // Uproszczona implementacja - w rzeczywisto wymaga analizy zawodników
-        if (tactic == "AttackInMiddle")
+        // Unikamy dzielenia przez 0
+        double midMe = Math.Max(1.0, me.Midfield);
+        double midOpp = Math.Max(1.0, opp.Midfield);
+        double possMe = midMe / (midMe + midOpp);
+        double possOpp = 1 - possMe;
+
+        double myAttAvg = (me.CentralAttack + me.RightAttack + me.LeftAttack) / 3.0;
+        double oppDefAvg = Math.Max(1.0, (opp.CentralDefense + opp.RightDefense + opp.LeftDefense) / 3.0);
+        double oppAttAvg = (opp.CentralAttack + opp.RightAttack + opp.LeftAttack) / 3.0;
+        double myDefAvg = Math.Max(1.0, (me.CentralDefense + me.RightDefense + me.LeftDefense) / 3.0);
+
+        double baseGoals = 1.45;                       // srednia liczba goli jednej druzyny
+        double alpha = 1.8;                            // wykladnik przewagi ataku nad obrona
+        double possFactor = 1.0 + 0.5 * (possMe - 0.5); // +- do 25% zaleznie od posiadania
+
+        double lamMe = baseGoals * Math.Pow(myAttAvg / oppDefAvg, alpha) * possFactor;
+        double lamOpp = baseGoals * Math.Pow(oppAttAvg / myDefAvg, alpha) * (2 - possFactor);
+
+        // Kontratak daje bonus do oczekiwanych goli przy niskim posiadaniu
+        if (tactic == "Counter" && possMe < 0.45)
         {
-            ratings.CentralAttack *= 1.1; // +10% do ataku centralnego
-            ratings.RightAttack *= 0.95; // -5% do ataków bocznych
-            ratings.LeftAttack *= 0.95;
+            lamMe *= 1.10;
         }
-        else if (tactic == "AttackOnWings")
+
+        // Long Shots: bonus jesli poziom LS co najmniej passable (srednia sc>5)
+        if (tactic == "LongShots")
         {
-            ratings.CentralAttack *= 0.95; // -5% do ataku centralnego
-            ratings.RightAttack *= 1.1; // +10% do ataków bocznych
-            ratings.LeftAttack *= 1.1;
+            var ls = AverageScoring(lineup);
+            if (ls > 7) lamMe *= FormationData.TacticModifiers.LongShotsGoalBonus;
         }
+
+        lamMe = Math.Clamp(lamMe, 0.05, 8.0);
+        lamOpp = Math.Clamp(lamOpp, 0.05, 8.0);
+
+        const int GoalCap = 10;
+        double pWin = 0, pDraw = 0, pLoss = 0;
+        for (int i = 0; i <= GoalCap; i++)
+        {
+            double pi = Poisson(lamMe, i);
+            for (int j = 0; j <= GoalCap; j++)
+            {
+                double pj = Poisson(lamOpp, j);
+                double p = pi * pj;
+                if (i > j) pWin += p;
+                else if (i == j) pDraw += p;
+                else pLoss += p;
+            }
+        }
+        return (pWin, pDraw, pLoss, lamMe, lamOpp);
     }
 
-    private LineupRatings ConvertToLineupRatings(TeamRatings teamRatings)
+    private static double Poisson(double lambda, int k)
     {
-        return new LineupRatings
+        if (lambda <= 0) return k == 0 ? 1.0 : 0.0;
+        // log-space dla stabilnosci
+        double log = -lambda + k * Math.Log(lambda) - LogFactorial(k);
+        return Math.Exp(log);
+    }
+
+    private static readonly double[] LogFactCache = BuildLogFactCache(21);
+    private static double[] BuildLogFactCache(int n)
+    {
+        var a = new double[n];
+        a[0] = 0;
+        for (int i = 1; i < n; i++) a[i] = a[i - 1] + Math.Log(i);
+        return a;
+    }
+    private static double LogFactorial(int n) =>
+        n < LogFactCache.Length ? LogFactCache[n] : LogFactCache[^1] + Math.Log(LogFactCache.Length);
+
+    // ======================= Helpers =======================
+
+    private double TeamStrength(AssignedLineup lineup)
+    {
+        var r = ComputeRatings(lineup);
+        return 3 * r.Midfield + r.CentralDefense + r.RightDefense + r.LeftDefense
+             + r.CentralAttack + r.RightAttack + r.LeftAttack;
+    }
+
+    private double AverageScoring(AssignedLineup lineup)
+    {
+        var outfield = lineup.Slots.Values.Where(s => s.SlotId != "GK").Select(s => s.Player.Skills.Scoring);
+        if (!outfield.Any()) return 0;
+        return outfield.Average();
+    }
+
+    private static bool IsCentralDefenderSlot(string slot) =>
+        slot == "CD" || slot == "RCD" || slot == "LCD";
+
+    private static bool IsInnerMidfielderSlot(string slot) =>
+        slot == "IM" || slot == "RIM" || slot == "LIM";
+
+    private static bool IsForwardSlot(string slot) =>
+        slot == "FW" || slot == "RFW" || slot == "LFW" || slot == "CFW";
+
+    private static double Variance(IEnumerable<double> values)
+    {
+        var arr = values.ToArray();
+        if (arr.Length == 0) return 0;
+        double mean = arr.Average();
+        return arr.Sum(v => (v - mean) * (v - mean)) / arr.Length;
+    }
+
+    private LineupRatings ConvertToLineupRatings(TeamRatings t) => new()
+    {
+        Midfield = t.MidfieldRating,
+        RightDefense = t.RightDefenseRating,
+        CentralDefense = t.CentralDefenseRating,
+        LeftDefense = t.LeftDefenseRating,
+        RightAttack = t.RightAttackRating,
+        CentralAttack = t.CentralAttackRating,
+        LeftAttack = t.LeftAttackRating,
+        Overall = (t.MidfieldRating + t.CentralDefenseRating + t.RightDefenseRating + t.LeftDefenseRating
+                  + t.CentralAttackRating + t.RightAttackRating + t.LeftAttackRating) / 7.0
+    };
+
+    private Lineup BuildFinalLineup(OptimizationCandidate best)
+    {
+        var lineup = new Lineup
         {
-            Midfield = teamRatings.MidfieldRating,
-            RightDefense = teamRatings.RightDefenseRating,
-            CentralDefense = teamRatings.CentralDefenseRating,
-            LeftDefense = teamRatings.LeftDefenseRating,
-            RightAttack = teamRatings.RightAttackRating,
-            CentralAttack = teamRatings.CentralAttackRating,
-            LeftAttack = teamRatings.LeftAttackRating,
-            Overall = (teamRatings.MidfieldRating + teamRatings.CentralDefenseRating + 
-                      teamRatings.RightDefenseRating + teamRatings.LeftDefenseRating + 
-                      teamRatings.CentralAttackRating + teamRatings.RightAttackRating + 
-                      teamRatings.LeftAttackRating) / 7.0
+            TacticType = best.Tactic,
+            Formation = best.Lineup.Formation.Name,
+            PredictedRatings = best.Ratings
         };
+        foreach (var s in best.Lineup.Slots)
+        {
+            lineup.Positions[s.Key] = new LineupPosition
+            {
+                Position = s.Key,
+                Player = s.Value.Player,
+                Behavior = s.Value.Behaviour
+            };
+        }
+        return lineup;
     }
 
-    private List<string> IdentifyStrengths(LineupRatings myRatings, LineupRatings opponentRatings)
+    private List<string> IdentifyStrengths(LineupRatings me, LineupRatings opp)
     {
-        var strengths = new List<string>();
-
-        if (myRatings.Midfield > opponentRatings.Midfield * 1.2)
-            strengths.Add("Dominacja w pomocy - kontroluj tempo gry");
-
-        if (myRatings.CentralDefense > opponentRatings.CentralAttack * 1.15)
-            strengths.Add("Silna obrona centralna - przeciwnik ma problemy ze strzelaniem");
-
-        if (myRatings.RightAttack > opponentRatings.LeftDefense * 1.15)
-            strengths.Add("Przewaga na prawej flance - wykorzystaj to skrzydlo");
-
-        if (myRatings.LeftAttack > opponentRatings.RightDefense * 1.15)
-            strengths.Add("Przewaga na lewej flance - wykorzystaj to skrzydlo");
-
-        return strengths;
+        var r = new List<string>();
+        if (me.Midfield > opp.Midfield * 1.15) r.Add("Przewaga w pomocy — wiecej szans na twoja druzyne.");
+        if (me.CentralDefense > opp.CentralAttack * 1.15) r.Add("Mocna obrona centralna — przeciwnik bedzie mial trudno w srodku.");
+        if (me.RightAttack > opp.LeftDefense * 1.15) r.Add("Atakuj prawym skrzydlem — slabosc w obronie przeciwnika.");
+        if (me.LeftAttack > opp.RightDefense * 1.15) r.Add("Atakuj lewym skrzydlem — slabosc w obronie przeciwnika.");
+        return r;
     }
 
-    private List<string> IdentifyWeaknesses(LineupRatings myRatings, LineupRatings opponentRatings)
+    private List<string> IdentifyWeaknesses(LineupRatings me, LineupRatings opp)
     {
-        var weaknesses = new List<string>();
-
-        if (myRatings.Midfield < opponentRatings.Midfield * 0.85)
-            weaknesses.Add("Sabo w pomocy - rozwa defensywn taktyk");
-
-        if (myRatings.CentralDefense < opponentRatings.CentralAttack * 0.9)
-            weaknesses.Add("Saba obrona centralna - wzmocnij");
-
-        if (myRatings.RightDefense < opponentRatings.LeftAttack * 0.9)
-            weaknesses.Add("Saba prawa obrona - przeciwnik moe to wykorzysta");
-
-        if (myRatings.LeftDefense < opponentRatings.RightAttack * 0.9)
-            weaknesses.Add("Saba lewa obrona - przeciwnik moe to wykorzysta");
-
-        return weaknesses;
+        var r = new List<string>();
+        if (me.Midfield < opp.Midfield * 0.9) r.Add("Slabsza pomoc — przeciwnik bedzie mial posiadanie.");
+        if (me.CentralDefense < opp.CentralAttack * 0.9) r.Add("Zagrozenie w srodku obrony — wzmocnij.");
+        if (me.RightDefense < opp.LeftAttack * 0.9) r.Add("Prawa obrona pod presja.");
+        if (me.LeftDefense < opp.RightAttack * 0.9) r.Add("Lewa obrona pod presja.");
+        return r;
     }
 
-    private List<string> GenerateRecommendations(TeamComparison comparison, Lineup lineup, FormationAnalysis analysis)
+    private List<string> GenerateRecommendations(OptimizationCandidate best, TeamComparison cmp)
     {
-        var recommendations = new List<string>();
-
-        // Rekomendacje na podstawie stylu formacji
-        switch (analysis.FormationStyle)
+        var rec = new List<string>
         {
-            case FormationStyle.UltraDefensive:
-                recommendations.Add("Graj defensywnie - formacja ultra-defensywna");
-                recommendations.Add("Czekaj na bledy przeciwnika i kontruj");
-                break;
-            case FormationStyle.Defensive:
-                recommendations.Add("Graj defensywnie - solidna obrona");
-                recommendations.Add("Zachowaj czyste konto");
-                break;
-            case FormationStyle.MidfieldControl:
-                recommendations.Add("Kontroluj gr w pomocy");
-                recommendations.Add("Wykorzystaj przewagi w posiadaniu");
-                break;
-            case FormationStyle.Balanced:
-                recommendations.Add("Graj zbalansowanie - elastyczno kluczem");
-                break;
-            case FormationStyle.Offensive:
-                recommendations.Add("Graj ofensywnie - stwórz pres");
-                break;
-            case FormationStyle.UltraOffensive:
-                recommendations.Add("Graj bardzo ofensywnie - atakuj bez pardonu");
-                break;
+            $"Formacja: {best.Lineup.Formation.Name} ({best.Lineup.Formation.Description}).",
+            $"Taktyka: {TranslateTactic(best.Tactic)}.",
+            $"Postawa druzyny: {TranslateAttitude(best.Attitude)}.",
+            $"Trener: {TranslateCoach(best.Coach)}.",
+            $"Szacowane prawdopodobienstwo: wygrana {best.WinProbability:P1}, remis {best.DrawProbability:P1}, porazka {best.LossProbability:P1}.",
+            $"Oczekiwany wynik (lambda): {best.ExpectedGoalsFor:F2}:{best.ExpectedGoalsAgainst:F2}."
+        };
+        if (best.DisorderRisk > 0.01)
+        {
+            rec.Add($"Ryzyko nieladu (niskie doswiadczenie formacji): {best.DisorderRisk:P0} — rozwaz czestsze granie ta formacja lub wybor formacji o wyzszym poziomie doswiadczenia.");
         }
 
-        // Rekomendacje na podstawie taktyki
-        if (analysis.RecommendedTactic == "Counter")
-        {
-            recommendations.Add("Ustaw kontratak - czekaj na bledy przeciwnika");
-        }
+        var bhvSummary = best.Lineup.Slots
+            .Where(kv => kv.Key != "GK")
+            .Select(kv => $"{kv.Key}={kv.Value.Behaviour}")
+            .ToList();
+        rec.Add("Ustawienia per slot: " + string.Join(", ", bhvSummary));
 
-        // Rekomendacje na podstawie analizy przeciwnika
-        if (analysis.OpponentStrength.SideDefense < 40)
-        {
-            recommendations.Add("Atakuj skrzydami - obrona przeciwnika jest saba");
-        }
-
-        if (analysis.OpponentStrength.CentralDefense < 40)
-        {
-            recommendations.Add("Atakuj przez centrum - przebij obron");
-        }
-
-        return recommendations;
+        rec.AddRange(cmp.Strengths);
+        rec.AddRange(cmp.Weaknesses);
+        return rec;
     }
+
+    private static string TranslateTactic(string t) => t switch
+    {
+        "Normal" => "Zwykla",
+        "Counter" => "Kontratak",
+        "AttackInMiddle" => "Atak srodkiem (AIM)",
+        "AttackOnWings" => "Atak skrzydlami (AOW)",
+        "Pressing" => "Pressing",
+        "PlayCreatively" => "Kreatywna gra",
+        "LongShots" => "Strzaly z dystansu",
+        _ => t
+    };
+
+    private static string TranslateAttitude(string a) => a switch
+    {
+        "PIC" => "Gra na luzie (PIC)",
+        "MOTS" => "Mecz sezonu (MOTS)",
+        _ => "Normalne spotkanie"
+    };
+
+    private static string TranslateCoach(string c) => c switch
+    {
+        "Offensive" => "Ofensywny",
+        "Defensive" => "Defensywny",
+        _ => "Neutralny"
+    };
 }
 
-public class FormationAnalysis
+// ======================= Internal structures =======================
+
+internal class AssignedSlot
 {
-    public FormationDefinition SelectedFormation { get; set; } = null!;
-    public OpponentStrength OpponentStrength { get; set; } = null!;
-    public string RecommendedTactic { get; set; } = "";
-    public FormationStyle FormationStyle { get; set; }
-    public string WeatherCondition { get; set; } = "Overcast"; // Domylnie
+    public string SlotId { get; set; } = "";
+    public Player Player { get; set; } = null!;
+    public string Behaviour { get; set; } = "";
 }
 
-public class OpponentStrength
+internal class AssignedLineup
 {
-    public double Midfield { get; set; }
-    public double CentralDefense { get; set; }
-    public double SideDefense { get; set; }
-    public double CentralAttack { get; set; }
-    public double SideAttack { get; set; }
-    public double Overall { get; set; }
-    public string WeakSide { get; set; } = "";
-    public string StrongSide { get; set; } = "";
+    public FormationDefinition Formation { get; set; } = null!;
+    public Dictionary<string, AssignedSlot> Slots { get; set; } = new();
 }
 
-public class PositionCounts
+internal class OptimizationCandidate
 {
-    public int CentralDefenders { get; set; }
-    public int InnerMidfielders { get; set; }
-    public int Forwards { get; set; }
+    public AssignedLineup Lineup { get; set; } = null!;
+    public string Tactic { get; set; } = "";
+    public string Attitude { get; set; } = "Normal";
+    public string Coach { get; set; } = "Neutral";
+    public LineupRatings Ratings { get; set; } = new();
+    public double WinProbability { get; set; }
+    public double DrawProbability { get; set; }
+    public double LossProbability { get; set; }
+    public double ExpectedGoalsFor { get; set; }
+    public double ExpectedGoalsAgainst { get; set; }
+    public double DisorderRisk { get; set; }
+    public double Score { get; set; }
+}
+
+internal class RatingWeights
+{
+    public double Midfield { get; set; } = 1.0;
+    public double CentralDefense { get; set; } = 1.0;
+    public double RightDefense { get; set; } = 1.0;
+    public double LeftDefense { get; set; } = 1.0;
+    public double CentralAttack { get; set; } = 1.0;
+    public double RightAttack { get; set; } = 1.0;
+    public double LeftAttack { get; set; } = 1.0;
+
+    public static RatingWeights Uniform => new();
 }

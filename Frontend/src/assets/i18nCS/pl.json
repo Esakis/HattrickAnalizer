@@ -77,6 +77,10 @@
     "myTeamIdLabel": "ID Twojej Drużyny:",
     "opponentTeamIdLabel": "ID Drużyny Przeciwnika:",
     "tacticLabel": "Preferowana Taktyka:",
+    "teamAttitudeLabel": "Postawa drużyny:",
+    "coachLabel": "Trener:",
+    "assistantLabel": "Asystent ds. taktyki (poziom):",
+    "formationExperienceLabel": "Doświadczenie formacji",
     "teamIdPlaceholder": "np. 123456",
     "optimizeLineup": "Optymalizuj Skład",
     "optimizing": "Optymalizacja...",
@@ -122,12 +126,34 @@
       "DF": "ND"
     },
     "tactics": {
+      "auto": "Automatycznie (najlepsza)",
       "normal": "Normalna",
-      "offensive": "Ofensywna",
-      "defensive": "Defensywna",
       "counter": "Kontratak",
       "attackMiddle": "Atak środkiem",
-      "attackWings": "Atak skrzydłami"
+      "attackWings": "Atak skrzydłami",
+      "pressing": "Pressing",
+      "creatively": "Kreatywna gra",
+      "longShots": "Strzały z dystansu"
+    },
+    "attitudes": {
+      "normal": "Normalne spotkanie",
+      "pic": "Gra na luzie (PIC)",
+      "mots": "Mecz sezonu (MOTS)"
+    },
+    "coach": {
+      "neutral": "Neutralny",
+      "offensive": "Ofensywny",
+      "defensive": "Defensywny"
+    },
+    "alternatives": {
+      "title": "Porównanie formacji",
+      "hint": "Inne formacje posortowane wg szacowanej skuteczności. Kliknij wiersz aby zobaczyć szczegóły.",
+      "rank": "#",
+      "win": "Wygrana",
+      "draw": "Remis",
+      "loss": "Porażka",
+      "xg": "Oczekiwane gole",
+      "disorder": "Ryzyko nieładu"
     },
     "formations": {
       "4-4-2": "4-4-2",

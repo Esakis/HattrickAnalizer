@@ -42,8 +42,8 @@
 
         <div class="form-group">
           <label for="tactic">{{ 'optimizer.tacticLabel' | translate }}</label>
-          <select 
-            id="tactic" 
+          <select
+            id="tactic"
             [(ngModel)]="preferredTactic"
             class="form-control">
             <option *ngFor="let tactic of tactics" [value]="tactic.value">
@@ -52,7 +52,60 @@
           </select>
         </div>
 
-        <button 
+        <div class="form-group">
+          <label for="teamAttitude">{{ 'optimizer.teamAttitudeLabel' | translate }}</label>
+          <select
+            id="teamAttitude"
+            [(ngModel)]="teamAttitude"
+            class="form-control">
+            <option *ngFor="let att of attitudes" [value]="att.value">
+              {{ att.label }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="coachType">{{ 'optimizer.coachLabel' | translate }}</label>
+          <select
+            id="coachType"
+            [(ngModel)]="coachType"
+            class="form-control">
+            <option *ngFor="let c of coachTypes" [value]="c.value">
+              {{ c.label }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="assistantLevel">{{ 'optimizer.assistantLabel' | translate }}</label>
+          <select
+            id="assistantLevel"
+            [(ngModel)]="assistantManagerLevel"
+            class="form-control">
+            <option [ngValue]="0">0</option>
+            <option [ngValue]="1">1</option>
+            <option [ngValue]="2">2</option>
+            <option [ngValue]="3">3</option>
+            <option [ngValue]="4">4</option>
+            <option [ngValue]="5">5</option>
+          </select>
+        </div>
+
+        <details class="form-group">
+          <summary>{{ 'optimizer.formationExperienceLabel' | translate }}</summary>
+          <div class="formation-exp-grid">
+            <div *ngFor="let f of availableFormations" class="formation-exp-row">
+              <label [for]="'fe_' + f">{{ f }}</label>
+              <select [id]="'fe_' + f" [(ngModel)]="formationExperience[f]" class="form-control">
+                <option *ngFor="let lvl of experienceLevels" [ngValue]="lvl.value">
+                  {{ lvl.label }}
+                </option>
+              </select>
+            </div>
+          </div>
+        </details>
+
+        <button
           (click)="optimizeLineup()" 
           [disabled]="loading"
           class="btn-primary">
@@ -239,7 +292,11 @@
       </div>
       <div *ngIf="result.optimalLineup.tacticType" class="tactic-info">
         <span class="tactic-label">{{ 'optimizer.tactic' | translate }}:</span>
-        <span class="tactic-value">{{ result.optimalLineup.tacticType }}</span>
+        <span class="tactic-value">{{ getTacticLabel(result.optimalLineup.tacticType) }}</span>
+      </div>
+      <div class="tactic-info">
+        <span class="tactic-label">{{ 'optimizer.teamAttitudeLabel' | translate }}</span>
+        <span class="tactic-value">{{ getAttitudeLabel(teamAttitude) }}</span>
       </div>
       <div class="lineup-field">
         <div class="position-row">
@@ -301,6 +358,39 @@
           {{ recommendation }}
         </li>
       </ul>
+    </div>
+
+    <div class="alternatives-section" *ngIf="result.alternatives?.length">
+      <h2>🔀 {{ 'optimizer.alternatives.title' | translate }}</h2>
+      <p class="alternatives-hint">{{ 'optimizer.alternatives.hint' | translate }}</p>
+      <table class="alternatives-table">
+        <thead>
+          <tr>
+            <th>{{ 'optimizer.alternatives.rank' | translate }}</th>
+            <th>{{ 'optimizer.formation' | translate }}</th>
+            <th>{{ 'optimizer.tactic' | translate }}</th>
+            <th>{{ 'optimizer.alternatives.win' | translate }}</th>
+            <th>{{ 'optimizer.alternatives.draw' | translate }}</th>
+            <th>{{ 'optimizer.alternatives.loss' | translate }}</th>
+            <th>{{ 'optimizer.alternatives.xg' | translate }}</th>
+            <th>{{ 'optimizer.alternatives.disorder' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let alt of result.alternatives; let i = index"
+              [class.selected]="i === selectedAlternative"
+              (click)="selectAlternative(i)">
+            <td>{{ i + 1 }}</td>
+            <td>{{ alt.formation }}</td>
+            <td>{{ getTacticLabel(alt.tactic) }}</td>
+            <td>{{ alt.winProbability | percent:'1.1-1' }}</td>
+            <td>{{ alt.drawProbability | percent:'1.1-1' }}</td>
+            <td>{{ alt.lossProbability | percent:'1.1-1' }}</td>
+            <td>{{ alt.expectedGoalsFor | number:'1.2-2' }} : {{ alt.expectedGoalsAgainst | number:'1.2-2' }}</td>
+            <td>{{ alt.disorderRisk | percent:'1.0-0' }}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>

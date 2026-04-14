@@ -77,6 +77,10 @@
     "myTeamIdLabel": "Your Team ID:",
     "opponentTeamIdLabel": "Opponent Team ID:",
     "tacticLabel": "Preferred Tactic:",
+    "teamAttitudeLabel": "Team Attitude:",
+    "coachLabel": "Coach:",
+    "assistantLabel": "Assistant manager level:",
+    "formationExperienceLabel": "Formation experience",
     "teamIdPlaceholder": "e.g. 123456",
     "optimizeLineup": "Optimize Lineup",
     "optimizing": "Optimizing...",
@@ -122,12 +126,34 @@
       "DF": "DF"
     },
     "tactics": {
+      "auto": "Auto (best)",
       "normal": "Normal",
-      "offensive": "Offensive",
-      "defensive": "Defensive",
       "counter": "Counter Attack",
-      "attackMiddle": "Attack Middle",
-      "attackWings": "Attack Wings"
+      "attackMiddle": "Attack in the Middle",
+      "attackWings": "Attack on Wings",
+      "pressing": "Pressing",
+      "creatively": "Play Creatively",
+      "longShots": "Long Shots"
+    },
+    "attitudes": {
+      "normal": "Normal match",
+      "pic": "Play it Cool (PIC)",
+      "mots": "Match of the Season (MOTS)"
+    },
+    "coach": {
+      "neutral": "Neutral",
+      "offensive": "Offensive",
+      "defensive": "Defensive"
+    },
+    "alternatives": {
+      "title": "Formation comparison",
+      "hint": "Other formations ranked by expected effectiveness. Click a row to see details.",
+      "rank": "#",
+      "win": "Win",
+      "draw": "Draw",
+      "loss": "Loss",
+      "xg": "Expected goals",
+      "disorder": "Disorder risk"
     },
     "formations": {
       "4-4-2": "4-4-2",

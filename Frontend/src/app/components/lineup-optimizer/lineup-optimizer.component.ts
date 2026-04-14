@@ -13,7 +13,13 @@ import { Player } from '../../models/player.model';
 export class LineupOptimizerComponent implements OnInit {
   myTeamId: number = 0;
   opponentTeamId: number = 0;
-  preferredTactic: string = 'Normal';
+  preferredTactic: string = 'Auto';
+  teamAttitude: string = 'Normal';
+  coachType: string = 'Neutral';
+  assistantManagerLevel: number = 0;
+  availableFormations: string[] = ['5-5-0','5-4-1','5-3-2','4-5-1','4-4-2','4-3-3','3-5-2','3-4-3','2-5-3'];
+  formationExperience: { [k: string]: number } = {};
+  selectedAlternative: number = 0;
 
   result: OptimizerResponse | null = null;
   loading: boolean = false;
@@ -36,6 +42,9 @@ export class LineupOptimizerComponent implements OnInit {
   opponentTeamName: string = '';
 
   tactics: { value: string; label: string }[] = [];
+  attitudes: { value: string; label: string }[] = [];
+  coachTypes: { value: string; label: string }[] = [];
+  experienceLevels: { value: number; label: string }[] = [];
 
   constructor(
     private hattrickApi: HattrickApiService,
@@ -71,13 +80,38 @@ export class LineupOptimizerComponent implements OnInit {
 
   private initializeTranslations(): void {
     this.tactics = [
+      { value: 'Auto', label: this.translate.instant('optimizer.tactics.auto') },
       { value: 'Normal', label: this.translate.instant('optimizer.tactics.normal') },
-      { value: 'Offensive', label: this.translate.instant('optimizer.tactics.offensive') },
-      { value: 'Defensive', label: this.translate.instant('optimizer.tactics.defensive') },
       { value: 'Counter', label: this.translate.instant('optimizer.tactics.counter') },
-      { value: 'AttackMiddle', label: this.translate.instant('optimizer.tactics.attackMiddle') },
-      { value: 'AttackWings', label: this.translate.instant('optimizer.tactics.attackWings') }
+      { value: 'AttackInMiddle', label: this.translate.instant('optimizer.tactics.attackMiddle') },
+      { value: 'AttackOnWings', label: this.translate.instant('optimizer.tactics.attackWings') },
+      { value: 'Pressing', label: this.translate.instant('optimizer.tactics.pressing') },
+      { value: 'PlayCreatively', label: this.translate.instant('optimizer.tactics.creatively') },
+      { value: 'LongShots', label: this.translate.instant('optimizer.tactics.longShots') }
     ];
+    this.attitudes = [
+      { value: 'Normal', label: this.translate.instant('optimizer.attitudes.normal') },
+      { value: 'PIC', label: this.translate.instant('optimizer.attitudes.pic') },
+      { value: 'MOTS', label: this.translate.instant('optimizer.attitudes.mots') }
+    ];
+    this.coachTypes = [
+      { value: 'Neutral', label: this.translate.instant('optimizer.coach.neutral') },
+      { value: 'Offensive', label: this.translate.instant('optimizer.coach.offensive') },
+      { value: 'Defensive', label: this.translate.instant('optimizer.coach.defensive') }
+    ];
+    this.experienceLevels = [
+      { value: 7, label: this.translate.instant('formationExperience.outstanding') },
+      { value: 6, label: this.translate.instant('formationExperience.formidable') },
+      { value: 5, label: this.translate.instant('formationExperience.excellent') },
+      { value: 4, label: this.translate.instant('formationExperience.solid') },
+      { value: 3, label: this.translate.instant('formationExperience.passable') },
+      { value: 2, label: this.translate.instant('formationExperience.inadequate') },
+      { value: 1, label: this.translate.instant('formationExperience.weak') },
+      { value: 0, label: this.translate.instant('formationExperience.poor') }
+    ];
+    for (const f of this.availableFormations) {
+      if (!(f in this.formationExperience)) this.formationExperience[f] = 5;
+    }
   }
 
   optimizeLineup(): void {
@@ -93,12 +127,17 @@ export class LineupOptimizerComponent implements OnInit {
       myTeamId: this.myTeamId,
       opponentTeamId: this.opponentTeamId,
       preferredTactic: this.preferredTactic,
-      focusAreas: []
+      teamAttitude: this.teamAttitude,
+      focusAreas: [],
+      coachType: this.coachType,
+      assistantManagerLevel: this.assistantManagerLevel,
+      formationExperience: this.formationExperience
     };
 
     this.hattrickApi.optimizeLineup(request).subscribe({
       next: (response) => {
         this.result = response;
+        this.selectedAlternative = 0;
         this.loading = false;
       },
       error: (err) => {
@@ -111,6 +150,35 @@ export class LineupOptimizerComponent implements OnInit {
   getPositionKeys(): string[] {
     if (!this.result?.optimalLineup?.positions) return [];
     return Object.keys(this.result.optimalLineup.positions);
+  }
+
+  getTacticLabel(value: string): string {
+    const map: { [key: string]: string } = {
+      'Auto': 'optimizer.tactics.auto',
+      'Normal': 'optimizer.tactics.normal',
+      'Counter': 'optimizer.tactics.counter',
+      'AttackInMiddle': 'optimizer.tactics.attackMiddle',
+      'AttackOnWings': 'optimizer.tactics.attackWings',
+      'Pressing': 'optimizer.tactics.pressing',
+      'PlayCreatively': 'optimizer.tactics.creatively',
+      'LongShots': 'optimizer.tactics.longShots'
+    };
+    const key = map[value];
+    return key ? this.translate.instant(key) : value;
+  }
+
+  getAttitudeLabel(value: string): string {
+    const map: { [key: string]: string } = {
+      'Normal': 'optimizer.attitudes.normal',
+      'PIC': 'optimizer.attitudes.pic',
+      'MOTS': 'optimizer.attitudes.mots'
+    };
+    const key = map[value];
+    return key ? this.translate.instant(key) : value;
+  }
+
+  selectAlternative(index: number): void {
+    this.selectedAlternative = index;
   }
 
   getPositionLabel(position: string): string {

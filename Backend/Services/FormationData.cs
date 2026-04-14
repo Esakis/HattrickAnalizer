@@ -349,6 +349,39 @@ public static class FormationData
         }
     };
 
+    // Mapowanie slotu w formacji -> dopuszczalne zachowania (behaviours).
+    // Klucze zachowań odpowiadają pozycjom w PositionContributions.
+    public static readonly Dictionary<string, string[]> SlotBehaviourOptions = new()
+    {
+        ["GK"] = new[] { "GK" },
+        ["RWB"] = new[] { "WBD", "WBN", "WBO", "WBTM" },
+        ["LWB"] = new[] { "WBD", "WBN", "WBO", "WBTM" },
+        ["RCD"] = new[] { "RCD", "CDO", "CDTW" },
+        ["LCD"] = new[] { "LCD", "CDO", "CDTW" },
+        ["CD"]  = new[] { "CD", "CDO" },
+        ["RW"]  = new[] { "RW", "WO", "WD", "WTM" },
+        ["LW"]  = new[] { "LW", "WO", "WD", "WTM" },
+        ["RIM"] = new[] { "RIM", "IMO", "IMD", "IMTW" },
+        ["LIM"] = new[] { "LIM", "IMO", "IMD", "IMTW" },
+        ["IM"]  = new[] { "IM", "IMO", "IMD" },
+        ["RFW"] = new[] { "RFW", "FTW", "DF" },
+        ["LFW"] = new[] { "LFW", "FTW", "DF" },
+        ["CFW"] = new[] { "CFW", "FTW", "DF" },
+        ["FW"]  = new[] { "FW", "FTW", "DF" }
+    };
+
+    // Informacja, czy slot jest po prawej / lewej / w centrum.
+    // Stosowane, by winger/WB kontrybuowali tylko do swojej flanki.
+    public static readonly Dictionary<string, string> SlotSide = new()
+    {
+        ["GK"] = "C",
+        ["RWB"] = "R", ["LWB"] = "L",
+        ["RCD"] = "C", ["LCD"] = "C", ["CD"] = "C",
+        ["RW"] = "R", ["LW"] = "L",
+        ["RIM"] = "C", ["LIM"] = "C", ["IM"] = "C",
+        ["RFW"] = "R", ["LFW"] = "L", ["CFW"] = "C", ["FW"] = "C"
+    };
+
     // Kary za aglomeracje (wielu graczy na tej samej pozycji centralnej)
     public static readonly Dictionary<int, double> CentralDefenderPenalty = new()
     {
@@ -384,26 +417,51 @@ public static class FormationData
     // Wspczynniki dla taktyk
     public static class TacticModifiers
     {
-        // Counter Attack - 93% midfield, ale szanse na kontr
+        // Counter Attack - 93% midfield, bonus do szans gdy druyna ma mniejszosc w posiadaniu
         public const double CounterAttackMidfieldPenalty = 0.93;
-        
-        // PIC (Play It Cool) - 83.945% midfield
+        public const double CounterAttackAttackBonus = 1.08; // boost atakow gdy kontratak zadziala (uproszczenie)
+
+        // PIC (Play It Cool) - 83.945% midfield, ale TS x1.33
         public const double PICMidfieldPenalty = 0.83945;
-        
-        // MOTS (Match Of The Season) - 111.49% midfield
+        public const double PICTeamSpiritBonus = 1.33;
+
+        // MOTS (Match Of The Season) - 111.49% midfield, TS spada 50%
         public const double MOTSMidfieldBonus = 1.1149;
-        
+        public const double MOTSTeamSpiritPenalty = 0.50;
+
         // Home advantage - 119.892% midfield
         public const double HomeAdvantage = 1.19892;
-        
+
         // Derby (away team) - 111.493% midfield
         public const double DerbyAwayBonus = 1.11493;
+
+        // AIM - Atak rodkiem: +~10% CA, -~5% boczne
+        public const double AIMCentralAttackBonus = 1.10;
+        public const double AIMSideAttackPenalty = 0.95;
+
+        // AOW - Atak skrzydlami: -~5% CA, +~10% boczne
+        public const double AOWCentralAttackPenalty = 0.95;
+        public const double AOWSideAttackBonus = 1.10;
+
+        // Pressing: -8% atak (oba), +6% obrona, wymaga kondycji
+        public const double PressingAttackPenalty = 0.92;
+        public const double PressingDefenseBonus = 1.06;
+        public const double PressingMidfieldPenalty = 0.97;
+
+        // Play Creatively: +6% atak, -4% obrona (uproszczenie - takt. SE)
+        public const double CreativelyAttackBonus = 1.06;
+        public const double CreativelyDefensePenalty = 0.96;
+
+        // Long Shots: -5% midfield, -2.7% attack; szansa na strzaly dystansowe
+        public const double LongShotsMidfieldPenalty = 0.95;
+        public const double LongShotsAttackPenalty = 0.973;
+        public const double LongShotsGoalBonus = 1.05; // bonus do oczekiwanych goli gdy LS level wysoki
 
         // AOW/AIM - poziom taktyki = (suma poda / 5) - 2
         public static int CalculateAOWAIMLevel(int totalPassing) => (totalPassing / 5) - 2;
 
         // Long Shots - poziom = 1.66*SC + 0.55*SP - 7.6
-        public static double CalculateLongShotsLevel(double avgScoring, double avgSetPieces) 
+        public static double CalculateLongShotsLevel(double avgScoring, double avgSetPieces)
             => 1.66 * avgScoring + 0.55 * avgSetPieces - 7.6;
 
         // Pressing wymaga wysokiej kondycji (stamina)

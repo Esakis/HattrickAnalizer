@@ -1,9 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { HattrickApiService } from '../../services/hattrick-api.service';
-import { OptimizerRequest, OptimizerResponse } from '../../models/lineup.model';
+import { OptimizerRequest, OptimizerResponse, LineupPosition, Lineup } from '../../models/lineup.model';
 import { TranslateService } from '@ngx-translate/core';
 import { DataCacheService } from '../../services/data-cache.service';
-import { Player } from '../../models/player.model';
+import { Player, PlayerMatchStats } from '../../models/player.model';
 
 @Component({
   selector: 'app-lineup-optimizer',
@@ -40,6 +40,46 @@ export class LineupOptimizerComponent implements OnInit {
   
   myTeamName: string = '';
   opponentTeamName: string = '';
+
+  // Wybór formacji i taktyki dla mojej drużyny
+  selectedMyFormation: string = 'Auto';
+  selectedMyTactic: string = 'Auto';
+  
+  // Wybór formacji i taktyki dla przeciwnika
+  selectedOpponentFormation: string = 'Auto';
+  selectedOpponentTactic: string = 'Auto';
+  
+  // Optimal Lineup dla przeciwnika
+  opponentOptimalLineup: Lineup | null = null;
+  
+  // Sortowanie tabeli graczy
+  playerSortColumn: string = 'form';
+  playerSortDirection: 'asc' | 'desc' = 'desc';
+  
+  // Trener i sztab
+  trainerLevel: number = 0;
+  assistantCoachLevel: number = 0;
+  formCoachLevel: number = 0;
+  
+  // Kolumny do sortowania
+  sortableColumns = [
+    { key: 'name', label: 'Imię' },
+    { key: 'age', label: 'Wiek' },
+    { key: 'form', label: 'Forma' },
+    { key: 'stamina', label: 'Kondycja' },
+    { key: 'keeper', label: 'Bramkarz' },
+    { key: 'defending', label: 'Obrona' },
+    { key: 'playmaking', label: 'Rozgrywanie' },
+    { key: 'winger', label: 'Skrzydło' },
+    { key: 'passing', label: 'Podania' },
+    { key: 'scoring', label: 'Strzelanie' },
+    { key: 'setPieces', label: 'Stałe fragmenty' },
+    { key: 'goals', label: 'Bramki' },
+    { key: 'assists', label: 'Asysty' },
+    { key: 'avgForm', label: 'Śr. Forma' },
+    { key: 'goalsPerMatch', label: 'Bramki/Mecz' },
+    { key: 'matchesPerGoal', label: 'Mecze/Bramka' }
+  ];
 
   tactics: { value: string; label: string }[] = [];
   attitudes: { value: string; label: string }[] = [];
@@ -100,17 +140,17 @@ export class LineupOptimizerComponent implements OnInit {
       { value: 'Defensive', label: this.translate.instant('optimizer.coach.defensive') }
     ];
     this.experienceLevels = [
-      { value: 7, label: this.translate.instant('formationExperience.outstanding') },
-      { value: 6, label: this.translate.instant('formationExperience.formidable') },
-      { value: 5, label: this.translate.instant('formationExperience.excellent') },
-      { value: 4, label: this.translate.instant('formationExperience.solid') },
-      { value: 3, label: this.translate.instant('formationExperience.passable') },
-      { value: 2, label: this.translate.instant('formationExperience.inadequate') },
-      { value: 1, label: this.translate.instant('formationExperience.weak') },
-      { value: 0, label: this.translate.instant('formationExperience.poor') }
+      { value: 10, label: this.translate.instant('formationExperience.10') },
+      { value: 9, label: this.translate.instant('formationExperience.9') },
+      { value: 8, label: this.translate.instant('formationExperience.8') },
+      { value: 7, label: this.translate.instant('formationExperience.7') },
+      { value: 6, label: this.translate.instant('formationExperience.6') },
+      { value: 5, label: this.translate.instant('formationExperience.5') },
+      { value: 4, label: this.translate.instant('formationExperience.4') },
+      { value: 3, label: this.translate.instant('formationExperience.3') }
     ];
     for (const f of this.availableFormations) {
-      if (!(f in this.formationExperience)) this.formationExperience[f] = 5;
+      if (!(f in this.formationExperience)) this.formationExperience[f] = 6;
     }
   }
 
@@ -259,9 +299,32 @@ export class LineupOptimizerComponent implements OnInit {
         this.myTeamName = team.teamName;
         this.lastLoadedMyTeamId = this.myTeamId;
         this.loadingMyTeam = false;
+        // Generuj statystyki dla graczy
+        this.generatePlayerStats();
+        // Pobierz doświadczenie formacji
+        this.loadFormationExperience();
       },
       error: () => {
         this.loadingMyTeam = false;
+      }
+    });
+  }
+
+  loadFormationExperience(): void {
+    if (!this.myTeamId) return;
+    
+    this.hattrickApi.getFormationExperience(this.myTeamId).subscribe({
+      next: (experience) => {
+        // Aktualizuj doświadczenie formacji z danych API
+        for (const formation of this.availableFormations) {
+          if (experience[formation] !== undefined) {
+            this.formationExperience[formation] = experience[formation];
+          }
+        }
+      },
+      error: (err) => {
+        console.error('Error loading formation experience:', err);
+        // W przypadku błędu zachowaj domyślne wartości
       }
     });
   }
@@ -281,6 +344,10 @@ export class LineupOptimizerComponent implements OnInit {
         this.opponentTeamName = team.teamName;
         this.lastLoadedOpponentId = this.opponentTeamId;
         this.loadingOpponentTeam = false;
+        // Generuj statystyki dla graczy przeciwnika
+        this.generatePlayerStats();
+        // Zbuduj optymalny skład dla przeciwnika
+        this.buildOpponentOptimalLineup();
       },
       error: () => {
         this.loadingOpponentTeam = false;
@@ -294,8 +361,10 @@ export class LineupOptimizerComponent implements OnInit {
       if (this.lastLoadedMyTeamId !== this.myTeamId) {
         this.myTeamPlayers = [];
         this.myTeamName = '';
+        this.myTeamStats = null;
       }
       this.loadMyTeam();
+      this.loadMyTeamStats();
     }
   }
 
@@ -305,8 +374,10 @@ export class LineupOptimizerComponent implements OnInit {
       if (this.lastLoadedOpponentId !== this.opponentTeamId) {
         this.opponentTeamPlayers = [];
         this.opponentTeamName = '';
+        this.opponentTeamStats = null;
       }
       this.loadOpponentTeam();
+      this.loadOpponentTeamStats();
     }
   }
 
@@ -435,5 +506,306 @@ export class LineupOptimizerComponent implements OnInit {
       recentResults.push(results[Math.floor(random() * results.length)]);
     }
     return recentResults;
+  }
+
+  // ==================== SORTOWANIE GRACZY ====================
+  
+  sortPlayers(column: string): void {
+    if (this.playerSortColumn === column) {
+      this.playerSortDirection = this.playerSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.playerSortColumn = column;
+      this.playerSortDirection = 'desc';
+    }
+  }
+
+  get sortedMyTeamPlayers(): Player[] {
+    if (!this.myTeamPlayers || this.myTeamPlayers.length === 0) return [];
+    
+    return [...this.myTeamPlayers].sort((a, b) => {
+      let valueA = this.getPlayerSortValue(a, this.playerSortColumn);
+      let valueB = this.getPlayerSortValue(b, this.playerSortColumn);
+      
+      if (typeof valueA === 'string') {
+        valueA = valueA.toLowerCase();
+        valueB = (valueB as string).toLowerCase();
+      }
+      
+      if (valueA < valueB) return this.playerSortDirection === 'asc' ? -1 : 1;
+      if (valueA > valueB) return this.playerSortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+
+  getPlayerSortValue(player: Player, column: string): any {
+    switch (column) {
+      case 'name': return `${player.firstName} ${player.lastName}`;
+      case 'age': return player.age;
+      case 'form': return player.form;
+      case 'stamina': return player.stamina;
+      case 'keeper': return player.skills?.keeper || 0;
+      case 'defending': return player.skills?.defending || 0;
+      case 'playmaking': return player.skills?.playmaking || 0;
+      case 'winger': return player.skills?.winger || 0;
+      case 'passing': return player.skills?.passing || 0;
+      case 'scoring': return player.skills?.scoring || 0;
+      case 'setPieces': return player.skills?.setPieces || 0;
+      case 'goals': return player.matchStats?.goals || 0;
+      case 'assists': return player.matchStats?.assists || 0;
+      case 'avgForm': return player.matchStats?.averageForm || player.form;
+      case 'goalsPerMatch': return player.matchStats?.goalsPerMatch || 0;
+      case 'matchesPerGoal': return player.matchStats?.matchesPerGoal || 999;
+      default: return 0;
+    }
+  }
+
+  // ==================== ZMIANA FORMACJI I TAKTYKI ====================
+  
+  onMyFormationChange(): void {
+    if (this.selectedMyFormation !== 'Auto') {
+      // Jeśli wybrano konkretną formację, dopasuj zawodników
+      this.assignPlayersToFormation(this.selectedMyFormation, this.myTeamPlayers);
+    }
+    // Jeśli Auto, optymalizator sam wybierze najlepszą
+  }
+
+  onMyTacticChange(): void {
+    // Aktualizuj preferredTactic dla optymalizatora
+    this.preferredTactic = this.selectedMyTactic;
+  }
+
+  onOpponentFormationChange(): void {
+    if (this.selectedOpponentFormation !== 'Auto' && this.opponentTeamPlayers.length > 0) {
+      this.buildOpponentOptimalLineup();
+    }
+  }
+
+  onOpponentTacticChange(): void {
+    if (this.opponentTeamPlayers.length > 0) {
+      this.buildOpponentOptimalLineup();
+    }
+  }
+
+  // ==================== OPTIMAL LINEUP DLA PRZECIWNIKA ====================
+
+  buildOpponentOptimalLineup(): void {
+    if (this.opponentTeamPlayers.length < 11) return;
+    
+    const formation = this.selectedOpponentFormation === 'Auto' 
+      ? this.getBestFormationForTeam(this.opponentTeamPlayers)
+      : this.selectedOpponentFormation;
+    
+    const positions = this.getFormationPositions(formation);
+    const lineup: Lineup = {
+      positions: {},
+      tacticType: this.selectedOpponentTactic === 'Auto' ? 'Normal' : this.selectedOpponentTactic,
+      tacticSkill: '',
+      predictedRatings: {
+        midfield: 0, rightDefense: 0, centralDefense: 0, leftDefense: 0,
+        rightAttack: 0, centralAttack: 0, leftAttack: 0, overall: 0
+      },
+      formation: formation
+    };
+
+    const availablePlayers = [...this.opponentTeamPlayers].filter(p => p.injuryLevel === 0);
+    const usedPlayers = new Set<number>();
+
+    for (const pos of positions) {
+      const bestPlayer = this.findBestPlayerForPosition(pos, availablePlayers, usedPlayers);
+      if (bestPlayer) {
+        lineup.positions[pos] = {
+          position: pos,
+          player: bestPlayer,
+          behavior: 'Normal'
+        };
+        usedPlayers.add(bestPlayer.playerId);
+      }
+    }
+
+    this.opponentOptimalLineup = lineup;
+  }
+
+  getFormationPositions(formation: string): string[] {
+    const formationMap: { [key: string]: string[] } = {
+      '5-5-0': ['GK', 'RWB', 'RCD', 'CD', 'LCD', 'LWB', 'RW', 'RIM', 'IM', 'LIM', 'LW'],
+      '5-4-1': ['GK', 'RWB', 'RCD', 'CD', 'LCD', 'LWB', 'RW', 'RIM', 'LIM', 'LW', 'FW'],
+      '5-3-2': ['GK', 'RWB', 'RCD', 'CD', 'LCD', 'LWB', 'RIM', 'IM', 'LIM', 'RFW', 'LFW'],
+      '4-5-1': ['GK', 'RWB', 'RCD', 'LCD', 'LWB', 'RW', 'RIM', 'IM', 'LIM', 'LW', 'FW'],
+      '4-4-2': ['GK', 'RWB', 'RCD', 'LCD', 'LWB', 'RW', 'RIM', 'LIM', 'LW', 'RFW', 'LFW'],
+      '4-3-3': ['GK', 'RWB', 'RCD', 'LCD', 'LWB', 'RW', 'IM', 'LW', 'RFW', 'FW', 'LFW'],
+      '3-5-2': ['GK', 'RCD', 'CD', 'LCD', 'RW', 'RIM', 'IM', 'LIM', 'LW', 'RFW', 'LFW'],
+      '3-4-3': ['GK', 'RCD', 'CD', 'LCD', 'RW', 'RIM', 'LIM', 'LW', 'RFW', 'FW', 'LFW'],
+      '2-5-3': ['GK', 'RCD', 'LCD', 'RW', 'RIM', 'IM', 'LIM', 'LW', 'RFW', 'FW', 'LFW']
+    };
+    return formationMap[formation] || formationMap['4-4-2'];
+  }
+
+  findBestPlayerForPosition(position: string, players: Player[], usedPlayers: Set<number>): Player | null {
+    const available = players.filter(p => !usedPlayers.has(p.playerId));
+    if (available.length === 0) return null;
+
+    return available.reduce((best, player) => {
+      const bestScore = this.getPositionScore(best, position);
+      const playerScore = this.getPositionScore(player, position);
+      return playerScore > bestScore ? player : best;
+    });
+  }
+
+  getPositionScore(player: Player, position: string): number {
+    const skills = player.skills;
+    const formBonus = player.form * 0.1;
+    
+    // Sprawdź czy gracz ma ocenę na tej pozycji z poprzednich meczów
+    if (player.matchStats?.positionRatings?.[position]) {
+      return player.matchStats.positionRatings[position] + formBonus;
+    }
+
+    switch (position) {
+      case 'GK':
+        return skills.keeper * 1.5 + formBonus;
+      case 'RWB':
+      case 'LWB':
+        return skills.defending * 0.8 + skills.winger * 0.6 + skills.playmaking * 0.2 + formBonus;
+      case 'RCD':
+      case 'LCD':
+      case 'CD':
+        return skills.defending * 1.2 + skills.playmaking * 0.3 + formBonus;
+      case 'RW':
+      case 'LW':
+        return skills.winger * 1.0 + skills.playmaking * 0.5 + skills.passing * 0.3 + formBonus;
+      case 'RIM':
+      case 'LIM':
+      case 'IM':
+        return skills.playmaking * 1.2 + skills.passing * 0.4 + skills.defending * 0.2 + formBonus;
+      case 'RFW':
+      case 'LFW':
+      case 'FW':
+        return skills.scoring * 1.3 + skills.passing * 0.3 + skills.winger * 0.2 + formBonus;
+      default:
+        return skills.playmaking + formBonus;
+    }
+  }
+
+  getBestFormationForTeam(players: Player[]): string {
+    // Analiza składu i wybór najlepszej formacji
+    const defenders = players.filter(p => p.skills.defending > 10).length;
+    const midfielders = players.filter(p => p.skills.playmaking > 10).length;
+    const forwards = players.filter(p => p.skills.scoring > 10).length;
+    const wingers = players.filter(p => p.skills.winger > 10).length;
+
+    if (defenders >= 5 && midfielders >= 4) return '5-4-1';
+    if (midfielders >= 5) return '4-5-1';
+    if (forwards >= 3 && wingers >= 2) return '4-3-3';
+    if (defenders >= 4 && forwards >= 2) return '4-4-2';
+    if (midfielders >= 5 && forwards >= 2) return '3-5-2';
+    
+    return '4-4-2'; // Domyślna
+  }
+
+  assignPlayersToFormation(formation: string, players: Player[]): void {
+    // Ta metoda może być używana do wizualizacji przypisania
+    // W praktyce optymalizator robi to automatycznie
+  }
+
+  // ==================== GENEROWANIE STATYSTYK GRACZY ====================
+
+  generatePlayerStats(): void {
+    this.myTeamPlayers = this.myTeamPlayers.map(player => {
+      if (!player.matchStats) {
+        player.matchStats = this.generateMockPlayerStats(player);
+      }
+      return player;
+    });
+    
+    this.opponentTeamPlayers = this.opponentTeamPlayers.map(player => {
+      if (!player.matchStats) {
+        player.matchStats = this.generateMockPlayerStats(player);
+      }
+      return player;
+    });
+  }
+
+  generateMockPlayerStats(player: Player): PlayerMatchStats {
+    // Generuj realistyczne statystyki na podstawie umiejętności gracza
+    let seed = player.playerId;
+    const random = () => {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+
+    const isForward = player.skills.scoring > 10;
+    const isMidfielder = player.skills.playmaking > 10;
+    const isDefender = player.skills.defending > 10;
+    const isKeeper = player.skills.keeper > 10;
+
+    const totalMatches = Math.floor(random() * 20) + 10;
+    let goals = 0;
+    let assists = 0;
+
+    if (isForward) {
+      goals = Math.floor(random() * totalMatches * 0.6) + Math.floor(player.skills.scoring / 3);
+      assists = Math.floor(random() * totalMatches * 0.2);
+    } else if (isMidfielder) {
+      goals = Math.floor(random() * totalMatches * 0.2);
+      assists = Math.floor(random() * totalMatches * 0.4) + Math.floor(player.skills.passing / 4);
+    } else if (isDefender) {
+      goals = Math.floor(random() * 3);
+      assists = Math.floor(random() * 5);
+    } else if (isKeeper) {
+      goals = 0;
+      assists = 0;
+    }
+
+    const goalsPerMatch = totalMatches > 0 ? goals / totalMatches : 0;
+    const matchesPerGoal = goals > 0 ? totalMatches / goals : 0;
+
+    return {
+      totalMatches,
+      goals,
+      assists,
+      yellowCards: Math.floor(random() * 5),
+      redCards: Math.floor(random() * 2),
+      averageRating: 5 + random() * 4,
+      averageForm: player.form - 1 + random() * 2,
+      goalsPerMatch,
+      matchesPerGoal,
+      minutesPlayed: totalMatches * 90 - Math.floor(random() * totalMatches * 20),
+      positionRatings: this.generatePositionRatings(player, random)
+    };
+  }
+
+  generatePositionRatings(player: Player, random: () => number): { [position: string]: number } {
+    const ratings: { [position: string]: number } = {};
+    const positions = ['GK', 'RWB', 'LWB', 'RCD', 'LCD', 'CD', 'RW', 'LW', 'RIM', 'LIM', 'IM', 'RFW', 'LFW', 'FW'];
+    
+    for (const pos of positions) {
+      const baseScore = this.getPositionScore(player, pos);
+      // Dodaj losową wariację z poprzednich meczów
+      ratings[pos] = Math.max(1, baseScore + (random() - 0.5) * 2);
+    }
+    
+    return ratings;
+  }
+
+  getPlayerPositionRating(player: Player, position: string): string {
+    if (player.matchStats?.positionRatings?.[position]) {
+      return player.matchStats.positionRatings[position].toFixed(1);
+    }
+    return '-';
+  }
+
+  // ==================== POMOCNICZE ====================
+
+  getOpponentPositionKeys(): string[] {
+    if (!this.opponentOptimalLineup?.positions) return [];
+    return Object.keys(this.opponentOptimalLineup.positions);
+  }
+
+  getSkillLevel(value: number): string {
+    const levels = ['', 'nędzny', 'marny', 'słaby', 'kiepski', 'niewystarczający', 
+                    'przeciętny', 'przyzwoity', 'solidny', 'znakomity', 'wybitny',
+                    'wspaniały', 'genialny', 'nadludzki', 'nieziemski', 'boski',
+                    'nadprzyrodzony', 'tytaniczny', 'magiczny', 'mistyczny', 'legendarny'];
+    return levels[Math.min(value, levels.length - 1)] || `${value}`;
   }
 }

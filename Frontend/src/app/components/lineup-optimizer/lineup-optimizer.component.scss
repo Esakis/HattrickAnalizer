@@ -719,3 +719,349 @@ details > summary {
     }
   }
 }
+
+// ==================== TABELA GRACZY ====================
+
+.players-table-section {
+  background: white;
+  margin: 0 20px 15px 20px;
+  padding: 15px 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(46, 125, 50, 0.15);
+  border: 2px solid #a5d6a7;
+
+  h2 {
+    color: #1b5e20;
+    margin: 0 0 15px 0;
+    font-size: 1.3em;
+    font-weight: 600;
+    border-bottom: 2px solid #66bb6a;
+    padding-bottom: 8px;
+  }
+
+  .table-container {
+    overflow-x: auto;
+    max-height: 500px;
+    overflow-y: auto;
+  }
+
+  .players-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85em;
+    min-width: 1200px;
+
+    th, td {
+      padding: 8px 6px;
+      text-align: center;
+      border-bottom: 1px solid #e0e0e0;
+      white-space: nowrap;
+    }
+
+    th {
+      background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+      color: #1b5e20;
+      font-weight: 700;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+
+      &.sortable {
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.2s;
+
+        &:hover {
+          background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
+        }
+      }
+
+      .sort-icon {
+        margin-left: 4px;
+        font-size: 0.8em;
+      }
+    }
+
+    tbody tr {
+      transition: background 0.2s;
+
+      &:hover {
+        background: #f1f8e9;
+      }
+
+      &:nth-child(even) {
+        background: #fafafa;
+
+        &:hover {
+          background: #f1f8e9;
+        }
+      }
+
+      &.injured {
+        background: #ffebee;
+        
+        &:hover {
+          background: #ffcdd2;
+        }
+      }
+    }
+
+    .player-name-cell {
+      text-align: left;
+      font-weight: 600;
+      color: #1b5e20;
+
+      .injury-icon {
+        margin-right: 4px;
+      }
+    }
+
+    // Kolorowanie formy
+    .form-1, .form-2, .form-3 { color: #d32f2f; font-weight: 700; }
+    .form-4, .form-5 { color: #f57c00; font-weight: 600; }
+    .form-6 { color: #fbc02d; }
+    .form-7 { color: #7cb342; font-weight: 600; }
+    .form-8 { color: #2e7d32; font-weight: 700; }
+  }
+}
+
+// ==================== OPTIMAL LINEUP PRZECIWNIKA ====================
+
+.opponent-lineup-section {
+  background: white;
+  margin: 0 20px 15px 20px;
+  padding: 15px 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(239, 83, 80, 0.15);
+  border: 2px solid #ef9a9a;
+
+  h2 {
+    color: #c62828;
+    margin: 0 0 15px 0;
+    font-size: 1.3em;
+    font-weight: 600;
+    border-bottom: 2px solid #ef5350;
+    padding-bottom: 8px;
+  }
+
+  .formation-info, .tactic-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    border: 1px solid #ef9a9a;
+
+    .formation-label, .tactic-label {
+      font-weight: 600;
+      color: #c62828;
+      font-size: 0.9em;
+    }
+
+    .formation-value, .tactic-value {
+      font-weight: 800;
+      color: #d32f2f;
+      font-size: 1.1em;
+      background: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid #ef5350;
+    }
+  }
+
+  .opponent-field {
+    background: linear-gradient(to bottom, #c62828 0%, #b71c1c 100%) !important;
+  }
+
+  .opponent-card {
+    border-left: 3px solid #ef5350 !important;
+
+    .player-name {
+      color: #c62828 !important;
+    }
+  }
+}
+
+// ==================== WYBÓR FORMACJI PRZECIWNIKA ====================
+
+.opponent-formation-select {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 8px;
+  background: #fff3e0;
+  border-radius: 6px;
+  border: 1px solid #ffcc80;
+
+  .form-group-inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+
+    label {
+      font-size: 0.8em;
+      font-weight: 600;
+      color: #e65100;
+      white-space: nowrap;
+    }
+
+    .form-control-sm {
+      flex: 1;
+      padding: 4px 6px;
+      font-size: 0.8em;
+      border: 1px solid #ffcc80;
+      border-radius: 4px;
+      background: white;
+
+      &:focus {
+        outline: none;
+        border-color: #ff9800;
+        box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.2);
+      }
+    }
+  }
+}
+
+// ==================== FORM DISPLAY ====================
+
+.form-display {
+  display: flex;
+  gap: 3px;
+
+  .form-result {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 700;
+    font-size: 0.8em;
+
+    &.win {
+      background: #c8e6c9;
+      color: #2e7d32;
+    }
+
+    &.draw {
+      background: #fff9c4;
+      color: #f57f17;
+    }
+
+    &.loss {
+      background: #ffcdd2;
+      color: #c62828;
+    }
+  }
+}
+
+// ==================== TEAM MATCH STATS ====================
+
+.team-match-stats {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #c8e6c9;
+}
+
+// ==================== TRENER I SZTAB ====================
+
+.staff-section {
+  margin-top: 12px;
+  padding: 10px;
+  background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+  border-radius: 8px;
+  border: 1px solid #ffc107;
+
+  h4 {
+    margin: 0 0 10px 0;
+    font-size: 0.95em;
+    color: #f57f17;
+    font-weight: 700;
+  }
+
+  .staff-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+
+    .staff-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+
+      label {
+        font-size: 0.75em;
+        font-weight: 600;
+        color: #e65100;
+      }
+
+      .form-control-sm {
+        padding: 4px 6px;
+        font-size: 0.8em;
+        border: 1px solid #ffcc80;
+        border-radius: 4px;
+        background: white;
+
+        &:focus {
+          outline: none;
+          border-color: #ff9800;
+          box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.2);
+        }
+      }
+    }
+  }
+
+  .formation-exp-details {
+    margin-top: 10px;
+
+    summary {
+      font-size: 0.85em;
+      font-weight: 600;
+      color: #e65100;
+      cursor: pointer;
+      padding: 4px 0;
+
+      &:hover {
+        color: #bf360c;
+      }
+    }
+
+    .formation-exp-compact {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding-top: 8px;
+
+      .formation-exp-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        background: white;
+        padding: 4px 6px;
+        border-radius: 4px;
+        border: 1px solid #ffe082;
+
+        .formation-name {
+          font-size: 0.75em;
+          font-weight: 700;
+          color: #f57f17;
+          min-width: 40px;
+        }
+
+        .form-control-xs {
+          width: 40px;
+          padding: 2px 4px;
+          font-size: 0.75em;
+          border: 1px solid #ffcc80;
+          border-radius: 3px;
+          background: #fffde7;
+          text-align: center;
+
+          &:focus {
+            outline: none;
+            border-color: #ff9800;
+          }
+        }
+      }
+    }
+  }
+}

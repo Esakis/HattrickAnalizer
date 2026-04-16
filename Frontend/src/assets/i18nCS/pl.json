@@ -298,22 +298,14 @@
     "nonExistent": "nieistniejące"
   },
   "formationExperience": {
-    "0": "olśniewające",
-    "1": "fantastyczne",
-    "2": "doskonałe",
-    "3": "solidne",
-    "4": "znośne",
+    "3": "kiepskie",
+    "4": "słabe",
     "5": "niewystarczające",
-    "6": "słabe",
-    "7": "kiepskie",
-    "outstanding": "olśniewające",
-    "formidable": "fantastyczne",
-    "excellent": "doskonałe",
-    "solid": "solidne",
-    "passable": "znośne",
-    "inadequate": "niewystarczające",
-    "weak": "słabe",
-    "poor": "kiepskie"
+    "6": "znośne",
+    "7": "solidne",
+    "8": "doskonałe",
+    "9": "fantastyczne",
+    "10": "olśniewające"
   },
   "sponsors": {
     "0": "Wysyłają Ci wiersze miłosne",

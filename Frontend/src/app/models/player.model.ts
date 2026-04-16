@@ -13,6 +13,23 @@ export interface Player {
   specialty: string;
   injuryLevel: number;
   shirtNumber: number;
+  // Rozszerzone statystyki
+  matchStats?: PlayerMatchStats;
+}
+
+export interface PlayerMatchStats {
+  totalMatches: number;
+  goals: number;
+  assists: number;
+  yellowCards: number;
+  redCards: number;
+  averageRating: number;
+  averageForm: number;
+  goalsPerMatch: number;
+  matchesPerGoal: number;
+  minutesPlayed: number;
+  // Oceny na różnych pozycjach
+  positionRatings?: { [position: string]: number };
 }
 
 export interface PlayerSkills {

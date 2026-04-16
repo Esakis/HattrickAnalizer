@@ -107,14 +107,33 @@ public static class TeamStatsExtensions
         summary.PointsPerMatch = summary.TotalMatches > 0 ? (double)summary.TotalPoints / summary.TotalMatches : 0;
         summary.WinRate = summary.TotalMatches > 0 ? (double)summary.Wins / summary.TotalMatches * 100 : 0;
 
-        // Statystyki formacji
+        // Statystyki formacji (cała historia)
         summary.FormationFrequency = matches
             .GroupBy(m => m.FormationUsed)
             .ToDictionary(g => g.Key, g => g.Count());
 
-        summary.MostCommonFormation = summary.FormationFrequency
-            .OrderByDescending(kvp => kvp.Value)
-            .FirstOrDefault().Key ?? "4-4-2";
+        // Średnia formacja z ostatnich 5 meczów
+        var last5formations = matches
+            .OrderByDescending(m => m.MatchDate)
+            .Take(5)
+            .Select(m => ParseFormation(m.FormationUsed))
+            .Where(p => p.HasValue)
+            .Select(p => p!.Value)
+            .ToList();
+
+        if (last5formations.Count > 0)
+        {
+            var d = (int)Math.Round(last5formations.Average(p => p.d));
+            var mid = (int)Math.Round(last5formations.Average(p => p.m));
+            var f = (int)Math.Round(last5formations.Average(p => p.f));
+            summary.MostCommonFormation = $"{d}-{mid}-{f}";
+        }
+        else
+        {
+            summary.MostCommonFormation = summary.FormationFrequency
+                .OrderByDescending(kvp => kvp.Value)
+                .FirstOrDefault().Key ?? "N/A";
+        }
 
         // Statystyki w zaleznoeci od miejsca
         summary.HomeWins = matches.Count(m => m.IsHomeMatch && m.TeamPoints == 3);
@@ -161,5 +180,16 @@ public static class TeamStatsExtensions
         summary.PointsByMatchType = matches
             .GroupBy(m => m.MatchType)
             .ToDictionary(g => g.Key, g => g.Sum(m => m.TeamPoints));
+    }
+
+    private static (int d, int m, int f)? ParseFormation(string formation)
+    {
+        var parts = formation.Split('-');
+        if (parts.Length == 3 &&
+            int.TryParse(parts[0], out int d) &&
+            int.TryParse(parts[1], out int m) &&
+            int.TryParse(parts[2], out int f))
+            return (d, m, f);
+        return null;
     }
 }

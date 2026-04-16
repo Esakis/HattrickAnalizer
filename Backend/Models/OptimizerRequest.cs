@@ -13,8 +13,8 @@ public class OptimizerRequest
     public string CoachType { get; set; } = "Neutral";
     // Poziom asystenta ds. taktyki (0-5)
     public int AssistantManagerLevel { get; set; } = 0;
-    // Doswiadczenie formacji: nazwa formacji (np. "4-4-2") -> poziom 0..7
-    // 0=nedzne, 1=zaloslne, 2=zle, 3=slabe, 4=niewystarczajace, 5=przyzwoite, 6=solidne, 7=znakomite
+    // Doswiadczenie formacji: nazwa formacji (np. "4-4-2") -> poziom 3..10
+    // 3=kiepskie, 4=slabe, 5=niewystarczajace, 6=znosne, 7=solidne, 8=doskonale, 9=fantastyczne, 10=olsniewajace
     public Dictionary<string, int> FormationExperience { get; set; } = new();
 }
 

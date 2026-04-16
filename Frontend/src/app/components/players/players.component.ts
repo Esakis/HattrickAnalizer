@@ -35,6 +35,10 @@ export class PlayersComponent implements OnInit {
   sortBy: string = 'name';
   filterPosition: string = 'all';
 
+  viewMode: 'table' | 'cards' = 'table';
+  playerSortColumn: string = 'form';
+  playerSortDirection: 'asc' | 'desc' = 'desc';
+
   positions: { value: string; label: string }[] = [];
   sortOptions: { value: string; label: string }[] = [];
 
@@ -223,5 +227,51 @@ export class PlayersComponent implements OnInit {
     if (form >= 5) return 'good';
     if (form >= 3) return 'average';
     return 'poor';
+  }
+
+  sortTable(column: string): void {
+    if (this.playerSortColumn === column) {
+      this.playerSortDirection = this.playerSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.playerSortColumn = column;
+      this.playerSortDirection = 'desc';
+    }
+  }
+
+  get sortedPlayers(): Player[] {
+    if (!this.players || this.players.length === 0) return [];
+    return [...this.players].sort((a, b) => {
+      let valueA = this.getPlayerSortValue(a, this.playerSortColumn);
+      let valueB = this.getPlayerSortValue(b, this.playerSortColumn);
+      if (typeof valueA === 'string') {
+        valueA = valueA.toLowerCase();
+        valueB = (valueB as string).toLowerCase();
+      }
+      if (valueA < valueB) return this.playerSortDirection === 'asc' ? -1 : 1;
+      if (valueA > valueB) return this.playerSortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+
+  getPlayerSortValue(player: Player, column: string): any {
+    switch (column) {
+      case 'name': return `${player.firstName} ${player.lastName}`;
+      case 'age': return player.age;
+      case 'form': return player.form;
+      case 'stamina': return player.stamina;
+      case 'keeper': return player.skills?.keeper || 0;
+      case 'defending': return player.skills?.defending || 0;
+      case 'playmaking': return player.skills?.playmaking || 0;
+      case 'winger': return player.skills?.winger || 0;
+      case 'passing': return player.skills?.passing || 0;
+      case 'scoring': return player.skills?.scoring || 0;
+      case 'setPieces': return player.skills?.setPieces || 0;
+      case 'goals': return player.matchStats?.goals || 0;
+      case 'assists': return player.matchStats?.assists || 0;
+      case 'avgForm': return player.matchStats?.averageForm || player.form;
+      case 'goalsPerMatch': return player.matchStats?.goalsPerMatch || 0;
+      case 'matchesPerGoal': return player.matchStats?.matchesPerGoal || 999;
+      default: return 0;
+    }
   }
 }

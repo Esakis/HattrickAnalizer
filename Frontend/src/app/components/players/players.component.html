@@ -29,7 +29,7 @@
     </div>
 
     <div class="filters" *ngIf="players.length > 0">
-      <div class="form-group">
+      <div class="form-group" *ngIf="viewMode === 'cards'">
         <label for="filterPosition">{{ 'players.positionFilter' | translate }}</label>
         <select id="filterPosition" [(ngModel)]="filterPosition">
           <option *ngFor="let pos of positions" [value]="pos.value">
@@ -38,13 +38,18 @@
         </select>
       </div>
 
-      <div class="form-group">
+      <div class="form-group" *ngIf="viewMode === 'cards'">
         <label for="sortBy">{{ 'players.sortBy' | translate }}</label>
         <select id="sortBy" [(ngModel)]="sortBy">
           <option *ngFor="let sort of sortOptions" [value]="sort.value">
             {{ sort.label | translate }}
           </option>
         </select>
+      </div>
+
+      <div class="view-toggle">
+        <button class="btn-view" [class.active]="viewMode === 'table'" (click)="viewMode = 'table'">📋 Tabela</button>
+        <button class="btn-view" [class.active]="viewMode === 'cards'" (click)="viewMode = 'cards'">🃏 Karty</button>
       </div>
     </div>
   </div>
@@ -73,7 +78,105 @@
       </div>
     </div>
 
-    <div class="players-grid">
+    <!-- WIDOK TABELI -->
+    <div *ngIf="viewMode === 'table'" class="table-container">
+      <table class="players-table">
+        <thead>
+          <tr>
+            <th (click)="sortTable('name')" class="sortable">
+              Imię i Nazwisko
+              <span class="sort-icon" *ngIf="playerSortColumn === 'name'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th (click)="sortTable('age')" class="sortable">
+              Wiek
+              <span class="sort-icon" *ngIf="playerSortColumn === 'age'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th (click)="sortTable('form')" class="sortable">
+              Forma
+              <span class="sort-icon" *ngIf="playerSortColumn === 'form'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th (click)="sortTable('stamina')" class="sortable">
+              Kondycja
+              <span class="sort-icon" *ngIf="playerSortColumn === 'stamina'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th (click)="sortTable('keeper')" class="sortable">
+              Bramkarz
+              <span class="sort-icon" *ngIf="playerSortColumn === 'keeper'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th (click)="sortTable('defending')" class="sortable">
+              Obrona
+              <span class="sort-icon" *ngIf="playerSortColumn === 'defending'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th (click)="sortTable('playmaking')" class="sortable">
+              Rozgrywanie
+              <span class="sort-icon" *ngIf="playerSortColumn === 'playmaking'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th (click)="sortTable('winger')" class="sortable">
+              Skrzydło
+              <span class="sort-icon" *ngIf="playerSortColumn === 'winger'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th (click)="sortTable('passing')" class="sortable">
+              Podania
+              <span class="sort-icon" *ngIf="playerSortColumn === 'passing'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th (click)="sortTable('scoring')" class="sortable">
+              Strzelanie
+              <span class="sort-icon" *ngIf="playerSortColumn === 'scoring'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th (click)="sortTable('setPieces')" class="sortable">
+              Stałe fr.
+              <span class="sort-icon" *ngIf="playerSortColumn === 'setPieces'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th (click)="sortTable('goals')" class="sortable">
+              Bramki
+              <span class="sort-icon" *ngIf="playerSortColumn === 'goals'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th (click)="sortTable('assists')" class="sortable">
+              Asysty
+              <span class="sort-icon" *ngIf="playerSortColumn === 'assists'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th (click)="sortTable('avgForm')" class="sortable">
+              Śr. Forma
+              <span class="sort-icon" *ngIf="playerSortColumn === 'avgForm'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th (click)="sortTable('goalsPerMatch')" class="sortable">
+              Bramki/Mecz
+              <span class="sort-icon" *ngIf="playerSortColumn === 'goalsPerMatch'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th (click)="sortTable('matchesPerGoal')" class="sortable">
+              Mecze/Bramka
+              <span class="sort-icon" *ngIf="playerSortColumn === 'matchesPerGoal'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let player of sortedPlayers" [class.injured]="player.injuryLevel > 0">
+            <td class="player-name-cell">
+              <span class="injury-icon" *ngIf="player.injuryLevel > 0">🤕</span>
+              {{ player.firstName }} {{ player.lastName }}
+            </td>
+            <td>{{ player.age }}</td>
+            <td [class]="'form-' + player.form">{{ player.form }}</td>
+            <td>{{ player.stamina }}</td>
+            <td>{{ player.skills?.keeper || 0 }}</td>
+            <td>{{ player.skills?.defending || 0 }}</td>
+            <td>{{ player.skills?.playmaking || 0 }}</td>
+            <td>{{ player.skills?.winger || 0 }}</td>
+            <td>{{ player.skills?.passing || 0 }}</td>
+            <td>{{ player.skills?.scoring || 0 }}</td>
+            <td>{{ player.skills?.setPieces || 0 }}</td>
+            <td>{{ player.matchStats?.goals || 0 }}</td>
+            <td>{{ player.matchStats?.assists || 0 }}</td>
+            <td>{{ (player.matchStats?.averageForm || player.form) | number:'1.1-1' }}</td>
+            <td>{{ (player.matchStats?.goalsPerMatch || 0) | number:'1.2-2' }}</td>
+            <td>{{ player.matchStats?.matchesPerGoal ? (player.matchStats?.matchesPerGoal | number:'1.1-1') : '-' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- WIDOK KART -->
+    <div *ngIf="viewMode === 'cards'" class="players-grid">
       <div class="player-card" *ngFor="let player of filteredPlayers">
         <div class="player-header">
           <div class="player-info">

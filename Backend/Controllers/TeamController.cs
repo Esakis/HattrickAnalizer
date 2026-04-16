@@ -81,4 +81,18 @@ public class TeamController : ControllerBase
             return StatusCode(500, new { error = ex.Message });
         }
     }
+
+    [HttpGet("{teamId}/formation-experience")]
+    public async Task<IActionResult> GetFormationExperience(int teamId)
+    {
+        try
+        {
+            var formationExperience = await _hattrickApi.GetFormationExperienceAsync(teamId);
+            return Ok(formationExperience);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = ex.Message });
+        }
+    }
 }

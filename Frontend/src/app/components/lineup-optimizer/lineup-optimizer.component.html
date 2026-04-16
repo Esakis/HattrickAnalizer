@@ -41,10 +41,23 @@
         </div>
 
         <div class="form-group">
+          <label for="myFormation">Formacja mojej drużyny</label>
+          <select
+            id="myFormation"
+            [(ngModel)]="selectedMyFormation"
+            (change)="onMyFormationChange()"
+            class="form-control">
+            <option value="Auto">Auto (najlepsza)</option>
+            <option *ngFor="let f of availableFormations" [value]="f">{{ f }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
           <label for="tactic">{{ 'optimizer.tacticLabel' | translate }}</label>
           <select
             id="tactic"
-            [(ngModel)]="preferredTactic"
+            [(ngModel)]="selectedMyTactic"
+            (change)="onMyTacticChange()"
             class="form-control">
             <option *ngFor="let tactic of tactics" [value]="tactic.value">
               {{ tactic.label }}
@@ -63,47 +76,6 @@
             </option>
           </select>
         </div>
-
-        <div class="form-group">
-          <label for="coachType">{{ 'optimizer.coachLabel' | translate }}</label>
-          <select
-            id="coachType"
-            [(ngModel)]="coachType"
-            class="form-control">
-            <option *ngFor="let c of coachTypes" [value]="c.value">
-              {{ c.label }}
-            </option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label for="assistantLevel">{{ 'optimizer.assistantLabel' | translate }}</label>
-          <select
-            id="assistantLevel"
-            [(ngModel)]="assistantManagerLevel"
-            class="form-control">
-            <option [ngValue]="0">0</option>
-            <option [ngValue]="1">1</option>
-            <option [ngValue]="2">2</option>
-            <option [ngValue]="3">3</option>
-            <option [ngValue]="4">4</option>
-            <option [ngValue]="5">5</option>
-          </select>
-        </div>
-
-        <details class="form-group">
-          <summary>{{ 'optimizer.formationExperienceLabel' | translate }}</summary>
-          <div class="formation-exp-grid">
-            <div *ngFor="let f of availableFormations" class="formation-exp-row">
-              <label [for]="'fe_' + f">{{ f }}</label>
-              <select [id]="'fe_' + f" [(ngModel)]="formationExperience[f]" class="form-control">
-                <option *ngFor="let lvl of experienceLevels" [ngValue]="lvl.value">
-                  {{ lvl.label }}
-                </option>
-              </select>
-            </div>
-          </div>
-        </details>
 
         <button
           (click)="optimizeLineup()" 
@@ -136,6 +108,43 @@
             <span class="stat-value">{{ myTeamAverageForm }}</span>
           </div>
           
+          <!-- Trener i sztab -->
+          <div class="staff-section">
+            <h4>👔 Trener i Sztab</h4>
+            <div class="staff-grid">
+              <div class="staff-item">
+                <label>Typ trenera:</label>
+                <select [(ngModel)]="coachType" class="form-control-sm">
+                  <option *ngFor="let c of coachTypes" [value]="c.value">{{ c.label }}</option>
+                </select>
+              </div>
+              <div class="staff-item">
+                <label>Asystent (taktyka):</label>
+                <select [(ngModel)]="assistantManagerLevel" class="form-control-sm">
+                  <option [ngValue]="0">0 - Brak</option>
+                  <option [ngValue]="1">1 - Słaby</option>
+                  <option [ngValue]="2">2 - Przeciętny</option>
+                  <option [ngValue]="3">3 - Dobry</option>
+                  <option [ngValue]="4">4 - Bardzo dobry</option>
+                  <option [ngValue]="5">5 - Znakomity</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- Poziomy doświadczenia formacji -->
+            <details class="formation-exp-details">
+              <summary>📊 Doświadczenie formacji</summary>
+              <div class="formation-exp-compact">
+                <div *ngFor="let f of availableFormations" class="formation-exp-item">
+                  <span class="formation-name">{{ f }}</span>
+                  <select [(ngModel)]="formationExperience[f]" class="form-control-xs">
+                    <option *ngFor="let lvl of experienceLevels" [ngValue]="lvl.value">{{ lvl.value }}</option>
+                  </select>
+                </div>
+              </div>
+            </details>
+          </div>
+          
           <!-- Statystyki druzy -->
           <div *ngIf="loadingMyTeamStats" class="loading-indicator">
             {{ 'common.loading' | translate }} {{ 'teamStats.stats' | translate }}...
@@ -150,14 +159,14 @@
               <span class="stat-value">{{ goalDifference }}</span>
             </div>
             <div class="stat-item">
-              <span class="stat-label">{{ 'teamStats.formation' | translate }}:</span>
+              <span class="stat-label">Śr. formacja (5 m.):</span>
               <span class="stat-value">{{ myTeamStats.statistics?.mostCommonFormation }}</span>
             </div>
             <div class="stat-item">
               <span class="stat-label">{{ 'teamStats.form' | translate }}:</span>
               <div class="form-display">
-                <span *ngFor="let result of myTeamStats.statistics?.recentResults" 
-                      class="form-result" 
+                <span *ngFor="let result of myTeamStats.statistics?.recentResults"
+                      class="form-result"
                       [class]="result === 'W' ? 'win' : result === 'D' ? 'draw' : 'loss'">
                   {{ result }}
                 </span>
@@ -172,6 +181,24 @@
 
       <div class="team-info opponent-team-info">
         <h3>⚔️ {{ opponentTeamName || ('optimizer.opponentTeam' | translate) }}</h3>
+        
+        <!-- Wybór formacji i taktyki przeciwnika -->
+        <div class="opponent-formation-select" *ngIf="opponentTeamPlayers.length > 0">
+          <div class="form-group-inline">
+            <label>Formacja:</label>
+            <select [(ngModel)]="selectedOpponentFormation" (change)="onOpponentFormationChange()" class="form-control-sm">
+              <option value="Auto">Auto</option>
+              <option *ngFor="let f of availableFormations" [value]="f">{{ f }}</option>
+            </select>
+          </div>
+          <div class="form-group-inline">
+            <label>Taktyka:</label>
+            <select [(ngModel)]="selectedOpponentTactic" (change)="onOpponentTacticChange()" class="form-control-sm">
+              <option *ngFor="let tactic of tactics" [value]="tactic.value">{{ tactic.label }}</option>
+            </select>
+          </div>
+        </div>
+        
         <div *ngIf="loadingOpponentTeam" class="loading-indicator">
           {{ 'common.loading' | translate }}...
         </div>
@@ -203,14 +230,14 @@
               <span class="stat-value">{{ opponentTeamStats.statistics?.goalDifference }}</span>
             </div>
             <div class="stat-item">
-              <span class="stat-label">{{ 'teamStats.formation' | translate }}:</span>
+              <span class="stat-label">Śr. formacja (5 m.):</span>
               <span class="stat-value">{{ opponentTeamStats.statistics?.mostCommonFormation }}</span>
             </div>
             <div class="stat-item">
               <span class="stat-label">{{ 'teamStats.form' | translate }}:</span>
               <div class="form-display">
-                <span *ngFor="let result of opponentTeamStats.statistics?.recentResults" 
-                      class="form-result" 
+                <span *ngFor="let result of opponentTeamStats.statistics?.recentResults"
+                      class="form-result"
                       [class]="result === 'W' ? 'win' : result === 'D' ? 'draw' : 'loss'">
                   {{ result }}
                 </span>
@@ -221,6 +248,78 @@
         <div *ngIf="!loadingOpponentTeam && opponentTeamPlayers.length === 0" class="no-data-small">
           {{ 'optimizer.enterTeamId' | translate }}
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTIMAL LINEUP DLA PRZECIWNIKA -->
+  <div class="opponent-lineup-section" *ngIf="opponentOptimalLineup && opponentTeamPlayers.length > 0">
+    <h2>⚔️ Przewidywany Skład Przeciwnika</h2>
+    <div class="formation-info">
+      <span class="formation-label">Formacja:</span>
+      <span class="formation-value">{{ opponentOptimalLineup.formation }}</span>
+    </div>
+    <div class="tactic-info">
+      <span class="tactic-label">Taktyka:</span>
+      <span class="tactic-value">{{ getTacticLabel(opponentOptimalLineup.tacticType) }}</span>
+    </div>
+    <div class="lineup-field opponent-field">
+      <div class="position-row">
+        <div class="position" *ngFor="let pos of ['GK']">
+          <div class="position-label">{{ getPositionLabel(pos) }}</div>
+          <div class="player-card opponent-card" *ngIf="opponentOptimalLineup.positions[pos]?.player as player">
+            <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
+            <div class="player-stats">
+              <span>Forma: {{ player.form }}</span>
+              <span *ngIf="player.matchStats?.positionRatings">Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="position-row">
+        <ng-container *ngFor="let pos of ['RWB', 'RCD', 'CD', 'LCD', 'LWB']">
+          <div class="position" *ngIf="opponentOptimalLineup.positions[pos]">
+            <div class="position-label">{{ getPositionLabel(pos) }}</div>
+            <div class="player-card opponent-card" *ngIf="opponentOptimalLineup.positions[pos]?.player as player">
+              <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
+              <div class="player-stats">
+                <span>Obrona: {{ player.skills?.defending }}</span>
+                <span *ngIf="player.matchStats?.positionRatings">Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+
+      <div class="position-row">
+        <ng-container *ngFor="let pos of ['RW', 'RIM', 'IM', 'LIM', 'LW']">
+          <div class="position" *ngIf="opponentOptimalLineup.positions[pos]">
+            <div class="position-label">{{ getPositionLabel(pos) }}</div>
+            <div class="player-card opponent-card" *ngIf="opponentOptimalLineup.positions[pos]?.player as player">
+              <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
+              <div class="player-stats">
+                <span>Rozgrywanie: {{ player.skills?.playmaking }}</span>
+                <span *ngIf="player.matchStats?.positionRatings">Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+
+      <div class="position-row">
+        <ng-container *ngFor="let pos of ['RFW', 'FW', 'LFW']">
+          <div class="position" *ngIf="opponentOptimalLineup.positions[pos]">
+            <div class="position-label">{{ getPositionLabel(pos) }}</div>
+            <div class="player-card opponent-card" *ngIf="opponentOptimalLineup.positions[pos]?.player as player">
+              <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
+              <div class="player-stats">
+                <span>Strzelanie: {{ player.skills?.scoring }}</span>
+                <span *ngIf="player.matchStats?.positionRatings">Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
+              </div>
+            </div>
+          </div>
+        </ng-container>
       </div>
     </div>
   </div>

@@ -159,21 +159,21 @@ public class AdvancedLineupOptimizer
         };
     }
 
-    // Prawdopodobienstwo nieladu formacji w funkcji poziomu doswiadczenia (0..7).
-    // 7 (znakomite+) = 0% ryzyka. Nizsze poziomy = rosnace ryzyko.
+    // Prawdopodobienstwo nieladu formacji w funkcji poziomu doswiadczenia (3..10).
+    // 10 (olsniewajace) = 0% ryzyka. Nizsze poziomy = rosnace ryzyko.
     private static double ComputeDisorderRisk(int formationExperience)
     {
-        int e = Math.Clamp(formationExperience, 0, 7);
+        int e = Math.Clamp(formationExperience, 3, 10);
         return e switch
         {
-            7 => 0.00,
-            6 => 0.05,
-            5 => 0.10,
-            4 => 0.18,
-            3 => 0.28,
-            2 => 0.40,
-            1 => 0.55,
-            _ => 0.70
+            10 => 0.00,
+            9 => 0.02,
+            8 => 0.05,
+            7 => 0.10,
+            6 => 0.18,
+            5 => 0.28,
+            4 => 0.40,
+            _ => 0.55  // 3 = kiepskie
         };
     }
 

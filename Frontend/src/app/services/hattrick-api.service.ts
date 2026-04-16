@@ -26,6 +26,10 @@ export class HattrickApiService {
     return this.http.get<any>(`${this.apiUrl}/team/${teamId}/match-stats`);
   }
 
+  getFormationExperience(teamId: number): Observable<{ [formation: string]: number }> {
+    return this.http.get<{ [formation: string]: number }>(`${this.apiUrl}/team/${teamId}/formation-experience`);
+  }
+
   getNextOpponent(): Observable<NextOpponent> {
     return this.http.get<NextOpponent>(`${this.apiUrl}/team/next-opponent`);
   }

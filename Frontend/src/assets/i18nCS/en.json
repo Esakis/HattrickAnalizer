@@ -298,22 +298,14 @@
     "nonExistent": "non-existent"
   },
   "formationExperience": {
-    "0": "outstanding",
-    "1": "formidable",
-    "2": "excellent",
-    "3": "solid",
-    "4": "passable",
+    "3": "poor",
+    "4": "weak",
     "5": "inadequate",
-    "6": "weak",
-    "7": "poor",
-    "outstanding": "outstanding",
-    "formidable": "formidable",
-    "excellent": "excellent",
-    "solid": "solid",
-    "passable": "passable",
-    "inadequate": "inadequate",
-    "weak": "weak",
-    "poor": "poor"
+    "6": "passable",
+    "7": "solid",
+    "8": "excellent",
+    "9": "formidable",
+    "10": "outstanding"
   },
   "sponsors": {
     "0": "Sending love poems to you",

@@ -134,12 +134,49 @@
     }
 
     .filters {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+      display: flex;
+      flex-wrap: wrap;
       gap: 12px;
       margin-top: 15px;
       padding-top: 15px;
       border-top: 2px solid #e8f5e9;
+      align-items: flex-end;
+
+      .form-group {
+        flex: 1;
+        min-width: 160px;
+        margin-bottom: 0;
+      }
+
+      .view-toggle {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+
+        .btn-view {
+          background: #e8f5e9;
+          color: #2e7d32;
+          border: 2px solid #a5d6a7;
+          padding: 7px 14px;
+          border-radius: 6px;
+          font-size: 0.85em;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+
+          &:hover {
+            background: #c8e6c9;
+            border-color: #66bb6a;
+          }
+
+          &.active {
+            background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
+            color: white;
+            border-color: #43a047;
+            box-shadow: 0 2px 8px rgba(67, 160, 71, 0.3);
+          }
+        }
+      }
     }
   }
 
@@ -201,6 +238,89 @@
         font-size: 0.75em;
         letter-spacing: 0.3px;
       }
+    }
+  }
+
+  .table-container {
+    margin: 0 20px 20px 20px;
+    overflow-x: auto;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(46, 125, 50, 0.15);
+    border: 2px solid #a5d6a7;
+
+    .players-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85em;
+
+      thead tr {
+        background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+        color: white;
+      }
+
+      th {
+        padding: 10px 8px;
+        text-align: center;
+        font-weight: 600;
+        white-space: nowrap;
+        font-size: 0.8em;
+        letter-spacing: 0.2px;
+
+        &.sortable {
+          cursor: pointer;
+          user-select: none;
+          transition: background 0.2s;
+
+          &:hover {
+            background: rgba(255, 255, 255, 0.15);
+          }
+        }
+
+        .sort-icon {
+          margin-left: 4px;
+          font-size: 0.75em;
+        }
+      }
+
+      tbody tr {
+        border-bottom: 1px solid #e8f5e9;
+        transition: background 0.15s;
+
+        &:hover {
+          background: #f1f8e9;
+        }
+
+        &.injured {
+          background: #fff3e0;
+
+          &:hover {
+            background: #ffe0b2;
+          }
+        }
+      }
+
+      td {
+        padding: 8px;
+        text-align: center;
+        color: #333;
+
+        &.player-name-cell {
+          text-align: left;
+          font-weight: 600;
+          color: #1b5e20;
+          white-space: nowrap;
+
+          .injury-icon {
+            margin-right: 4px;
+          }
+        }
+      }
+
+      .form-1, .form-2, .form-3 { color: #d32f2f; font-weight: 700; }
+      .form-4, .form-5 { color: #f57c00; font-weight: 700; }
+      .form-6, .form-7 { color: #558b2f; font-weight: 700; }
+      .form-8, .form-9, .form-10 { color: #2e7d32; font-weight: 800; }
     }
   }
 

@@ -825,62 +825,186 @@ details > summary {
   }
 }
 
-// ==================== OPTIMAL LINEUP PRZECIWNIKA ====================
+// ==================== SKŁADY OBOK SIEBIE ====================
 
-.opponent-lineup-section {
-  background: white;
-  margin: 0 20px 15px 20px;
-  padding: 15px 20px;
-  border-radius: 10px;
-  box-shadow: 0 4px 15px rgba(239, 83, 80, 0.15);
-  border: 2px solid #ef9a9a;
+.lineups-side-by-side {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
 
-  h2 {
-    color: #c62828;
-    margin: 0 0 15px 0;
-    font-size: 1.3em;
-    font-weight: 600;
-    border-bottom: 2px solid #ef5350;
-    padding-bottom: 8px;
+  @media (max-width: 1200px) {
+    grid-template-columns: 1fr;
   }
 
-  .formation-info, .tactic-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
-    padding: 8px 12px;
-    border-radius: 6px;
-    margin-bottom: 12px;
-    border: 1px solid #ef9a9a;
+  .lineup-section {
+    background: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(46, 125, 50, 0.15);
+    border: 2px solid #a5d6a7;
 
-    .formation-label, .tactic-label {
+    h2 {
+      color: #1b5e20;
+      margin: 0 0 12px 0;
+      font-size: 1.3em;
       font-weight: 600;
-      color: #c62828;
-      font-size: 0.9em;
+      border-bottom: 2px solid #66bb6a;
+      padding-bottom: 6px;
     }
 
-    .formation-value, .tactic-value {
-      font-weight: 800;
-      color: #d32f2f;
-      font-size: 1.1em;
-      background: white;
-      padding: 4px 8px;
-      border-radius: 4px;
-      border: 1px solid #ef5350;
+    .formation-info, .tactic-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(135deg, #f1f8e9 0%, #e8f5e9 100%);
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      border: 1px solid #c8e6c9;
+
+      .formation-label, .tactic-label {
+        font-weight: 600;
+        color: #2e7d32;
+        font-size: 0.85em;
+      }
+
+      .formation-value, .tactic-value {
+        font-weight: 800;
+        color: #43a047;
+        font-size: 1em;
+        background: white;
+        padding: 3px 6px;
+        border-radius: 4px;
+        border: 1px solid #66bb6a;
+      }
+    }
+
+    .lineup-field {
+      background: linear-gradient(to bottom, #2e7d32 0%, #1b5e20 100%);
+      padding: 15px;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: inset 0 0 30px rgba(0,0,0,0.3);
+
+      .position-row {
+        display: flex;
+        justify-content: space-around;
+        gap: 8px;
+
+        .position {
+          flex: 1;
+          max-width: 120px;
+
+          .position-label {
+            text-align: center;
+            color: white;
+            font-weight: 700;
+            font-size: 0.7em;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+
+          .player-card {
+            background: white;
+            border-radius: 6px;
+            padding: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            min-height: 50px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+            &:hover {
+              transform: translateY(-2px);
+              box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            }
+
+            .player-name {
+              font-weight: 600;
+              font-size: 0.75em;
+              color: #1b5e20;
+              margin-bottom: 2px;
+            }
+
+            .player-stats {
+              font-size: 0.65em;
+              color: #666;
+              display: flex;
+              gap: 6px;
+              flex-wrap: wrap;
+            }
+          }
+        }
+      }
+    }
+
+    &.my-lineup-section {
+      border-left: 5px solid #43a047;
+    }
+
+    &.opponent-lineup-section {
+      border: 2px solid #ef9a9a;
+      border-left: 5px solid #ef5350;
+      box-shadow: 0 4px 15px rgba(239, 83, 80, 0.15);
+
+      h2 {
+        color: #c62828;
+        border-bottom-color: #ef5350;
+      }
+
+      .formation-info, .tactic-info {
+        background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+        border-color: #ef9a9a;
+
+        .formation-label, .tactic-label {
+          color: #c62828;
+        }
+
+        .formation-value, .tactic-value {
+          color: #d32f2f;
+          border-color: #ef5350;
+        }
+      }
+
+      .lineup-field {
+        background: linear-gradient(to bottom, #c62828 0%, #b71c1c 100%);
+      }
+
+      .player-card {
+        border-left: 3px solid #ef5350;
+
+        .player-name {
+          color: #c62828 !important;
+        }
+      }
     }
   }
+}
 
-  .opponent-field {
-    background: linear-gradient(to bottom, #c62828 0%, #b71c1c 100%) !important;
+.comparison-section-wrapper {
+  margin-bottom: 15px;
+
+  .comparison-section {
+    width: 100%;
   }
+}
 
-  .opponent-card {
-    border-left: 3px solid #ef5350 !important;
+// ==================== OPTIMAL LINEUP PRZECIWNIKA (styl boiska) ====================
 
-    .player-name {
-      color: #c62828 !important;
-    }
+.opponent-field {
+  background: linear-gradient(to bottom, #c62828 0%, #b71c1c 100%) !important;
+}
+
+.opponent-card {
+  border-left: 3px solid #ef5350 !important;
+
+  .player-name {
+    color: #c62828 !important;
   }
 }
 

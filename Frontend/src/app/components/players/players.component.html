@@ -120,7 +120,7 @@
               <span class="sort-icon" *ngIf="playerSortColumn === 'passing'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
             </th>
             <th (click)="sortTable('scoring')" class="sortable">
-              Strzelanie
+              {{ 'players.skills.scoring' | translate }}
               <span class="sort-icon" *ngIf="playerSortColumn === 'scoring'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
             </th>
             <th (click)="sortTable('setPieces')" class="sortable">

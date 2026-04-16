@@ -72,7 +72,7 @@ export class LineupOptimizerComponent implements OnInit {
     { key: 'playmaking', label: 'Rozgrywanie' },
     { key: 'winger', label: 'Skrzydło' },
     { key: 'passing', label: 'Podania' },
-    { key: 'scoring', label: 'Strzelanie' },
+    { key: 'scoring', label: 'Skuteczność' },
     { key: 'setPieces', label: 'Stałe fragmenty' },
     { key: 'goals', label: 'Bramki' },
     { key: 'assists', label: 'Asysty' },
@@ -791,7 +791,7 @@ export class LineupOptimizerComponent implements OnInit {
     if (player.matchStats?.positionRatings?.[position]) {
       return player.matchStats.positionRatings[position].toFixed(1);
     }
-    return '-';
+    return '0';
   }
 
   // ==================== POMOCNICZE ====================

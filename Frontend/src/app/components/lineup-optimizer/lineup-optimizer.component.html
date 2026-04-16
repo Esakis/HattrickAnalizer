@@ -252,80 +252,157 @@
     </div>
   </div>
 
-  <!-- OPTIMAL LINEUP DLA PRZECIWNIKA -->
-  <div class="opponent-lineup-section" *ngIf="opponentOptimalLineup && opponentTeamPlayers.length > 0">
-    <h2>⚔️ Przewidywany Skład Przeciwnika</h2>
-    <div class="formation-info">
-      <span class="formation-label">Formacja:</span>
-      <span class="formation-value">{{ opponentOptimalLineup.formation }}</span>
-    </div>
-    <div class="tactic-info">
-      <span class="tactic-label">Taktyka:</span>
-      <span class="tactic-value">{{ getTacticLabel(opponentOptimalLineup.tacticType) }}</span>
-    </div>
-    <div class="lineup-field opponent-field">
-      <div class="position-row">
-        <div class="position" *ngFor="let pos of ['GK']">
-          <div class="position-label">{{ getPositionLabel(pos) }}</div>
-          <div class="player-card opponent-card" *ngIf="opponentOptimalLineup.positions[pos]?.player as player">
-            <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
-            <div class="player-stats">
-              <span>Forma: {{ player.form }}</span>
-              <span *ngIf="player.matchStats?.positionRatings">Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
+  <div *ngIf="result" class="results-section">
+    <!-- OBA SKŁADY OBOK SIEBIE -->
+    <div class="lineups-side-by-side">
+      <!-- MÓJ OPTYMALNY SKŁAD -->
+      <div class="lineup-section my-lineup-section">
+        <h2>🏠 {{ 'optimizer.optimalLineup' | translate }}</h2>
+        <div *ngIf="result.optimalLineup.formation" class="formation-info">
+          <span class="formation-label">{{ 'optimizer.formation' | translate }}:</span>
+          <span class="formation-value">{{ result.optimalLineup.formation }}</span>
+        </div>
+        <div *ngIf="result.optimalLineup.tacticType" class="tactic-info">
+          <span class="tactic-label">{{ 'optimizer.tactic' | translate }}:</span>
+          <span class="tactic-value">{{ getTacticLabel(result.optimalLineup.tacticType) }}</span>
+        </div>
+        <div class="tactic-info">
+          <span class="tactic-label">{{ 'optimizer.teamAttitudeLabel' | translate }}</span>
+          <span class="tactic-value">{{ getAttitudeLabel(teamAttitude) }}</span>
+        </div>
+        <div class="lineup-field">
+          <div class="position-row">
+            <div class="position" *ngFor="let pos of ['GK']">
+              <div class="position-label tooltip" [attr.data-tooltip]="getPositionDescription(pos)">{{ getPositionLabel(pos) }}</div>
+              <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
+                <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
+                <div class="player-stats">
+                  <span>Forma: {{ player.form }}</span>
+                  <span>Wiek: {{ player.age }}</span>
+                </div>
+              </div>
             </div>
+          </div>
+
+          <div class="position-row">
+            <ng-container *ngFor="let pos of ['RWB', 'RCD', 'CD', 'LCD', 'LWB']">
+              <div class="position" *ngIf="result.optimalLineup.positions[pos]">
+                <div class="position-label tooltip" [attr.data-tooltip]="getPositionDescription(pos)">{{ getPositionLabel(pos) }}</div>
+                <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
+                  <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
+                  <div class="player-stats">
+                    <span>Obrona: {{ player.skills.defending }}</span>
+                  </div>
+                </div>
+              </div>
+            </ng-container>
+          </div>
+
+          <div class="position-row">
+            <ng-container *ngFor="let pos of ['RW', 'RIM', 'IM', 'LIM', 'LW']">
+              <div class="position" *ngIf="result.optimalLineup.positions[pos]">
+                <div class="position-label tooltip" [attr.data-tooltip]="getPositionDescription(pos)">{{ getPositionLabel(pos) }}</div>
+                <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
+                  <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
+                  <div class="player-stats">
+                    <span>Rozgrywanie: {{ player.skills.playmaking }}</span>
+                  </div>
+                </div>
+              </div>
+            </ng-container>
+          </div>
+
+          <div class="position-row">
+            <ng-container *ngFor="let pos of ['RFW', 'FW', 'LFW']">
+              <div class="position" *ngIf="result.optimalLineup.positions[pos]">
+                <div class="position-label tooltip" [attr.data-tooltip]="getPositionDescription(pos)">{{ getPositionLabel(pos) }}</div>
+                <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
+                  <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
+                  <div class="player-stats">
+                    <span>{{ 'players.skills.scoring' | translate }}: {{ player.skills.scoring }}</span>
+                  </div>
+                </div>
+              </div>
+            </ng-container>
           </div>
         </div>
       </div>
 
-      <div class="position-row">
-        <ng-container *ngFor="let pos of ['RWB', 'RCD', 'CD', 'LCD', 'LWB']">
-          <div class="position" *ngIf="opponentOptimalLineup.positions[pos]">
-            <div class="position-label">{{ getPositionLabel(pos) }}</div>
-            <div class="player-card opponent-card" *ngIf="opponentOptimalLineup.positions[pos]?.player as player">
-              <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
-              <div class="player-stats">
-                <span>Obrona: {{ player.skills?.defending }}</span>
-                <span *ngIf="player.matchStats?.positionRatings">Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
+      <!-- PRZEWIDYWANY SKŁAD PRZECIWNIKA -->
+      <div class="lineup-section opponent-lineup-section" *ngIf="opponentOptimalLineup && opponentTeamPlayers.length > 0">
+        <h2>⚔️ Przewidywany Skład Przeciwnika</h2>
+        <div class="formation-info">
+          <span class="formation-label">{{ 'optimizer.formation' | translate }}:</span>
+          <span class="formation-value">{{ opponentOptimalLineup.formation }}</span>
+        </div>
+        <div class="tactic-info">
+          <span class="tactic-label">{{ 'optimizer.tactic' | translate }}:</span>
+          <span class="tactic-value">{{ getTacticLabel(opponentOptimalLineup.tacticType) }}</span>
+        </div>
+        <div class="tactic-info">
+          <span class="tactic-label">{{ 'optimizer.teamAttitudeLabel' | translate }}</span>
+          <span class="tactic-value">{{ 'optimizer.attitudes.normal' | translate }}</span>
+        </div>
+        <div class="lineup-field opponent-field">
+          <div class="position-row">
+            <div class="position" *ngFor="let pos of ['GK']">
+              <div class="position-label">{{ getPositionLabel(pos) }}</div>
+              <div class="player-card opponent-card" *ngIf="opponentOptimalLineup.positions[pos]?.player as player">
+                <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
+                <div class="player-stats">
+                  <span>Forma: {{ player.form }}</span>
+                  <span>Wiek: {{ player.age }}</span>
+                </div>
               </div>
             </div>
           </div>
-        </ng-container>
-      </div>
 
-      <div class="position-row">
-        <ng-container *ngFor="let pos of ['RW', 'RIM', 'IM', 'LIM', 'LW']">
-          <div class="position" *ngIf="opponentOptimalLineup.positions[pos]">
-            <div class="position-label">{{ getPositionLabel(pos) }}</div>
-            <div class="player-card opponent-card" *ngIf="opponentOptimalLineup.positions[pos]?.player as player">
-              <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
-              <div class="player-stats">
-                <span>Rozgrywanie: {{ player.skills?.playmaking }}</span>
-                <span *ngIf="player.matchStats?.positionRatings">Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
+          <div class="position-row">
+            <ng-container *ngFor="let pos of ['RWB', 'RCD', 'CD', 'LCD', 'LWB']">
+              <div class="position" *ngIf="opponentOptimalLineup.positions[pos]">
+                <div class="position-label">{{ getPositionLabel(pos) }}</div>
+                <div class="player-card opponent-card" *ngIf="opponentOptimalLineup.positions[pos]?.player as player">
+                  <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
+                  <div class="player-stats">
+                    <span>Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
+                  </div>
+                </div>
               </div>
-            </div>
+            </ng-container>
           </div>
-        </ng-container>
-      </div>
 
-      <div class="position-row">
-        <ng-container *ngFor="let pos of ['RFW', 'FW', 'LFW']">
-          <div class="position" *ngIf="opponentOptimalLineup.positions[pos]">
-            <div class="position-label">{{ getPositionLabel(pos) }}</div>
-            <div class="player-card opponent-card" *ngIf="opponentOptimalLineup.positions[pos]?.player as player">
-              <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
-              <div class="player-stats">
-                <span>Strzelanie: {{ player.skills?.scoring }}</span>
-                <span *ngIf="player.matchStats?.positionRatings">Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
+          <div class="position-row">
+            <ng-container *ngFor="let pos of ['RW', 'RIM', 'IM', 'LIM', 'LW']">
+              <div class="position" *ngIf="opponentOptimalLineup.positions[pos]">
+                <div class="position-label">{{ getPositionLabel(pos) }}</div>
+                <div class="player-card opponent-card" *ngIf="opponentOptimalLineup.positions[pos]?.player as player">
+                  <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
+                  <div class="player-stats">
+                    <span>Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
+                  </div>
+                </div>
               </div>
-            </div>
+            </ng-container>
           </div>
-        </ng-container>
+
+          <div class="position-row">
+            <ng-container *ngFor="let pos of ['RFW', 'FW', 'LFW']">
+              <div class="position" *ngIf="opponentOptimalLineup.positions[pos]">
+                <div class="position-label">{{ getPositionLabel(pos) }}</div>
+                <div class="player-card opponent-card" *ngIf="opponentOptimalLineup.positions[pos]?.player as player">
+                  <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
+                  <div class="player-stats">
+                    <span>Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
+                  </div>
+                </div>
+              </div>
+            </ng-container>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div *ngIf="result" class="results-section">
-    <div class="two-column-layout">
+    <div class="comparison-section-wrapper">
       <div class="comparison-section">
         <h2>{{ 'optimizer.comparison.title' | translate }}</h2>
         <div class="ratings-comparison">
@@ -383,71 +460,6 @@
         </div>
       </div>
 
-      <div class="lineup-section">
-      <h2>{{ 'optimizer.optimalLineup' | translate }}</h2>
-      <div *ngIf="result.optimalLineup.formation" class="formation-info">
-        <span class="formation-label">{{ 'optimizer.formation' | translate }}:</span>
-        <span class="formation-value">{{ result.optimalLineup.formation }}</span>
-      </div>
-      <div *ngIf="result.optimalLineup.tacticType" class="tactic-info">
-        <span class="tactic-label">{{ 'optimizer.tactic' | translate }}:</span>
-        <span class="tactic-value">{{ getTacticLabel(result.optimalLineup.tacticType) }}</span>
-      </div>
-      <div class="tactic-info">
-        <span class="tactic-label">{{ 'optimizer.teamAttitudeLabel' | translate }}</span>
-        <span class="tactic-value">{{ getAttitudeLabel(teamAttitude) }}</span>
-      </div>
-      <div class="lineup-field">
-        <div class="position-row">
-          <div class="position" *ngFor="let pos of ['GK']">
-            <div class="position-label tooltip" [attr.data-tooltip]="getPositionDescription(pos)">{{ getPositionLabel(pos) }}</div>
-            <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
-              <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
-              <div class="player-stats">
-                <span>Forma: {{ player.form }}</span>
-                <span>Wiek: {{ player.age }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="position-row">
-          <div class="position" *ngFor="let pos of ['RWB', 'RCD', 'CD', 'LCD', 'LWB']">
-            <div class="position-label tooltip" [attr.data-tooltip]="getPositionDescription(pos)">{{ getPositionLabel(pos) }}</div>
-            <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
-              <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
-              <div class="player-stats">
-                <span>Obrona: {{ player.skills.defending }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="position-row">
-          <div class="position" *ngFor="let pos of ['RW', 'RIM', 'IM', 'LIM', 'LW']">
-            <div class="position-label tooltip" [attr.data-tooltip]="getPositionDescription(pos)">{{ getPositionLabel(pos) }}</div>
-            <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
-              <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
-              <div class="player-stats">
-                <span>Rozgrywanie: {{ player.skills.playmaking }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="position-row">
-          <div class="position" *ngFor="let pos of ['RFW', 'FW', 'LFW']">
-            <div class="position-label tooltip" [attr.data-tooltip]="getPositionDescription(pos)">{{ getPositionLabel(pos) }}</div>
-            <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
-              <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
-              <div class="player-stats">
-                <span>Strzelanie: {{ player.skills.scoring }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
     </div>
 
     <div class="recommendations-section">

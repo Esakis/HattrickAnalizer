@@ -572,7 +572,7 @@ public class HattrickApiService
             GoalsAgainst = goalsAgainst,
             TeamPoints = teamPoints,
             MatchResult = $"{goalsFor}-{goalsAgainst}",
-            FormationUsed = matchDetails?.Formation ?? "4-4-2",
+            FormationUsed = matchDetails?.Formation ?? "N/A",
             // Prawdziwe oceny meczowe z matchdetails
             MidfieldRating = matchDetails?.MidfieldRating ?? 0,
             RightDefenseRating = matchDetails?.RightDefenseRating ?? 0,
@@ -593,74 +593,52 @@ public class HattrickApiService
 
         try
         {
+            // Użyj matchdetails zamiast matchlineup - matchdetails jest publiczne i zawiera formacje obu drużyn
             var queryParams = new Dictionary<string, string>
             {
-                { "file", "matchlineup" },
+                { "file", "matchdetails" },
                 { "matchId", matchId },
-                { "version", "2.1" }
+                { "version", "3.0" }
             };
 
             var response = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
             var doc = XDocument.Parse(response);
 
-            // Hattrick matchlineup: <Team><TeamID> (dwa elementy - jeden na drużynę)
-            var myTeamElement = doc.Descendants("Team")
-                .FirstOrDefault(t => int.TryParse(t.Element("TeamID")?.Value, out int id) && id == teamId);
-
+            // matchdetails zwraca <Match><HomeTeam> i <AwayTeam>
+            var homeTeam = doc.Descendants("HomeTeam").FirstOrDefault();
+            var awayTeam = doc.Descendants("AwayTeam").FirstOrDefault();
+            
+            var homeTeamId = int.Parse(homeTeam?.Element("HomeTeamID")?.Value ?? "0");
+            var awayTeamId = int.Parse(awayTeam?.Element("AwayTeamID")?.Value ?? "0");
+            
+            // Wybierz odpowiednią drużynę
+            var myTeamElement = homeTeamId == teamId ? homeTeam : awayTeam;
             if (myTeamElement == null) return null;
 
-            // StartingLineup zawiera 11 graczy startowych
-            var startingLineup = myTeamElement.Element("StartingLineup");
-            var players = startingLineup?.Descendants("Player").ToList() ?? new List<XElement>();
+            // Formacja jest w elemencie <Formation>
+            var formationStr = myTeamElement.Element("Formation")?.Value ?? "";
+            
+            // Oceny drużyny
+            var midfieldRating = int.Parse(myTeamElement.Element("RatingMidfield")?.Value ?? "0");
+            var rightDefense = int.Parse(myTeamElement.Element("RatingRightDef")?.Value ?? "0");
+            var centralDefense = int.Parse(myTeamElement.Element("RatingMidDef")?.Value ?? "0");
+            var leftDefense = int.Parse(myTeamElement.Element("RatingLeftDef")?.Value ?? "0");
+            var rightAttack = int.Parse(myTeamElement.Element("RatingRightAtt")?.Value ?? "0");
+            var centralAttack = int.Parse(myTeamElement.Element("RatingMidAtt")?.Value ?? "0");
+            var leftAttack = int.Parse(myTeamElement.Element("RatingLeftAtt")?.Value ?? "0");
 
-            // Tylko główne pozycje (RoleID 100-113)
-            var mainPlayers = players.Where(p => IsMainPlayer(p.Element("RoleID")?.Value ?? "")).ToList();
-
-            // MatchRoleID (Hattrick API):
-            // 101=Right back, 102=Right CD, 103=Middle CD, 104=Left CD, 105=Left back
-            // 106=Right winger, 107=Right IM, 108=Middle IM, 109=Left IM, 110=Left winger
-            // 111=Right forward, 112=Middle forward, 113=Left forward
-            var defenders = mainPlayers.Count(p =>
-            {
-                var rId = p.Element("RoleID")?.Value ?? "";
-                return rId is "101" or "102" or "103" or "104" or "105";
-            });
-            var midfielders = mainPlayers.Count(p =>
-            {
-                var rId = p.Element("RoleID")?.Value ?? "";
-                return rId is "106" or "107" or "108" or "109" or "110";
-            });
-            var forwards = mainPlayers.Count(p =>
-            {
-                var rId = p.Element("RoleID")?.Value ?? "";
-                return rId is "111" or "112" or "113";
-            });
-            var wingers = mainPlayers.Count(p =>
-            {
-                var rId = p.Element("RoleID")?.Value ?? "";
-                return rId is "106" or "110";
-            });
-
-            var formation = DetectFormation(defenders, midfielders, wingers, forwards);
-
-            // Oceny mogą być w elemencie Rating lub bezpośrednio w elemencie drużyny
-            var ratings = myTeamElement.Element("Rating");
-            var midfieldRating = int.Parse(ratings?.Element("Midfield")?.Value ?? "0");
-            var rightDefense = int.Parse(ratings?.Element("RightDefense")?.Value ?? "0");
-            var centralDefense = int.Parse(ratings?.Element("CentralDefense")?.Value ?? "0");
-            var leftDefense = int.Parse(ratings?.Element("LeftDefense")?.Value ?? "0");
-            var rightAttack = int.Parse(ratings?.Element("RightAttack")?.Value ?? "0");
-            var centralAttack = int.Parse(ratings?.Element("CentralAttack")?.Value ?? "0");
-            var leftAttack = int.Parse(ratings?.Element("LeftAttack")?.Value ?? "0");
-
-            var arenaElement = doc.Descendants("Arena").FirstOrDefault();
-            var possession = int.Parse(arenaElement?.Element("Possession")?.Value ?? "0");
-            var attitude = myTeamElement.Element("Attitude")?.Value ?? "Normal";
+            // Posiadanie piłki i inne dane
+            var matchElement = doc.Descendants("Match").FirstOrDefault();
+            var possession = homeTeamId == teamId 
+                ? int.Parse(matchElement?.Element("PossessionFirstHalfHome")?.Value ?? "0")
+                : int.Parse(matchElement?.Element("PossessionFirstHalfAway")?.Value ?? "0");
+            
+            var attitude = myTeamElement.Element("TacticType")?.Value ?? "Normal";
             var teamSpirit = myTeamElement.Element("TeamSpirit")?.Value ?? "calm";
 
             return new MatchDetails
             {
-                Formation = formation,
+                Formation = formationStr,
                 MidfieldRating = midfieldRating,
                 RightDefenseRating = rightDefense,
                 CentralDefenseRating = centralDefense,
@@ -673,8 +651,9 @@ public class HattrickApiService
                 TeamSpirit = teamSpirit
             };
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"Error getting match details for matchId {matchId}, teamId {teamId}: {ex.Message}");
             return null;
         }
     }

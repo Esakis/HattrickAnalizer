@@ -159,8 +159,19 @@
               <span class="stat-value">{{ goalDifference }}</span>
             </div>
             <div class="stat-item">
-              <span class="stat-label">Śr. formacja (5 m.):</span>
-              <span class="stat-value">{{ myTeamStats.statistics?.mostCommonFormation }}</span>
+              <span class="stat-label">Formacje (5 m.):</span>
+              <span class="stat-value">
+                <span *ngIf="myTeamStats.statistics?.last5Formations?.length > 0">
+                  {{ myTeamStats.statistics.last5Formations.join(', ') }}
+                </span>
+                <span *ngIf="!myTeamStats.statistics?.last5Formations?.length">
+                  {{ myTeamStats.statistics?.mostCommonFormation || 'N/A' }}
+                </span>
+              </span>
+            </div>
+            <div class="stat-item" *ngIf="myTeamStats.statistics?.last5Formations?.length > 0">
+              <span class="stat-label">Najczęstsza:</span>
+              <span class="stat-value stat-highlight">{{ myTeamStats.statistics?.mostCommonFormation }}</span>
             </div>
             <div class="stat-item">
               <span class="stat-label">{{ 'teamStats.form' | translate }}:</span>
@@ -230,8 +241,19 @@
               <span class="stat-value">{{ opponentTeamStats.statistics?.goalDifference }}</span>
             </div>
             <div class="stat-item">
-              <span class="stat-label">Śr. formacja (5 m.):</span>
-              <span class="stat-value">{{ opponentTeamStats.statistics?.mostCommonFormation }}</span>
+              <span class="stat-label">Formacje (5 m.):</span>
+              <span class="stat-value">
+                <span *ngIf="opponentTeamStats.statistics?.last5Formations?.length > 0">
+                  {{ opponentTeamStats.statistics.last5Formations.join(', ') }}
+                </span>
+                <span *ngIf="!opponentTeamStats.statistics?.last5Formations?.length">
+                  {{ opponentTeamStats.statistics?.mostCommonFormation || 'N/A' }}
+                </span>
+              </span>
+            </div>
+            <div class="stat-item" *ngIf="opponentTeamStats.statistics?.last5Formations?.length > 0">
+              <span class="stat-label">Najczęstsza:</span>
+              <span class="stat-value stat-highlight">{{ opponentTeamStats.statistics?.mostCommonFormation }}</span>
             </div>
             <div class="stat-item">
               <span class="stat-label">{{ 'teamStats.form' | translate }}:</span>

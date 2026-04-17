@@ -47,6 +47,7 @@ public class TeamStatisticsSummary
     public double PointsPerMatch { get; set; }
     public double WinRate { get; set; }
     public string MostCommonFormation { get; set; } = string.Empty;
+    public List<string> Last5Formations { get; set; } = new();
     public Dictionary<string, int> FormationFrequency { get; set; } = new();
     public Dictionary<string, double> FormationWinRate { get; set; } = new();
     public Dictionary<string, double> FormationPointsPerMatch { get; set; } = new();
@@ -112,21 +113,23 @@ public static class TeamStatsExtensions
             .GroupBy(m => m.FormationUsed)
             .ToDictionary(g => g.Key, g => g.Count());
 
-        // Średnia formacja z ostatnich 5 meczów
-        var last5formations = matches
+        // Formacje z ostatnich 5 meczów
+        summary.Last5Formations = matches
             .OrderByDescending(m => m.MatchDate)
             .Take(5)
-            .Select(m => ParseFormation(m.FormationUsed))
-            .Where(p => p.HasValue)
-            .Select(p => p!.Value)
+            .Select(m => m.FormationUsed)
+            .Where(f => !string.IsNullOrEmpty(f))
             .ToList();
 
-        if (last5formations.Count > 0)
+        // Najczęstsza formacja z ostatnich 5 meczów
+        if (summary.Last5Formations.Count > 0)
         {
-            var d = (int)Math.Round(last5formations.Average(p => p.d));
-            var mid = (int)Math.Round(last5formations.Average(p => p.m));
-            var f = (int)Math.Round(last5formations.Average(p => p.f));
-            summary.MostCommonFormation = $"{d}-{mid}-{f}";
+            summary.MostCommonFormation = summary.Last5Formations
+                .GroupBy(f => f)
+                .OrderByDescending(g => g.Count())
+                .ThenByDescending(g => summary.Last5Formations.IndexOf(g.Key)) // Jeśli remis, wybierz nowszą
+                .Select(g => g.Key)
+                .FirstOrDefault() ?? "N/A";
         }
         else
         {
@@ -180,16 +183,5 @@ public static class TeamStatsExtensions
         summary.PointsByMatchType = matches
             .GroupBy(m => m.MatchType)
             .ToDictionary(g => g.Key, g => g.Sum(m => m.TeamPoints));
-    }
-
-    private static (int d, int m, int f)? ParseFormation(string formation)
-    {
-        var parts = formation.Split('-');
-        if (parts.Length == 3 &&
-            int.TryParse(parts[0], out int d) &&
-            int.TryParse(parts[1], out int m) &&
-            int.TryParse(parts[2], out int f))
-            return (d, m, f);
-        return null;
     }
 }

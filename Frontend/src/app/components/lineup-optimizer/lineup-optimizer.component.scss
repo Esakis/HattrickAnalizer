@@ -136,6 +136,15 @@
           font-weight: 800;
           color: #43a047;
           font-size: 1.1em;
+
+          &.stat-highlight {
+            background: linear-gradient(135deg, #ffeb3b 0%, #fdd835 100%);
+            padding: 2px 8px;
+            border-radius: 4px;
+            color: #1b5e20;
+            font-weight: 900;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          }
         }
       }
     }

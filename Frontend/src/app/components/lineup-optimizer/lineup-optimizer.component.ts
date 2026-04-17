@@ -17,7 +17,7 @@ export class LineupOptimizerComponent implements OnInit {
   teamAttitude: string = 'Normal';
   coachType: string = 'Neutral';
   assistantManagerLevel: number = 0;
-  availableFormations: string[] = ['5-5-0','5-4-1','5-3-2','4-5-1','4-4-2','4-3-3','3-5-2','3-4-3','2-5-3'];
+  availableFormations: string[] = ['5-5-0','5-4-1','5-3-2','5-2-3','4-5-1','4-4-2','4-3-3','3-5-2','3-4-3','2-5-3'];
   formationExperience: { [k: string]: number } = {};
   selectedAlternative: number = 0;
 
@@ -630,6 +630,7 @@ export class LineupOptimizerComponent implements OnInit {
       '5-5-0': ['GK', 'RWB', 'RCD', 'CD', 'LCD', 'LWB', 'RW', 'RIM', 'IM', 'LIM', 'LW'],
       '5-4-1': ['GK', 'RWB', 'RCD', 'CD', 'LCD', 'LWB', 'RW', 'RIM', 'LIM', 'LW', 'FW'],
       '5-3-2': ['GK', 'RWB', 'RCD', 'CD', 'LCD', 'LWB', 'RIM', 'IM', 'LIM', 'RFW', 'LFW'],
+      '5-2-3': ['GK', 'RWB', 'RCD', 'CD', 'LCD', 'LWB', 'RW', 'LW', 'RFW', 'FW', 'LFW'],
       '4-5-1': ['GK', 'RWB', 'RCD', 'LCD', 'LWB', 'RW', 'RIM', 'IM', 'LIM', 'LW', 'FW'],
       '4-4-2': ['GK', 'RWB', 'RCD', 'LCD', 'LWB', 'RW', 'RIM', 'LIM', 'LW', 'RFW', 'LFW'],
       '4-3-3': ['GK', 'RWB', 'RCD', 'LCD', 'LWB', 'RW', 'IM', 'LW', 'RFW', 'FW', 'LFW'],

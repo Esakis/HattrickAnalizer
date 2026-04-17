@@ -15,6 +15,22 @@ public class Player
     public int Leadership { get; set; }
     public string Specialty { get; set; } = string.Empty;
     public int InjuryLevel { get; set; }
+    public int ShirtNumber { get; set; }
+    public PlayerMatchStats? MatchStats { get; set; }
+}
+
+public class PlayerMatchStats
+{
+    public int TotalMatches { get; set; }
+    public int Goals { get; set; }
+    public int Assists { get; set; }
+    public int YellowCards { get; set; }
+    public int RedCards { get; set; }
+    public double AverageRating { get; set; }
+    public double AverageForm { get; set; }
+    public double GoalsPerMatch { get; set; }
+    public double MatchesPerGoal { get; set; }
+    public int MinutesPlayed { get; set; }
 }
 
 public class PlayerSkills

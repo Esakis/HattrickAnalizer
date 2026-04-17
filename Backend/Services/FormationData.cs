@@ -97,6 +97,16 @@ public static class FormationData
             Positions = new[] { "GK", "RCD", "LCD", "RW", "RIM", "IM", "LIM", "LW", "RFW", "FW", "LFW" },
             Style = FormationStyle.UltraOffensive,
             Description = "Ekstremalnie ofensywna, saba obrona"
+        },
+        ["5-2-3"] = new FormationDefinition
+        {
+            Name = "5-2-3",
+            Defenders = 5,
+            Midfielders = 2,
+            Forwards = 3,
+            Positions = new[] { "GK", "RWB", "RCD", "CD", "LCD", "LWB", "RW", "LW", "RFW", "FW", "LFW" },
+            Style = FormationStyle.Offensive,
+            Description = "Silna obrona z trójk napastników"
         }
     };
 

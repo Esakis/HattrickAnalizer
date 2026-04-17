@@ -239,9 +239,12 @@ public class HattrickApiService
 
     private Player ParsePlayer(XElement element)
     {
-        return new Player
+        var playerId = int.Parse(element.Element("PlayerID")?.Value ?? "0");
+        
+        // Pobierz podstawowe dane zawodnika
+        var player = new Player
         {
-            PlayerId = int.Parse(element.Element("PlayerID")?.Value ?? "0"),
+            PlayerId = playerId,
             FirstName = element.Element("FirstName")?.Value ?? "",
             LastName = element.Element("LastName")?.Value ?? "",
             Age = int.Parse(element.Element("Age")?.Value ?? "17"),
@@ -249,6 +252,11 @@ public class HattrickApiService
             Form = int.Parse(element.Element("PlayerForm")?.Value ?? "5"),
             Stamina = int.Parse(element.Element("StaminaSkill")?.Value ?? "5"),
             Experience = int.Parse(element.Element("Experience")?.Value ?? "3"),
+            ShirtNumber = int.Parse(element.Element("PlayerNumber")?.Value ?? "0"),
+            InjuryLevel = int.Parse(element.Element("InjuryLevel")?.Value ?? "0"),
+            Specialty = element.Element("Specialty")?.Value ?? "",
+            Loyalty = int.Parse(element.Element("Loyalty")?.Value ?? "0"),
+            Leadership = int.Parse(element.Element("Leadership")?.Value ?? "0"),
             Skills = new PlayerSkills
             {
                 Keeper = int.Parse(element.Element("KeeperSkill")?.Value ?? "0"),
@@ -260,6 +268,36 @@ public class HattrickApiService
                 SetPieces = int.Parse(element.Element("SetPiecesSkill")?.Value ?? "0")
             }
         };
+
+        // Pobierz statystyki meczowe z elementu LastMatch (jeśli dostępne)
+        var lastMatchElement = element.Element("LastMatch");
+        if (lastMatchElement != null)
+        {
+            var careerGoals = int.Parse(element.Element("CareerGoals")?.Value ?? "0");
+            var careerHattricks = int.Parse(element.Element("CareerHattricks")?.Value ?? "0");
+            var leagueGoals = int.Parse(element.Element("LeagueGoals")?.Value ?? "0");
+            var cupGoals = int.Parse(element.Element("CupGoals")?.Value ?? "0");
+            var friendlyGoals = int.Parse(element.Element("FriendliesGoals")?.Value ?? "0");
+            
+            var totalMatches = int.Parse(element.Element("Caps")?.Value ?? "0");
+            var totalGoals = careerGoals;
+            
+            player.MatchStats = new PlayerMatchStats
+            {
+                TotalMatches = totalMatches,
+                Goals = totalGoals,
+                Assists = 0, // API Hattrick nie udostępnia asyst w podstawowym endpoint
+                YellowCards = int.Parse(element.Element("Cards")?.Value ?? "0"),
+                RedCards = 0,
+                AverageRating = 0,
+                AverageForm = player.Form,
+                GoalsPerMatch = totalMatches > 0 ? Math.Round((double)totalGoals / totalMatches, 2) : 0,
+                MatchesPerGoal = totalGoals > 0 ? Math.Round((double)totalMatches / totalGoals, 1) : 0,
+                MinutesPlayed = 0
+            };
+        }
+
+        return player;
     }
 
     private TeamRatings ParseTeamRatings(XDocument doc, int teamId)
@@ -289,6 +327,10 @@ public class HattrickApiService
 
         for (int i = 1; i <= 18; i++)
         {
+            var totalMatches = random.Next(10, 150);
+            var goals = i >= 9 && i <= 13 ? random.Next(5, 50) : random.Next(0, 15);
+            var assists = random.Next(0, 30);
+            
             players.Add(new Player
             {
                 PlayerId = i,
@@ -299,6 +341,8 @@ public class HattrickApiService
                 Form = random.Next(1, 9),
                 Stamina = random.Next(1, 9),
                 Experience = random.Next(1, 9),
+                ShirtNumber = i,
+                InjuryLevel = random.Next(0, 10) > 8 ? random.Next(1, 4) : 0,
                 Skills = new PlayerSkills
                 {
                     Keeper = i == 1 ? random.Next(5, 15) : 0,
@@ -308,6 +352,19 @@ public class HattrickApiService
                     Passing = random.Next(2, 11),
                     Scoring = i >= 9 && i <= 13 ? random.Next(5, 15) : random.Next(1, 8),
                     SetPieces = random.Next(1, 10)
+                },
+                MatchStats = new PlayerMatchStats
+                {
+                    TotalMatches = totalMatches,
+                    Goals = goals,
+                    Assists = assists,
+                    YellowCards = random.Next(0, 15),
+                    RedCards = random.Next(0, 3),
+                    AverageRating = Math.Round(random.NextDouble() * 3 + 5, 1),
+                    AverageForm = random.Next(1, 9),
+                    GoalsPerMatch = totalMatches > 0 ? Math.Round((double)goals / totalMatches, 2) : 0,
+                    MatchesPerGoal = goals > 0 ? Math.Round((double)totalMatches / goals, 1) : 0,
+                    MinutesPlayed = totalMatches * random.Next(60, 90)
                 }
             });
         }

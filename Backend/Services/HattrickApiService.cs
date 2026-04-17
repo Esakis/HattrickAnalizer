@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Xml.Linq;
 using HattrickAnalizer.Models;
@@ -72,12 +73,21 @@ public class HattrickApiService
 
     public async Task<List<Player>> GetTeamPlayersAsync(int teamId, string? sessionId = null)
     {
+        Console.WriteLine($"========== GetTeamPlayersAsync CALLED for team {teamId} ==========");
+        Debug.WriteLine($"========== GetTeamPlayersAsync CALLED for team {teamId} ==========");
+        
         var (accessToken, accessTokenSecret) = ResolveTokens(sessionId);
         if (accessToken == null || accessTokenSecret == null)
         {
+            Console.WriteLine($"No OAuth tokens available - returning mock players");
+            Debug.WriteLine($"No OAuth tokens available - returning mock players");
             return GenerateMockPlayers();
         }
 
+        Console.WriteLine($"OAuth tokens found - attempting to fetch players from API");
+        
+        // Pobierz graczy z API players (daje imiona, umiejętności, formę itd.)
+        var playersFromApi = new Dictionary<int, Player>();
         try
         {
             var queryParams = new Dictionary<string, string>
@@ -87,31 +97,267 @@ public class HattrickApiService
                 { "version", "2.8" }
             };
             var response = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
-
             var doc = XDocument.Parse(response);
-            var players = new List<Player>();
             foreach (var playerElement in doc.Descendants("Player"))
             {
-                players.Add(ParsePlayer(playerElement));
+                var p = ParsePlayer(playerElement);
+                playersFromApi[p.PlayerId] = p;
             }
-
-            // Wzbogać graczy o statystyki meczowe (matchlineup jest publiczne, więc działa dla każdej drużyny)
-            try
-            {
-                await EnrichPlayersWithMatchStatsAsync(players, teamId, accessToken, accessTokenSecret);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Could not enrich players with match stats for team {teamId}: {ex.Message}");
-                // enrichment jest best-effort - nie przerywaj ładowania gdy nie wyszło
-            }
-
-            return players;
+            Console.WriteLine($"[GetTeamPlayersAsync] Got {playersFromApi.Count} players from API for team {teamId}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error getting players for team {teamId}: {ex.Message}");
-            return GenerateMockPlayers();
+            Console.WriteLine($"[GetTeamPlayersAsync] Players API failed for team {teamId}: {ex.Message}");
+        }
+
+        // Pobierz graczy z matchlineup XML (daje prawdziwe PlayerID z meczów + oceny)
+        try
+        {
+            var matchPlayers = await GetTeamPlayersFromMatchesAsync(teamId, accessToken!, accessTokenSecret!);
+            Console.WriteLine($"[GetTeamPlayersAsync] Got {matchPlayers.Count} players from matches for team {teamId}");
+            
+            if (matchPlayers.Count > 0)
+            {
+                // Uzupełnij dane z API players (imiona, skille, forma) jeśli dostępne
+                foreach (var mp in matchPlayers)
+                {
+                    if (playersFromApi.TryGetValue(mp.PlayerId, out var apiPlayer))
+                    {
+                        // Weź dane personalne z API, a statystyki z lineup
+                        mp.Skills = apiPlayer.Skills;
+                        mp.Form = apiPlayer.Form;
+                        mp.Stamina = apiPlayer.Stamina;
+                        mp.Experience = apiPlayer.Experience;
+                        mp.Loyalty = apiPlayer.Loyalty;
+                        mp.Leadership = apiPlayer.Leadership;
+                        mp.Specialty = apiPlayer.Specialty;
+                        mp.InjuryLevel = apiPlayer.InjuryLevel;
+                        mp.ShirtNumber = apiPlayer.ShirtNumber;
+                        mp.TSI = apiPlayer.TSI;
+                        mp.Age = apiPlayer.Age;
+                    }
+                }
+                return matchPlayers;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[GetTeamPlayersAsync] Match lineup extraction failed for team {teamId}: {ex.Message}");
+        }
+
+        // Fallback: zwróć graczy z API bez statystyk meczowych
+        if (playersFromApi.Count > 0)
+        {
+            return playersFromApi.Values.ToList();
+        }
+
+        return GenerateMockPlayers();
+    }
+
+    private async Task<List<Player>> GetTeamPlayersFromMatchesAsync(int teamId, string accessToken, string accessTokenSecret)
+    {
+        Console.WriteLine($"[GetTeamPlayersFromMatchesAsync] Fetching players for team {teamId} from match data...");
+        Debug.WriteLine($"[GetTeamPlayersFromMatchesAsync] Fetching players for team {teamId} from match data...");
+        
+        // Pobierz mecze drużyny (publiczne API)
+        var matchQuery = new Dictionary<string, string>
+        {
+            { "file", "matches" },
+            { "teamId", teamId.ToString() },
+            { "version", "2.8" }
+        };
+        var matchesXml = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, matchQuery);
+        var matchesDoc = XDocument.Parse(matchesXml);
+
+        var finishedMatchIds = matchesDoc.Descendants("Match")
+            .Where(m => 
+            {
+                var status = m.Element("Status")?.Value ?? "";
+                var matchType = int.Parse(m.Element("MatchType")?.Value ?? "0");
+                var homeTeamId = int.Parse(m.Element("HomeTeam")?.Element("HomeTeamID")?.Value ?? "0");
+                var awayTeamId = int.Parse(m.Element("AwayTeam")?.Element("AwayTeamID")?.Value ?? "0");
+                return status.Equals("FINISHED", StringComparison.OrdinalIgnoreCase) 
+                    && matchType >= 1 && matchType <= 12
+                    && (homeTeamId == teamId || awayTeamId == teamId);
+            })
+            .Select(m => m.Element("MatchID")?.Value)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Take(10)
+            .ToList();
+
+        Console.WriteLine($"[GetTeamPlayersFromMatchesAsync] Found {finishedMatchIds.Count} senior matches for team {teamId}");
+        if (finishedMatchIds.Count == 0) return new List<Player>();
+
+        // Pobierz składy z meczów (publiczne API)
+        var playerDict = new Dictionary<int, Player>();
+        var appearances = new Dictionary<int, PlayerAppearanceAggregate>();
+
+        foreach (var matchId in finishedMatchIds)
+        {
+            var lineupXml = await FetchMatchLineupAsync(matchId!, teamId, accessToken, accessTokenSecret);
+            if (string.IsNullOrEmpty(lineupXml))
+            {
+                Console.WriteLine($"[GetTeamPlayersFromMatchesAsync] Empty lineup XML for match {matchId}");
+                continue;
+            }
+
+            try
+            {
+                var doc = XDocument.Parse(lineupXml);
+                var rootChildren = doc.Root?.Elements().Select(e => e.Name.LocalName).ToList() ?? new List<string>();
+                Console.WriteLine($"[GetTeamPlayersFromMatchesAsync] Match {matchId} root children: {string.Join(", ", rootChildren)}");
+                var playerCount = doc.Descendants("Player").Count();
+                Console.WriteLine($"[GetTeamPlayersFromMatchesAsync] Total <Player> elements in XML: {playerCount}");
+                if (playerCount > 0)
+                {
+                    var firstPlayer = doc.Descendants("Player").First();
+                    var parentChain = new List<string>();
+                    var p = firstPlayer.Parent;
+                    while (p != null) { parentChain.Insert(0, p.Name.LocalName); p = p.Parent; }
+                    Console.WriteLine($"[GetTeamPlayersFromMatchesAsync] First Player parent chain: {string.Join(" > ", parentChain)}");
+                }
+                ExtractPlayersFromLineup(lineupXml, teamId, playerDict, appearances);
+                Console.WriteLine($"[GetTeamPlayersFromMatchesAsync] After extract: {playerDict.Count} players so far");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GetTeamPlayersFromMatchesAsync] EXCEPTION for match {matchId}: {ex}");
+            }
+        }
+
+        Debug.WriteLine($"[GetTeamPlayersFromMatchesAsync] Extracted {playerDict.Count} unique players");
+
+        // Oblicz średnie oceny dla każdego gracza
+        foreach (var player in playerDict.Values)
+        {
+            if (appearances.TryGetValue(player.PlayerId, out var agg) && agg.Matches > 0)
+            {
+                var stats = new PlayerMatchStats
+                {
+                    TotalMatches = agg.Matches,
+                    Goals = agg.Goals,
+                    MinutesPlayed = agg.Minutes,
+                    AverageRating = Math.Round(agg.RatingSum / agg.Matches, 2),
+                    AverageForm = player.Form,
+                    GoalsPerMatch = agg.Matches > 0 ? Math.Round((double)agg.Goals / agg.Matches, 2) : 0,
+                    MatchesPerGoal = agg.Goals > 0 ? Math.Round((double)agg.Matches / agg.Goals, 1) : 0
+                };
+
+                // Oblicz średnie oceny na pozycjach
+                foreach (var kvp in agg.PositionRatings)
+                {
+                    if (kvp.Value.Count > 0)
+                    {
+                        stats.PositionRatings[kvp.Key] = Math.Round(kvp.Value.Average(), 2);
+                        Debug.WriteLine($"[GetTeamPlayersFromMatchesAsync] Player {player.PlayerId} ({player.FirstName} {player.LastName}): {kvp.Key} = {stats.PositionRatings[kvp.Key]} (from {kvp.Value.Count} matches)");
+                    }
+                }
+
+                player.MatchStats = stats;
+            }
+        }
+
+        Debug.WriteLine($"[GetTeamPlayersFromMatchesAsync] Returning {playerDict.Values.Count} players with stats");
+        return playerDict.Values.ToList();
+    }
+
+    private void ExtractPlayersFromLineup(string lineupXml, int teamId, Dictionary<int, Player> playerDict, Dictionary<int, PlayerAppearanceAggregate> appearances)
+    {
+        var doc = XDocument.Parse(lineupXml);
+        
+        // matchlineup XML structure:
+        //   <HattrickData>
+        //     <HomeTeam><HomeTeamID>...</HomeTeamID></HomeTeam>  (just header)
+        //     <AwayTeam><AwayTeamID>...</AwayTeamID></AwayTeam>  (just header)
+        //     <Team><TeamID>...</TeamID><StartingLineup><Player>...</Player></StartingLineup></Team>  (actual lineup)
+        // Players are inside <Team>, NOT inside <HomeTeam>/<AwayTeam>
+        
+        var teamElement = doc.Descendants("Team")
+            .FirstOrDefault(t => t.Element("TeamID")?.Value == teamId.ToString());
+        
+        if (teamElement == null)
+        {
+            // The API returns lineup for the requested teamId, so <Team> should always match
+            Console.WriteLine($"[ExtractPlayersFromLineup] <Team> with TeamID={teamId} not found");
+            return;
+        }
+
+        // Use Lineup (has PlayedMinutes/Rating) rather than StartingLineup (only has PlayerID/RoleID)
+        var lineupContainer = teamElement.Element("Lineup");
+        var lineupPlayers = new List<XElement>();
+        if (lineupContainer != null)
+        {
+            lineupPlayers.AddRange(lineupContainer.Elements("Player"));
+            if (lineupPlayers.Count > 0)
+            {
+                var firstEls = lineupPlayers[0].Elements().Select(e => $"{e.Name.LocalName}={e.Value}").ToList();
+                Console.WriteLine($"[ExtractPlayersFromLineup] Team {teamId}: {lineupPlayers.Count} players from <Lineup>, first: {string.Join(", ", firstEls)}");
+            }
+        }
+        // Fallback to StartingLineup + Substitutions if Lineup is empty
+        if (lineupPlayers.Count == 0)
+        {
+            foreach (var containerName in new[] { "StartingLineup", "Substitutions", "Bench" })
+            {
+                var container = teamElement.Element(containerName);
+                if (container != null)
+                    lineupPlayers.AddRange(container.Elements("Player"));
+            }
+            Console.WriteLine($"[ExtractPlayersFromLineup] Team {teamId}: fallback to StartingLineup, {lineupPlayers.Count} players");
+        }
+
+        foreach (var playerEl in lineupPlayers)
+        {
+            if (!int.TryParse(playerEl.Element("PlayerID")?.Value, out int pid)) continue;
+
+            // Dodaj gracza do słownika jeśli jeszcze go nie ma
+            if (!playerDict.ContainsKey(pid))
+            {
+                var player = new Player
+                {
+                    PlayerId = pid,
+                    FirstName = playerEl.Element("FirstName")?.Value ?? "",
+                    LastName = playerEl.Element("LastName")?.Value ?? "",
+                    Age = int.Parse(playerEl.Element("Age")?.Value ?? "17"),
+                    Form = int.Parse(playerEl.Element("PlayerForm")?.Value ?? "5"),
+                    Stamina = int.Parse(playerEl.Element("StaminaSkill")?.Value ?? "5"),
+                    Skills = new PlayerSkills()
+                };
+                playerDict[pid] = player;
+                appearances[pid] = new PlayerAppearanceAggregate();
+                Debug.WriteLine($"[ExtractPlayersFromLineup] Added new player: {player.FirstName} {player.LastName} (ID: {pid})");
+            }
+
+            var agg = appearances[pid];
+            // Lineup element has no PlayedMinutes - if player is in Lineup, they played
+            var minutes = int.Parse(playerEl.Element("PlayedMinutes")?.Value ?? "90");
+            if (minutes <= 0) continue;
+
+            // matchlineup v2.1 uses RatingStarsEndOfMatch / RatingStars, not RatingEndOfGame
+            var ratingStr = playerEl.Element("RatingStarsEndOfMatch")?.Value 
+                ?? playerEl.Element("RatingStars")?.Value 
+                ?? playerEl.Element("RatingEndOfGame")?.Value 
+                ?? playerEl.Element("Rating")?.Value ?? "0";
+            var rating = double.Parse(ratingStr, System.Globalization.CultureInfo.InvariantCulture);
+            var roleId = playerEl.Element("RoleID")?.Value ?? "";
+            var position = MapRoleIdToPosition(roleId);
+
+            Debug.WriteLine($"[ExtractPlayersFromLineup] Player {pid}: minutes={minutes}, rating={rating}, roleId={roleId}, position={position}");
+
+            agg.Matches += 1;
+            agg.Minutes += minutes;
+            agg.RatingSum += rating;
+
+            // Zapisz ocenę na pozycji
+            if (!string.IsNullOrEmpty(position) && rating > 0)
+            {
+                if (!agg.PositionRatings.ContainsKey(position))
+                {
+                    agg.PositionRatings[position] = new List<double>();
+                }
+                agg.PositionRatings[position].Add(rating);
+                Debug.WriteLine($"[ExtractPlayersFromLineup] Added rating {rating} for player {pid} at position {position}");
+            }
         }
     }
 
@@ -128,19 +374,35 @@ public class HattrickApiService
         var matchesXml = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, matchQuery);
         var matchesDoc = XDocument.Parse(matchesXml);
 
+        // Pobierz tylko mecze seniorskie (MatchType 1-3: League, Qualification, Cup)
+        // Wyklucz mecze młodzieżówki (MatchType 50+)
         var finishedMatchIds = matchesDoc.Descendants("Match")
-            .Where(m => (m.Element("Status")?.Value ?? "").Equals("FINISHED", StringComparison.OrdinalIgnoreCase))
+            .Where(m => 
+            {
+                var status = m.Element("Status")?.Value ?? "";
+                var matchType = int.Parse(m.Element("MatchType")?.Value ?? "0");
+                var homeTeamId = int.Parse(m.Element("HomeTeam")?.Element("HomeTeamID")?.Value ?? "0");
+                var awayTeamId = int.Parse(m.Element("AwayTeam")?.Element("AwayTeamID")?.Value ?? "0");
+                
+                // Tylko finished mecze seniorskie gdzie nasza drużyna gra
+                return status.Equals("FINISHED", StringComparison.OrdinalIgnoreCase) 
+                    && matchType >= 1 && matchType <= 12  // Senior matches only
+                    && (homeTeamId == teamId || awayTeamId == teamId);
+            })
             .Select(m => m.Element("MatchID")?.Value)
             .Where(id => !string.IsNullOrEmpty(id))
             .Take(10)
             .ToList();
+        
+        Console.WriteLine($"[EnrichPlayers] Found {finishedMatchIds.Count} senior matches for team {teamId}");
+        Debug.WriteLine($"[EnrichPlayers] Found {finishedMatchIds.Count} senior matches for team {teamId}");
 
         if (finishedMatchIds.Count == 0) return;
 
         var playerIndex = players.ToDictionary(p => p.PlayerId);
         var appearances = players.ToDictionary(p => p.PlayerId, _ => new PlayerAppearanceAggregate());
 
-        var lineupTasks = finishedMatchIds.Select(id => FetchMatchLineupAsync(id!, accessToken, accessTokenSecret));
+        var lineupTasks = finishedMatchIds.Select(id => FetchMatchLineupAsync(id!, teamId, accessToken, accessTokenSecret));
         var lineups = await Task.WhenAll(lineupTasks);
 
         foreach (var lineupXml in lineups)
@@ -148,11 +410,14 @@ public class HattrickApiService
             if (string.IsNullOrEmpty(lineupXml)) continue;
             try
             {
+                // Log XML snippet before parsing
+                var snippet = lineupXml.Length > 500 ? lineupXml.Substring(0, 500) : lineupXml;
+                Console.WriteLine($"[EnrichPlayers] Lineup XML snippet: {snippet}");
                 AggregateLineup(lineupXml, teamId, playerIndex, appearances);
             }
-            catch
+            catch (Exception ex)
             {
-                // pomiń uszkodzony lineup
+                Console.WriteLine($"[EnrichPlayers] EXCEPTION in AggregateLineup: {ex.Message}");
             }
         }
 
@@ -169,36 +434,42 @@ public class HattrickApiService
             stats.GoalsPerMatch = agg.Matches > 0 ? Math.Round((double)agg.Goals / agg.Matches, 2) : 0;
             stats.MatchesPerGoal = agg.Goals > 0 ? Math.Round((double)agg.Matches / agg.Goals, 1) : 0;
             
+            Console.WriteLine($"[EnrichPlayers] Processing player {player.PlayerId} ({player.FirstName} {player.LastName}): {agg.Matches} matches, {agg.PositionRatings.Count} positions");
+            Debug.WriteLine($"[EnrichPlayers] Processing player {player.PlayerId} ({player.FirstName} {player.LastName}): {agg.Matches} matches, {agg.PositionRatings.Count} positions");
+            
             // Calculate average ratings per position
             foreach (var kvp in agg.PositionRatings)
             {
                 if (kvp.Value.Count > 0)
                 {
                     stats.PositionRatings[kvp.Key] = Math.Round(kvp.Value.Average(), 2);
+                    Console.WriteLine($"[EnrichPlayers] Player {player.PlayerId}: {kvp.Key} = {stats.PositionRatings[kvp.Key]} (from {kvp.Value.Count} matches)");
+                    Debug.WriteLine($"[EnrichPlayers] Player {player.PlayerId}: {kvp.Key} = {stats.PositionRatings[kvp.Key]} (from {kvp.Value.Count} matches)");
                 }
             }
             
             player.MatchStats = stats;
+            Console.WriteLine($"[EnrichPlayers] Player {player.PlayerId} final PositionRatings count: {stats.PositionRatings.Count}");
+            Debug.WriteLine($"[EnrichPlayers] Player {player.PlayerId} final PositionRatings count: {stats.PositionRatings.Count}");
         }
     }
 
-    private async Task<string?> FetchMatchLineupAsync(string matchId, string accessToken, string accessTokenSecret)
+    private async Task<string?> FetchMatchLineupAsync(string matchId, int teamId, string accessToken, string accessTokenSecret)
     {
         try
         {
-            // matchlineup jest publiczne - nie wymaga autoryzacji dla konkretnej drużyny
-            // Możemy pobrać składy z dowolnego meczu
             var queryParams = new Dictionary<string, string>
             {
                 { "file", "matchlineup" },
                 { "matchId", matchId },
+                { "teamId", teamId.ToString() },
                 { "version", "2.1" }
             };
             return await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error fetching match lineup for matchId {matchId}: {ex.Message}");
+            Debug.WriteLine($"Error fetching match lineup for matchId {matchId}: {ex.Message}");
             return null;
         }
     }
@@ -206,52 +477,37 @@ public class HattrickApiService
     private void AggregateLineup(string lineupXml, int teamId, Dictionary<int, Player> playerIndex, Dictionary<int, PlayerAppearanceAggregate> appearances)
     {
         var doc = XDocument.Parse(lineupXml);
-        var teamElement = doc.Descendants("Team")
-            .FirstOrDefault(t => int.TryParse(t.Element("TeamID")?.Value, out int id) && id == teamId);
-        if (teamElement == null) return;
-
-        var scorerElements = teamElement.Descendants("Goal")
-            .Concat(doc.Descendants("Goal"))
-            .Distinct();
-        var goalsByPlayer = new Dictionary<int, int>();
-        foreach (var goal in scorerElements)
-        {
-            var teamIdEl = goal.Element("ScorerTeamID")?.Value;
-            if (teamIdEl != null && int.TryParse(teamIdEl, out int scoringTeamId) && scoringTeamId != teamId) continue;
-            if (int.TryParse(goal.Element("ScorerPlayerID")?.Value, out int scorerId))
-            {
-                goalsByPlayer[scorerId] = goalsByPlayer.GetValueOrDefault(scorerId, 0) + 1;
-            }
-        }
-
-        var lineupPlayers = new List<XElement>();
-        var starting = teamElement.Element("StartingLineup");
-        if (starting != null) lineupPlayers.AddRange(starting.Elements("Player"));
-        var subs = teamElement.Element("Substitutions");
-        if (subs != null) lineupPlayers.AddRange(subs.Elements("Player"));
-        var bench = teamElement.Element("Bench");
-        if (bench != null) lineupPlayers.AddRange(bench.Elements("Player"));
-
+        
+        // Zbierz WSZYSTKICH graczy z całego XML - niezależnie od struktury
+        var allPlayers = doc.Descendants("Player").ToList();
+        
         var seenPlayers = new HashSet<int>();
-        foreach (var playerEl in lineupPlayers)
+        int matched = 0;
+        foreach (var playerEl in allPlayers)
         {
             if (!int.TryParse(playerEl.Element("PlayerID")?.Value, out int pid)) continue;
+            // Sprawdź czy ten gracz jest w naszym indeksie (czyli należy do szukanej drużyny)
             if (!playerIndex.ContainsKey(pid)) continue;
             if (!appearances.TryGetValue(pid, out var agg)) continue;
-
-            var minutes = int.Parse(playerEl.Element("PlayedMinutes")?.Value ?? "0");
-            if (minutes <= 0) continue;
             if (!seenPlayers.Add(pid)) continue;
 
-            var rating = double.Parse(playerEl.Element("RatingEndOfGame")?.Value ?? playerEl.Element("Rating")?.Value ?? "0", CultureInfo.InvariantCulture);
+            var minutes = int.Parse(playerEl.Element("PlayedMinutes")?.Value ?? "90");
+            if (minutes <= 0) continue;
+
+            var rating = double.Parse(
+                playerEl.Element("RatingStarsEndOfMatch")?.Value ?? 
+                playerEl.Element("RatingStars")?.Value ??
+                playerEl.Element("RatingEndOfGame")?.Value ?? 
+                playerEl.Element("Rating")?.Value ?? "0", 
+                CultureInfo.InvariantCulture);
             var roleId = playerEl.Element("RoleID")?.Value ?? "";
             var position = MapRoleIdToPosition(roleId);
 
             agg.Matches += 1;
             agg.Minutes += minutes;
             agg.RatingSum += rating;
-            agg.Goals += goalsByPlayer.GetValueOrDefault(pid, 0);
-            
+            matched++;
+
             // Track rating for this position
             if (!string.IsNullOrEmpty(position) && rating > 0)
             {
@@ -262,6 +518,7 @@ public class HattrickApiService
                 agg.PositionRatings[position].Add(rating);
             }
         }
+        Console.WriteLine($"[AggregateLineup] team={teamId}: {allPlayers.Count} players in XML, {matched} matched");
     }
 
     private class PlayerAppearanceAggregate

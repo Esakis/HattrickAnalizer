@@ -338,13 +338,22 @@ export class LineupOptimizerComponent implements OnInit {
     }
     
     this.loadingOpponentTeam = true;
+    
+    // Najpierw pobierz podstawowe info o drużynie (nazwa)
     this.hattrickApi.getTeam(this.opponentTeamId).subscribe({
       next: (team) => {
-        this.opponentTeamPlayers = team.players;
         this.opponentTeamName = team.teamName;
+      },
+      error: () => {}
+    });
+    
+    // Następnie pobierz graczy z wzbogaconymi statystykami
+    this.hattrickApi.getPlayers(this.opponentTeamId).subscribe({
+      next: (players) => {
+        this.opponentTeamPlayers = players;
         this.lastLoadedOpponentId = this.opponentTeamId;
         this.loadingOpponentTeam = false;
-        // Generuj statystyki dla graczy przeciwnika
+        // Generuj statystyki dla graczy przeciwnika (tylko jeśli brak danych z API)
         this.generatePlayerStats();
         // Zbuduj optymalny skład dla przeciwnika
         this.buildOpponentOptimalLineup();

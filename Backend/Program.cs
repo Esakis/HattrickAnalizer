@@ -2,6 +2,9 @@ using HattrickAnalizer.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Enable console logging for debugging
+Console.WriteLine("========== APPLICATION STARTING ==========");
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

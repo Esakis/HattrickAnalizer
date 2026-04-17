@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using HattrickAnalizer.Services;
 using HattrickAnalizer.Models;
@@ -20,13 +21,16 @@ public class TeamController : ControllerBase
     [HttpGet("{teamId}")]
     public async Task<IActionResult> GetTeam(int teamId)
     {
+        Debug.WriteLine($"[TeamController] GetTeam called for teamId: {teamId}");
         try
         {
             var team = await _hattrickApi.GetTeamDetailsAsync(teamId);
+            Debug.WriteLine($"[TeamController] GetTeam returned team: {team.TeamName}");
             return Ok(team);
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"[TeamController] GetTeam error: {ex.Message}");
             return StatusCode(500, new { error = ex.Message });
         }
     }
@@ -34,13 +38,28 @@ public class TeamController : ControllerBase
     [HttpGet("{teamId}/players")]
     public async Task<IActionResult> GetPlayers(int teamId)
     {
+        Debug.WriteLine($"[TeamController] GetPlayers called for teamId: {teamId}");
+        Console.WriteLine($"[TeamController] GetPlayers called for teamId: {teamId}");
         try
         {
             var players = await _hattrickApi.GetTeamPlayersAsync(teamId);
+            var playersWithRatings = players.Count(p => p.MatchStats?.PositionRatings?.Count > 0);
+            Debug.WriteLine($"[TeamController] GetPlayers returned {players.Count} players, {playersWithRatings} have position ratings");
+            Console.WriteLine($"[TeamController] GetPlayers returned {players.Count} players, {playersWithRatings} have position ratings");
+            
+            // Log first player's ratings as sample
+            var firstWithRatings = players.FirstOrDefault(p => p.MatchStats?.PositionRatings?.Count > 0);
+            if (firstWithRatings != null)
+            {
+                Console.WriteLine($"[TeamController] Sample player {firstWithRatings.PlayerId} has ratings: {string.Join(", ", firstWithRatings.MatchStats!.PositionRatings.Select(kvp => $"{kvp.Key}={kvp.Value}"))}");
+            }
+            
             return Ok(players);
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"[TeamController] GetPlayers error: {ex.Message}");
+            Console.WriteLine($"[TeamController] GetPlayers error: {ex.Message}");
             return StatusCode(500, new { error = ex.Message });
         }
     }

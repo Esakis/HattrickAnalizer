@@ -95,19 +95,22 @@ public class HattrickApiService
                 players.Add(ParsePlayer(playerElement));
             }
 
+            // Wzbogać graczy o statystyki meczowe (matchlineup jest publiczne, więc działa dla każdej drużyny)
             try
             {
                 await EnrichPlayersWithMatchStatsAsync(players, teamId, accessToken, accessTokenSecret);
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"Could not enrich players with match stats for team {teamId}: {ex.Message}");
                 // enrichment jest best-effort - nie przerywaj ładowania gdy nie wyszło
             }
 
             return players;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"Error getting players for team {teamId}: {ex.Message}");
             return GenerateMockPlayers();
         }
     }
@@ -165,6 +168,16 @@ public class HattrickApiService
             stats.AverageForm = agg.Matches > 0 ? Math.Round(agg.RatingSum / agg.Matches, 1) : player.Form;
             stats.GoalsPerMatch = agg.Matches > 0 ? Math.Round((double)agg.Goals / agg.Matches, 2) : 0;
             stats.MatchesPerGoal = agg.Goals > 0 ? Math.Round((double)agg.Matches / agg.Goals, 1) : 0;
+            
+            // Calculate average ratings per position
+            foreach (var kvp in agg.PositionRatings)
+            {
+                if (kvp.Value.Count > 0)
+                {
+                    stats.PositionRatings[kvp.Key] = Math.Round(kvp.Value.Average(), 2);
+                }
+            }
+            
             player.MatchStats = stats;
         }
     }
@@ -173,6 +186,8 @@ public class HattrickApiService
     {
         try
         {
+            // matchlineup jest publiczne - nie wymaga autoryzacji dla konkretnej drużyny
+            // Możemy pobrać składy z dowolnego meczu
             var queryParams = new Dictionary<string, string>
             {
                 { "file", "matchlineup" },
@@ -181,8 +196,9 @@ public class HattrickApiService
             };
             return await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"Error fetching match lineup for matchId {matchId}: {ex.Message}");
             return null;
         }
     }
@@ -228,11 +244,23 @@ public class HattrickApiService
             if (!seenPlayers.Add(pid)) continue;
 
             var rating = double.Parse(playerEl.Element("RatingEndOfGame")?.Value ?? playerEl.Element("Rating")?.Value ?? "0", CultureInfo.InvariantCulture);
+            var roleId = playerEl.Element("RoleID")?.Value ?? "";
+            var position = MapRoleIdToPosition(roleId);
 
             agg.Matches += 1;
             agg.Minutes += minutes;
             agg.RatingSum += rating;
             agg.Goals += goalsByPlayer.GetValueOrDefault(pid, 0);
+            
+            // Track rating for this position
+            if (!string.IsNullOrEmpty(position) && rating > 0)
+            {
+                if (!agg.PositionRatings.ContainsKey(position))
+                {
+                    agg.PositionRatings[position] = new List<double>();
+                }
+                agg.PositionRatings[position].Add(rating);
+            }
         }
     }
 
@@ -242,6 +270,7 @@ public class HattrickApiService
         public int Minutes { get; set; }
         public int Goals { get; set; }
         public double RatingSum { get; set; }
+        public Dictionary<string, List<double>> PositionRatings { get; set; } = new();
     }
 
     public async Task<NextOpponentInfo?> GetNextOpponentAsync(int teamId, string? sessionId = null)
@@ -773,6 +802,33 @@ public class HattrickApiService
         // Główne pozycje w meczu: 100 (GK) do 113 (Left forward)
         // Wszystkie inne (17,18,19-35,114-213) to role specjalne lub zastępcy
         return int.TryParse(roleId, out int id) && id >= 100 && id <= 113;
+    }
+
+    private static string MapRoleIdToPosition(string roleId)
+    {
+        // Mapowanie RoleID z API Hattrick na pozycje używane w aplikacji
+        // 100 = Keeper
+        // 101 = Right back, 102 = Right CD, 103 = Middle CD, 104 = Left CD, 105 = Left back
+        // 106 = Right winger, 107 = Right IM, 108 = Middle IM, 109 = Left IM, 110 = Left winger
+        // 111 = Right forward, 112 = Middle forward, 113 = Left forward
+        return roleId switch
+        {
+            "100" => "GK",
+            "101" => "RWB",
+            "102" => "RCD",
+            "103" => "CD",
+            "104" => "LCD",
+            "105" => "LWB",
+            "106" => "RW",
+            "107" => "RIM",
+            "108" => "IM",
+            "109" => "LIM",
+            "110" => "LW",
+            "111" => "RFW",
+            "112" => "FW",
+            "113" => "LFW",
+            _ => ""
+        };
     }
 
     public async Task<Dictionary<string, int>> GetFormationExperienceAsync(int teamId, string? sessionId = null)

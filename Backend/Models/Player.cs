@@ -31,6 +31,7 @@ public class PlayerMatchStats
     public double GoalsPerMatch { get; set; }
     public double MatchesPerGoal { get; set; }
     public int MinutesPlayed { get; set; }
+    public Dictionary<string, double> PositionRatings { get; set; } = new();
 }
 
 public class PlayerSkills

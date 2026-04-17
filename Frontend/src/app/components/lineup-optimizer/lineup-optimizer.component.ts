@@ -431,12 +431,20 @@ export class LineupOptimizerComponent implements OnInit {
       next: (stats: any) => {
         this.opponentTeamStats = stats;
         this.loadingOpponentTeamStats = false;
+        // Przebuduj skład przeciwnika z poprawną formacją
+        if (this.opponentTeamPlayers.length > 0) {
+          this.buildOpponentOptimalLineup();
+        }
       },
       error: (err: any) => {
         console.error('Error loading opponent stats:', err);
         // Fallback do mockowych danych w razie bdu
         this.opponentTeamStats = this.generateMockTeamStats(this.opponentTeamId);
         this.loadingOpponentTeamStats = false;
+        // Przebuduj skład przeciwnika z poprawną formacją
+        if (this.opponentTeamPlayers.length > 0) {
+          this.buildOpponentOptimalLineup();
+        }
       }
     });
   }
@@ -591,8 +599,9 @@ export class LineupOptimizerComponent implements OnInit {
   buildOpponentOptimalLineup(): void {
     if (this.opponentTeamPlayers.length < 11) return;
     
+    // Użyj najczęstszej formacji z ostatnich 5 meczów przeciwnika
     const formation = this.selectedOpponentFormation === 'Auto' 
-      ? this.getBestFormationForTeam(this.opponentTeamPlayers)
+      ? (this.opponentTeamStats?.statistics?.mostCommonFormation || this.getBestFormationForTeam(this.opponentTeamPlayers))
       : this.selectedOpponentFormation;
     
     const positions = this.getFormationPositions(formation);
@@ -653,38 +662,13 @@ export class LineupOptimizerComponent implements OnInit {
   }
 
   getPositionScore(player: Player, position: string): number {
-    const skills = player.skills;
-    const formBonus = player.form * 0.1;
-    
     // Sprawdź czy gracz ma ocenę na tej pozycji z poprzednich meczów
     if (player.matchStats?.positionRatings?.[position]) {
-      return player.matchStats.positionRatings[position] + formBonus;
+      return player.matchStats.positionRatings[position];
     }
 
-    switch (position) {
-      case 'GK':
-        return skills.keeper * 1.5 + formBonus;
-      case 'RWB':
-      case 'LWB':
-        return skills.defending * 0.8 + skills.winger * 0.6 + skills.playmaking * 0.2 + formBonus;
-      case 'RCD':
-      case 'LCD':
-      case 'CD':
-        return skills.defending * 1.2 + skills.playmaking * 0.3 + formBonus;
-      case 'RW':
-      case 'LW':
-        return skills.winger * 1.0 + skills.playmaking * 0.5 + skills.passing * 0.3 + formBonus;
-      case 'RIM':
-      case 'LIM':
-      case 'IM':
-        return skills.playmaking * 1.2 + skills.passing * 0.4 + skills.defending * 0.2 + formBonus;
-      case 'RFW':
-      case 'LFW':
-      case 'FW':
-        return skills.scoring * 1.3 + skills.passing * 0.3 + skills.winger * 0.2 + formBonus;
-      default:
-        return skills.playmaking + formBonus;
-    }
+    // Jeśli nie ma rzeczywistych ocen, użyj calculateSkillBasedRating
+    return this.calculateSkillBasedRating(player, position);
   }
 
   getBestFormationForTeam(players: Player[]): string {
@@ -711,16 +695,41 @@ export class LineupOptimizerComponent implements OnInit {
   // ==================== GENEROWANIE STATYSTYK GRACZY ====================
 
   generatePlayerStats(): void {
+    // Nie generujemy mockowych ocen - używamy tylko rzeczywistych danych z API
     this.myTeamPlayers = this.myTeamPlayers.map(player => {
       if (!player.matchStats) {
-        player.matchStats = this.generateMockPlayerStats(player);
+        player.matchStats = {
+          totalMatches: 0,
+          goals: 0,
+          assists: 0,
+          yellowCards: 0,
+          redCards: 0,
+          averageRating: 0,
+          averageForm: player.form,
+          goalsPerMatch: 0,
+          matchesPerGoal: 0,
+          minutesPlayed: 0,
+          positionRatings: {}
+        };
       }
       return player;
     });
     
     this.opponentTeamPlayers = this.opponentTeamPlayers.map(player => {
       if (!player.matchStats) {
-        player.matchStats = this.generateMockPlayerStats(player);
+        player.matchStats = {
+          totalMatches: 0,
+          goals: 0,
+          assists: 0,
+          yellowCards: 0,
+          redCards: 0,
+          averageRating: 0,
+          averageForm: player.form,
+          goalsPerMatch: 0,
+          matchesPerGoal: 0,
+          minutesPlayed: 0,
+          positionRatings: {}
+        };
       }
       return player;
     });
@@ -780,19 +789,69 @@ export class LineupOptimizerComponent implements OnInit {
     const positions = ['GK', 'RWB', 'LWB', 'RCD', 'LCD', 'CD', 'RW', 'LW', 'RIM', 'LIM', 'IM', 'RFW', 'LFW', 'FW'];
     
     for (const pos of positions) {
-      const baseScore = this.getPositionScore(player, pos);
-      // Dodaj losową wariację z poprzednich meczów
-      ratings[pos] = Math.max(1, baseScore + (random() - 0.5) * 2);
+      // Oblicz bazową ocenę na podstawie umiejętności gracza (skala Hattrick 0-20)
+      const skillScore = this.calculateSkillBasedRating(player, pos);
+      // Dodaj losową wariację ±1.5 żeby symulować różnice między meczami
+      const variation = (random() - 0.5) * 3;
+      ratings[pos] = Math.max(1, Math.min(20, skillScore + variation));
     }
     
     return ratings;
   }
 
+  calculateSkillBasedRating(player: Player, position: string): number {
+    const skills = player.skills;
+    const form = player.form;
+    const stamina = player.stamina;
+    
+    // Oceny w Hattrick są zazwyczaj 1-10, rzadko wyżej
+    // Bazowa ocena: 1.0 + (główna umiejętność / 3) + bonusy
+    // Forma i kondycja mają wpływ na końcową ocenę
+    let rating = 1.0;
+    
+    switch (position) {
+      case 'GK':
+        rating = 1.0 + (skills.keeper / 3) + (form * 0.05) + (stamina * 0.03);
+        break;
+      case 'RWB':
+      case 'LWB':
+        rating = 1.0 + (skills.defending / 3.5) + (skills.winger / 5) + (skills.playmaking / 8) + (form * 0.05) + (stamina * 0.03);
+        break;
+      case 'RCD':
+      case 'LCD':
+      case 'CD':
+        rating = 1.0 + (skills.defending / 3) + (skills.playmaking / 10) + (form * 0.05) + (stamina * 0.03);
+        break;
+      case 'RW':
+      case 'LW':
+        rating = 1.0 + (skills.winger / 3) + (skills.playmaking / 6) + (skills.passing / 8) + (form * 0.05) + (stamina * 0.03);
+        break;
+      case 'RIM':
+      case 'LIM':
+      case 'IM':
+        rating = 1.0 + (skills.playmaking / 3) + (skills.passing / 6) + (skills.defending / 10) + (form * 0.05) + (stamina * 0.03);
+        break;
+      case 'RFW':
+      case 'LFW':
+      case 'FW':
+        rating = 1.0 + (skills.scoring / 3) + (skills.passing / 8) + (skills.winger / 10) + (form * 0.05) + (stamina * 0.03);
+        break;
+      default:
+        rating = 1.0 + (skills.playmaking / 4) + (form * 0.05) + (stamina * 0.03);
+    }
+    
+    return Math.max(1, Math.min(10, rating));
+  }
+
   getPlayerPositionRating(player: Player, position: string): string {
+    // Najpierw sprawdź rzeczywiste oceny z meczów (dla własnej drużyny)
     if (player.matchStats?.positionRatings?.[position]) {
       return player.matchStats.positionRatings[position].toFixed(1);
     }
-    return '0';
+    
+    // Dla graczy bez danych z API (np. drużyna przeciwnika), oblicz szacunkową ocenę
+    const estimatedRating = this.calculateSkillBasedRating(player, position);
+    return estimatedRating.toFixed(1);
   }
 
   // ==================== POMOCNICZE ====================

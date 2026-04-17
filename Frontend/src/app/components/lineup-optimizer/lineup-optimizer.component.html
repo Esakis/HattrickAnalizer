@@ -299,8 +299,7 @@
               <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
                 <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
                 <div class="player-stats">
-                  <span>Forma: {{ player.form }}</span>
-                  <span>Wiek: {{ player.age }}</span>
+                  <span>Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
                 </div>
               </div>
             </div>
@@ -313,7 +312,7 @@
                 <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
                   <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
                   <div class="player-stats">
-                    <span>Obrona: {{ player.skills.defending }}</span>
+                    <span>Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
                   </div>
                 </div>
               </div>
@@ -327,7 +326,7 @@
                 <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
                   <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
                   <div class="player-stats">
-                    <span>Rozgrywanie: {{ player.skills.playmaking }}</span>
+                    <span>Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
                   </div>
                 </div>
               </div>
@@ -341,7 +340,7 @@
                 <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
                   <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
                   <div class="player-stats">
-                    <span>{{ 'players.skills.scoring' | translate }}: {{ player.skills.scoring }}</span>
+                    <span>Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
                   </div>
                 </div>
               </div>
@@ -372,8 +371,7 @@
               <div class="player-card opponent-card" *ngIf="opponentOptimalLineup.positions[pos]?.player as player">
                 <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
                 <div class="player-stats">
-                  <span>Forma: {{ player.form }}</span>
-                  <span>Wiek: {{ player.age }}</span>
+                  <span>Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
                 </div>
               </div>
             </div>

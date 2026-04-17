@@ -478,16 +478,16 @@ public static class FormationData
         public const int MinStaminaForPressing = 7;
     }
 
-    // Typ trenera
+    // Typ trenera (według poradnika Hattrick)
     public static class CoachModifiers
     {
-        // Offensive coach: +7.4% attack, -12% defense
-        public const double OffensiveAttackBonus = 1.074;
-        public const double OffensiveDefensePenalty = 0.88;
+        // Offensive coach: +8% attack, -11% defense
+        public const double OffensiveAttackBonus = 1.08;
+        public const double OffensiveDefensePenalty = 0.89;
 
-        // Defensive coach: +12.8% defense, -11.8% attack
-        public const double DefensiveDefenseBonus = 1.128;
-        public const double DefensiveAttackPenalty = 0.882;
+        // Defensive coach: +14% defense, -8% attack
+        public const double DefensiveDefenseBonus = 1.14;
+        public const double DefensiveAttackPenalty = 0.92;
     }
 }
 

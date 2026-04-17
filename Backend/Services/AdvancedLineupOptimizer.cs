@@ -43,7 +43,8 @@ public class AdvancedLineupOptimizer
 
         OptimizationCandidate? best = null;
         var allCandidates = new List<OptimizationCandidate>();
-        foreach (var formation in FormationData.Formations.Values)
+        var formationsToTry = ResolveFormationCandidates(request.PreferredFormation);
+        foreach (var formation in formationsToTry)
         {
             // Pierwsze przypisanie: niezalezne od taktyki — bazuje na lacznym wkladzie w ratingi.
             var baseLineup = BuildInitialLineup(formation, available);
@@ -126,6 +127,19 @@ public class AdvancedLineupOptimizer
     }
 
     // ======================= Tactics =======================
+
+    private static IEnumerable<FormationDefinition> ResolveFormationCandidates(string preferred)
+    {
+        if (string.IsNullOrWhiteSpace(preferred) || preferred == "Auto")
+        {
+            return FormationData.Formations.Values;
+        }
+        if (FormationData.Formations.TryGetValue(preferred, out var specific))
+        {
+            return new[] { specific };
+        }
+        return FormationData.Formations.Values;
+    }
 
     private static IEnumerable<string> ResolveTacticCandidates(string preferred)
     {
@@ -747,10 +761,36 @@ public class AdvancedLineupOptimizer
             {
                 Position = s.Key,
                 Player = s.Value.Player,
-                Behavior = s.Value.Behaviour
+                Behavior = s.Value.Behaviour,
+                Rating = ComputePlayerSlotRating(s.Value.Player, s.Key, s.Value.Behaviour)
             };
         }
         return lineup;
+    }
+
+    /// <summary>
+    /// Szacowana ocena meczowa gracza na pozycji (skala Hattrick 0-20).
+    /// Dla bramkarza "magicznego" (keeper=19) daje ~9 na start z wysoka kondycja.
+    /// Bazuje na glownej umiejetnosci wymaganej przez rolke + modyfikatory (forma, kondycja, XP, lojalnosc).
+    /// </summary>
+    private double ComputePlayerSlotRating(Player player, string slot, string behaviour)
+    {
+        if (player == null) return 0;
+        double eff = EffectiveMultiplier(player);
+        var skills = player.Skills;
+        double main = slot switch
+        {
+            "GK" => skills.Keeper,
+            "RWB" or "LWB" => 0.7 * skills.Defending + 0.3 * skills.Winger,
+            "RCD" or "LCD" or "CD" => skills.Defending,
+            "RW" or "LW" => 0.6 * skills.Winger + 0.4 * skills.Playmaking,
+            "RIM" or "LIM" or "IM" => skills.Playmaking,
+            "RFW" or "LFW" or "FW" or "CFW" => skills.Scoring,
+            _ => skills.Playmaking
+        };
+        // Wspolczynnik 0.4: skill 19 * 0.4 * eff(~1.15) ~ 8.7 → pokrywa sie z ocenami meczowymi w Hattrick.
+        double rating = main * 0.4 * eff;
+        return Math.Max(0, Math.Min(20, rating));
     }
 
     private List<string> IdentifyStrengths(LineupRatings me, LineupRatings opp)

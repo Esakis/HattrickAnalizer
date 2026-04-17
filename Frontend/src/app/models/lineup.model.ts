@@ -12,6 +12,7 @@ export interface LineupPosition {
   position: string;
   player: Player | null;
   behavior: string;
+  rating?: number;
 }
 
 export interface LineupRatings {
@@ -34,6 +35,7 @@ export interface OptimizerRequest {
   coachType: string;
   assistantManagerLevel: number;
   formationExperience: { [formation: string]: number };
+  preferredFormation?: string;
 }
 
 export interface FormationAlternative {

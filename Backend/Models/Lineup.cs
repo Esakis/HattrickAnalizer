@@ -14,6 +14,7 @@ public class LineupPosition
     public string Position { get; set; } = string.Empty;
     public Player? Player { get; set; }
     public string Behavior { get; set; } = "Normal";
+    public double Rating { get; set; }
 }
 
 public class LineupRatings

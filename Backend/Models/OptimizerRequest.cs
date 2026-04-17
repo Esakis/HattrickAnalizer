@@ -16,6 +16,9 @@ public class OptimizerRequest
     // Doswiadczenie formacji: nazwa formacji (np. "4-4-2") -> poziom 3..10
     // 3=kiepskie, 4=slabe, 5=niewystarczajace, 6=znosne, 7=solidne, 8=doskonale, 9=fantastyczne, 10=olsniewajace
     public Dictionary<string, int> FormationExperience { get; set; } = new();
+
+    // Wymuszona formacja (np. "4-4-2"). "Auto" lub pusta -> optymalizator iteruje po wszystkich.
+    public string PreferredFormation { get; set; } = "Auto";
 }
 
 public class OptimizerResponse

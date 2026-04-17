@@ -89,8 +89,12 @@
     "comparison": {
       "title": "Porównanie Drużyn",
       "midfield": "Środek pola:",
+      "leftDefense": "Obrona lewa:",
       "centralDefense": "Obrona centralna:",
-      "centralAttack": "Atak centralny:"
+      "rightDefense": "Obrona prawa:",
+      "leftAttack": "Atak lewy:",
+      "centralAttack": "Atak centralny:",
+      "rightAttack": "Atak prawy:"
     },
     "strengths": "Twoje Mocne Strony",
     "weaknesses": "Słabe Punkty",

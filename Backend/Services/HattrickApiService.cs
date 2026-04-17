@@ -135,6 +135,13 @@ public class HattrickApiService
                         mp.ShirtNumber = apiPlayer.ShirtNumber;
                         mp.TSI = apiPlayer.TSI;
                         mp.Age = apiPlayer.Age;
+
+                        if (mp.MatchStats != null && apiPlayer.MatchStats != null)
+                        {
+                            mp.MatchStats.Goals = apiPlayer.MatchStats.Goals;
+                            mp.MatchStats.YellowCards = apiPlayer.MatchStats.YellowCards;
+                            mp.MatchStats.AverageForm = apiPlayer.Form;
+                        }
                     }
                 }
                 return matchPlayers;
@@ -376,22 +383,29 @@ public class HattrickApiService
 
         // Pobierz tylko mecze seniorskie (MatchType 1-3: League, Qualification, Cup)
         // Wyklucz mecze młodzieżówki (MatchType 50+)
+        // Sortujemy po dacie malejaco i bierzemy 3 najnowsze - zeby ocena odzwierciedlala aktualna forme,
+        // a nie usrednienie z dlugiego okresu (graczy rosnie/spada forma).
         var finishedMatchIds = matchesDoc.Descendants("Match")
-            .Where(m => 
+            .Where(m =>
             {
                 var status = m.Element("Status")?.Value ?? "";
                 var matchType = int.Parse(m.Element("MatchType")?.Value ?? "0");
                 var homeTeamId = int.Parse(m.Element("HomeTeam")?.Element("HomeTeamID")?.Value ?? "0");
                 var awayTeamId = int.Parse(m.Element("AwayTeam")?.Element("AwayTeamID")?.Value ?? "0");
-                
+
                 // Tylko finished mecze seniorskie gdzie nasza drużyna gra
-                return status.Equals("FINISHED", StringComparison.OrdinalIgnoreCase) 
+                return status.Equals("FINISHED", StringComparison.OrdinalIgnoreCase)
                     && matchType >= 1 && matchType <= 12  // Senior matches only
                     && (homeTeamId == teamId || awayTeamId == teamId);
             })
+            .OrderByDescending(m =>
+            {
+                var dateStr = m.Element("MatchDate")?.Value ?? "";
+                return DateTime.TryParse(dateStr, out var dt) ? dt : DateTime.MinValue;
+            })
             .Select(m => m.Element("MatchID")?.Value)
             .Where(id => !string.IsNullOrEmpty(id))
-            .Take(10)
+            .Take(3)
             .ToList();
         
         Console.WriteLine($"[EnrichPlayers] Found {finishedMatchIds.Count} senior matches for team {teamId}");
@@ -427,12 +441,9 @@ public class HattrickApiService
 
             var stats = player.MatchStats ?? new PlayerMatchStats();
             stats.TotalMatches = agg.Matches;
-            stats.Goals = agg.Goals;
             stats.MinutesPlayed = agg.Minutes;
             stats.AverageRating = agg.Matches > 0 ? Math.Round(agg.RatingSum / agg.Matches, 2) : 0;
-            stats.AverageForm = agg.Matches > 0 ? Math.Round(agg.RatingSum / agg.Matches, 1) : player.Form;
-            stats.GoalsPerMatch = agg.Matches > 0 ? Math.Round((double)agg.Goals / agg.Matches, 2) : 0;
-            stats.MatchesPerGoal = agg.Goals > 0 ? Math.Round((double)agg.Matches / agg.Goals, 1) : 0;
+            stats.AverageForm = player.Form;
             
             Console.WriteLine($"[EnrichPlayers] Processing player {player.PlayerId} ({player.FirstName} {player.LastName}): {agg.Matches} matches, {agg.PositionRatings.Count} positions");
             Debug.WriteLine($"[EnrichPlayers] Processing player {player.PlayerId} ({player.FirstName} {player.LastName}): {agg.Matches} matches, {agg.PositionRatings.Count} positions");

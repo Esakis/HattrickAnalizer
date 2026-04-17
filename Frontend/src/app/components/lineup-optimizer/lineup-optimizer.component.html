@@ -299,7 +299,7 @@
               <div class="player-card" *ngIf="result.optimalLineup.positions[pos]?.player as player">
                 <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
                 <div class="player-stats">
-                  <span>Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
+                  <span>Ocena: {{ getPlayerPositionRating(player, pos, result.optimalLineup.positions[pos].rating) }}</span>
                 </div>
               </div>
             </div>
@@ -371,7 +371,7 @@
               <div class="player-card opponent-card" *ngIf="opponentOptimalLineup.positions[pos]?.player as player">
                 <div class="player-name">{{ player.firstName }} {{ player.lastName }}</div>
                 <div class="player-stats">
-                  <span>Ocena: {{ getPlayerPositionRating(player, pos) }}</span>
+                  <span>Ocena: {{ getPlayerPositionRating(player, pos, opponentOptimalLineup.positions[pos].rating) }}</span>
                 </div>
               </div>
             </div>
@@ -426,38 +426,16 @@
       <div class="comparison-section">
         <h2>{{ 'optimizer.comparison.title' | translate }}</h2>
         <div class="ratings-comparison">
-          <div class="rating-row">
-            <span class="rating-label">{{ 'optimizer.comparison.midfield' | translate }}</span>
+          <div class="rating-row" *ngFor="let sector of comparisonSectors">
+            <span class="rating-label">{{ sector.label | translate }}</span>
             <div class="rating-bars">
-              <div class="bar my-team" [style.width.%]="(result.comparison.myTeamRatings.midfield / (result.comparison.myTeamRatings.midfield + result.comparison.opponentRatings.midfield)) * 100">
-                {{ result.comparison.myTeamRatings.midfield | number:'1.0-0' }}
+              <div class="bar my-team"
+                   [style.width.%]="getSectorBarWidth(result.comparison.myTeamRatings[sector.key], result.comparison.opponentRatings[sector.key], 'my')">
+                {{ result.comparison.myTeamRatings[sector.key] | number:'1.1-1' }}
               </div>
-              <div class="bar opponent" [style.width.%]="(result.comparison.opponentRatings.midfield / (result.comparison.myTeamRatings.midfield + result.comparison.opponentRatings.midfield)) * 100">
-                {{ result.comparison.opponentRatings.midfield | number:'1.0-0' }}
-              </div>
-            </div>
-          </div>
-
-          <div class="rating-row">
-            <span class="rating-label">{{ 'optimizer.comparison.centralDefense' | translate }}</span>
-            <div class="rating-bars">
-              <div class="bar my-team" [style.width.%]="(result.comparison.myTeamRatings.centralDefense / (result.comparison.myTeamRatings.centralDefense + result.comparison.opponentRatings.centralDefense)) * 100">
-                {{ result.comparison.myTeamRatings.centralDefense | number:'1.0-0' }}
-              </div>
-              <div class="bar opponent" [style.width.%]="(result.comparison.opponentRatings.centralDefense / (result.comparison.myTeamRatings.centralDefense + result.comparison.opponentRatings.centralDefense)) * 100">
-                {{ result.comparison.opponentRatings.centralDefense | number:'1.0-0' }}
-              </div>
-            </div>
-          </div>
-
-          <div class="rating-row">
-            <span class="rating-label">{{ 'optimizer.comparison.centralAttack' | translate }}</span>
-            <div class="rating-bars">
-              <div class="bar my-team" [style.width.%]="(result.comparison.myTeamRatings.centralAttack / (result.comparison.myTeamRatings.centralAttack + result.comparison.opponentRatings.centralAttack)) * 100">
-                {{ result.comparison.myTeamRatings.centralAttack | number:'1.0-0' }}
-              </div>
-              <div class="bar opponent" [style.width.%]="(result.comparison.opponentRatings.centralAttack / (result.comparison.myTeamRatings.centralAttack + result.comparison.opponentRatings.centralAttack)) * 100">
-                {{ result.comparison.opponentRatings.centralAttack | number:'1.0-0' }}
+              <div class="bar opponent"
+                   [style.width.%]="getSectorBarWidth(result.comparison.myTeamRatings[sector.key], result.comparison.opponentRatings[sector.key], 'opp')">
+                {{ result.comparison.opponentRatings[sector.key] | number:'1.1-1' }}
               </div>
             </div>
           </div>

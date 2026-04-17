@@ -171,7 +171,8 @@ export class LineupOptimizerComponent implements OnInit {
       focusAreas: [],
       coachType: this.coachType,
       assistantManagerLevel: this.assistantManagerLevel,
-      formationExperience: this.formationExperience
+      formationExperience: this.formationExperience,
+      preferredFormation: this.selectedMyFormation
     };
 
     this.hattrickApi.optimizeLineup(request).subscribe({
@@ -579,16 +580,17 @@ export class LineupOptimizerComponent implements OnInit {
   // ==================== ZMIANA FORMACJI I TAKTYKI ====================
   
   onMyFormationChange(): void {
-    if (this.selectedMyFormation !== 'Auto') {
-      // Jeśli wybrano konkretną formację, dopasuj zawodników
-      this.assignPlayersToFormation(this.selectedMyFormation, this.myTeamPlayers);
+    // Po zmianie formacji natychmiast przelicz sklad z ograniczeniem do tej formacji.
+    if (this.myTeamId && this.opponentTeamId && this.myTeamPlayers.length >= 11) {
+      this.optimizeLineup();
     }
-    // Jeśli Auto, optymalizator sam wybierze najlepszą
   }
 
   onMyTacticChange(): void {
-    // Aktualizuj preferredTactic dla optymalizatora
     this.preferredTactic = this.selectedMyTactic;
+    if (this.result && this.myTeamId && this.opponentTeamId) {
+      this.optimizeLineup();
+    }
   }
 
   onOpponentFormationChange(): void {
@@ -634,7 +636,8 @@ export class LineupOptimizerComponent implements OnInit {
         lineup.positions[pos] = {
           position: pos,
           player: bestPlayer,
-          behavior: 'Normal'
+          behavior: 'Normal',
+          rating: this.calculateSkillBasedRating(bestPlayer, pos)
         };
         usedPlayers.add(bestPlayer.playerId);
       }
@@ -810,57 +813,60 @@ export class LineupOptimizerComponent implements OnInit {
 
   calculateSkillBasedRating(player: Player, position: string): number {
     const skills = player.skills;
-    const form = player.form;
-    const stamina = player.stamina;
-    
-    // Oceny w Hattrick są zazwyczaj 1-10, rzadko wyżej
-    // Bazowa ocena: 1.0 + (główna umiejętność / 3) + bonusy
-    // Forma i kondycja mają wpływ na końcową ocenę
-    let rating = 1.0;
-    
+    // Skala Hattrick 0-20 (ocena meczowa). Bramkarz magiczny (19) powinien dawac ~9 na start.
+    // Forma 1-9 -> mnoznik 0.7-1.1, kondycja 1-9 -> 0.9-1.05.
+    const formMult = 0.6 + (player.form / 9) * 0.5;
+    const staminaMult = 0.9 + (player.stamina / 9) * 0.15;
+    const eff = formMult * staminaMult;
+
+    let main = 0;
     switch (position) {
       case 'GK':
-        rating = 1.0 + (skills.keeper / 3) + (form * 0.05) + (stamina * 0.03);
+        main = skills.keeper;
         break;
       case 'RWB':
       case 'LWB':
-        rating = 1.0 + (skills.defending / 3.5) + (skills.winger / 5) + (skills.playmaking / 8) + (form * 0.05) + (stamina * 0.03);
+        main = 0.7 * skills.defending + 0.3 * skills.winger;
         break;
       case 'RCD':
       case 'LCD':
       case 'CD':
-        rating = 1.0 + (skills.defending / 3) + (skills.playmaking / 10) + (form * 0.05) + (stamina * 0.03);
+        main = skills.defending;
         break;
       case 'RW':
       case 'LW':
-        rating = 1.0 + (skills.winger / 3) + (skills.playmaking / 6) + (skills.passing / 8) + (form * 0.05) + (stamina * 0.03);
+        main = 0.6 * skills.winger + 0.4 * skills.playmaking;
         break;
       case 'RIM':
       case 'LIM':
       case 'IM':
-        rating = 1.0 + (skills.playmaking / 3) + (skills.passing / 6) + (skills.defending / 10) + (form * 0.05) + (stamina * 0.03);
+        main = skills.playmaking;
         break;
       case 'RFW':
       case 'LFW':
       case 'FW':
-        rating = 1.0 + (skills.scoring / 3) + (skills.passing / 8) + (skills.winger / 10) + (form * 0.05) + (stamina * 0.03);
+        main = skills.scoring;
         break;
       default:
-        rating = 1.0 + (skills.playmaking / 4) + (form * 0.05) + (stamina * 0.03);
+        main = skills.playmaking;
     }
-    
-    return Math.max(1, Math.min(10, rating));
+
+    // Wspolczynnik 0.4 kalibruje wynik do rzeczywistych ocen meczowych Hattrick.
+    return Math.max(0, Math.min(20, main * 0.4 * eff));
   }
 
-  getPlayerPositionRating(player: Player, position: string): string {
-    // Najpierw sprawdź rzeczywiste oceny z meczów (dla własnej drużyny)
-    if (player.matchStats?.positionRatings?.[position]) {
-      return player.matchStats.positionRatings[position].toFixed(1);
+  getPlayerPositionRating(player: Player, position: string, backendRating?: number): string {
+    // Priorytet 1: rzeczywista ocena z ostatnich meczow CHPP (positionRatings na danej pozycji).
+    const real = player.matchStats?.positionRatings?.[position];
+    if (real !== undefined && real > 0) {
+      return real.toFixed(1);
     }
-    
-    // Dla graczy bez danych z API (np. drużyna przeciwnika), oblicz szacunkową ocenę
-    const estimatedRating = this.calculateSkillBasedRating(player, position);
-    return estimatedRating.toFixed(1);
+    // Priorytet 2: rating wyliczony przez backend (uwzglednia forme/XP/lojalnosc).
+    if (backendRating !== undefined && backendRating > 0) {
+      return backendRating.toFixed(1);
+    }
+    // Fallback: frontendowe oszacowanie na podstawie umiejetnosci.
+    return this.calculateSkillBasedRating(player, position).toFixed(1);
   }
 
   // ==================== POMOCNICZE ====================
@@ -868,6 +874,24 @@ export class LineupOptimizerComponent implements OnInit {
   getOpponentPositionKeys(): string[] {
     if (!this.opponentOptimalLineup?.positions) return [];
     return Object.keys(this.opponentOptimalLineup.positions);
+  }
+
+  // Sektory uzywane w wykresie porownania (7 aspektow Hattrick)
+  comparisonSectors: { key: keyof import('../../models/lineup.model').LineupRatings; label: string }[] = [
+    { key: 'midfield', label: 'optimizer.comparison.midfield' },
+    { key: 'leftDefense', label: 'optimizer.comparison.leftDefense' },
+    { key: 'centralDefense', label: 'optimizer.comparison.centralDefense' },
+    { key: 'rightDefense', label: 'optimizer.comparison.rightDefense' },
+    { key: 'leftAttack', label: 'optimizer.comparison.leftAttack' },
+    { key: 'centralAttack', label: 'optimizer.comparison.centralAttack' },
+    { key: 'rightAttack', label: 'optimizer.comparison.rightAttack' }
+  ];
+
+  getSectorBarWidth(myValue: number, oppValue: number, side: 'my' | 'opp'): number {
+    const total = (myValue || 0) + (oppValue || 0);
+    if (total <= 0) return 50;
+    const pct = ((side === 'my' ? myValue : oppValue) / total) * 100;
+    return Math.max(5, Math.min(95, pct));
   }
 
   getSkillLevel(value: number): string {

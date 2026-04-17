@@ -165,11 +165,11 @@
             <td>{{ player.skills?.passing || 0 }}</td>
             <td>{{ player.skills?.scoring || 0 }}</td>
             <td>{{ player.skills?.setPieces || 0 }}</td>
-            <td>{{ player.matchStats?.goals || 0 }}</td>
-            <td>{{ player.matchStats?.assists || 0 }}</td>
-            <td>{{ (player.matchStats?.averageForm || player.form) | number:'1.1-1' }}</td>
-            <td>{{ (player.matchStats?.goalsPerMatch || 0) | number:'1.2-2' }}</td>
-            <td>{{ player.matchStats?.matchesPerGoal ? (player.matchStats?.matchesPerGoal | number:'1.1-1') : '-' }}</td>
+            <td>{{ player.matchStats?.goals ?? 0 }}</td>
+            <td>{{ player.matchStats?.assists ? player.matchStats?.assists : '—' }}</td>
+            <td>{{ player.matchStats?.totalMatches ? (player.matchStats?.averageForm | number:'1.1-1') : (player.form | number:'1.1-1') }}</td>
+            <td>{{ player.matchStats?.totalMatches ? (player.matchStats?.goalsPerMatch | number:'1.2-2') : '—' }}</td>
+            <td>{{ player.matchStats?.matchesPerGoal ? (player.matchStats?.matchesPerGoal | number:'1.1-1') : '—' }}</td>
           </tr>
         </tbody>
       </table>

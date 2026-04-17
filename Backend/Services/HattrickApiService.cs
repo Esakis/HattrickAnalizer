@@ -94,12 +94,154 @@ public class HattrickApiService
             {
                 players.Add(ParsePlayer(playerElement));
             }
+
+            try
+            {
+                await EnrichPlayersWithMatchStatsAsync(players, teamId, accessToken, accessTokenSecret);
+            }
+            catch
+            {
+                // enrichment jest best-effort - nie przerywaj ładowania gdy nie wyszło
+            }
+
             return players;
         }
         catch
         {
             return GenerateMockPlayers();
         }
+    }
+
+    private async Task EnrichPlayersWithMatchStatsAsync(List<Player> players, int teamId, string accessToken, string accessTokenSecret)
+    {
+        if (players.Count == 0) return;
+
+        var matchQuery = new Dictionary<string, string>
+        {
+            { "file", "matches" },
+            { "teamId", teamId.ToString() },
+            { "version", "2.8" }
+        };
+        var matchesXml = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, matchQuery);
+        var matchesDoc = XDocument.Parse(matchesXml);
+
+        var finishedMatchIds = matchesDoc.Descendants("Match")
+            .Where(m => (m.Element("Status")?.Value ?? "").Equals("FINISHED", StringComparison.OrdinalIgnoreCase))
+            .Select(m => m.Element("MatchID")?.Value)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Take(10)
+            .ToList();
+
+        if (finishedMatchIds.Count == 0) return;
+
+        var playerIndex = players.ToDictionary(p => p.PlayerId);
+        var appearances = players.ToDictionary(p => p.PlayerId, _ => new PlayerAppearanceAggregate());
+
+        var lineupTasks = finishedMatchIds.Select(id => FetchMatchLineupAsync(id!, accessToken, accessTokenSecret));
+        var lineups = await Task.WhenAll(lineupTasks);
+
+        foreach (var lineupXml in lineups)
+        {
+            if (string.IsNullOrEmpty(lineupXml)) continue;
+            try
+            {
+                AggregateLineup(lineupXml, teamId, playerIndex, appearances);
+            }
+            catch
+            {
+                // pomiń uszkodzony lineup
+            }
+        }
+
+        foreach (var player in players)
+        {
+            if (!appearances.TryGetValue(player.PlayerId, out var agg) || agg.Matches == 0) continue;
+
+            var stats = player.MatchStats ?? new PlayerMatchStats();
+            stats.TotalMatches = agg.Matches;
+            stats.Goals = agg.Goals;
+            stats.MinutesPlayed = agg.Minutes;
+            stats.AverageRating = agg.Matches > 0 ? Math.Round(agg.RatingSum / agg.Matches, 2) : 0;
+            stats.AverageForm = agg.Matches > 0 ? Math.Round(agg.RatingSum / agg.Matches, 1) : player.Form;
+            stats.GoalsPerMatch = agg.Matches > 0 ? Math.Round((double)agg.Goals / agg.Matches, 2) : 0;
+            stats.MatchesPerGoal = agg.Goals > 0 ? Math.Round((double)agg.Matches / agg.Goals, 1) : 0;
+            player.MatchStats = stats;
+        }
+    }
+
+    private async Task<string?> FetchMatchLineupAsync(string matchId, string accessToken, string accessTokenSecret)
+    {
+        try
+        {
+            var queryParams = new Dictionary<string, string>
+            {
+                { "file", "matchlineup" },
+                { "matchId", matchId },
+                { "version", "2.1" }
+            };
+            return await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void AggregateLineup(string lineupXml, int teamId, Dictionary<int, Player> playerIndex, Dictionary<int, PlayerAppearanceAggregate> appearances)
+    {
+        var doc = XDocument.Parse(lineupXml);
+        var teamElement = doc.Descendants("Team")
+            .FirstOrDefault(t => int.TryParse(t.Element("TeamID")?.Value, out int id) && id == teamId);
+        if (teamElement == null) return;
+
+        var scorerElements = teamElement.Descendants("Goal")
+            .Concat(doc.Descendants("Goal"))
+            .Distinct();
+        var goalsByPlayer = new Dictionary<int, int>();
+        foreach (var goal in scorerElements)
+        {
+            var teamIdEl = goal.Element("ScorerTeamID")?.Value;
+            if (teamIdEl != null && int.TryParse(teamIdEl, out int scoringTeamId) && scoringTeamId != teamId) continue;
+            if (int.TryParse(goal.Element("ScorerPlayerID")?.Value, out int scorerId))
+            {
+                goalsByPlayer[scorerId] = goalsByPlayer.GetValueOrDefault(scorerId, 0) + 1;
+            }
+        }
+
+        var lineupPlayers = new List<XElement>();
+        var starting = teamElement.Element("StartingLineup");
+        if (starting != null) lineupPlayers.AddRange(starting.Elements("Player"));
+        var subs = teamElement.Element("Substitutions");
+        if (subs != null) lineupPlayers.AddRange(subs.Elements("Player"));
+        var bench = teamElement.Element("Bench");
+        if (bench != null) lineupPlayers.AddRange(bench.Elements("Player"));
+
+        var seenPlayers = new HashSet<int>();
+        foreach (var playerEl in lineupPlayers)
+        {
+            if (!int.TryParse(playerEl.Element("PlayerID")?.Value, out int pid)) continue;
+            if (!playerIndex.ContainsKey(pid)) continue;
+            if (!appearances.TryGetValue(pid, out var agg)) continue;
+
+            var minutes = int.Parse(playerEl.Element("PlayedMinutes")?.Value ?? "0");
+            if (minutes <= 0) continue;
+            if (!seenPlayers.Add(pid)) continue;
+
+            var rating = double.Parse(playerEl.Element("RatingEndOfGame")?.Value ?? playerEl.Element("Rating")?.Value ?? "0", CultureInfo.InvariantCulture);
+
+            agg.Matches += 1;
+            agg.Minutes += minutes;
+            agg.RatingSum += rating;
+            agg.Goals += goalsByPlayer.GetValueOrDefault(pid, 0);
+        }
+    }
+
+    private class PlayerAppearanceAggregate
+    {
+        public int Matches { get; set; }
+        public int Minutes { get; set; }
+        public int Goals { get; set; }
+        public double RatingSum { get; set; }
     }
 
     public async Task<NextOpponentInfo?> GetNextOpponentAsync(int teamId, string? sessionId = null)
@@ -269,33 +411,33 @@ public class HattrickApiService
             }
         };
 
-        // Pobierz statystyki meczowe z elementu LastMatch (jeśli dostępne)
+        // Podstawowe statystyki - career + bieżący sezon. Per-mecz dane są później
+        // uzupełniane przez EnrichPlayersWithMatchStatsAsync (z matchlineup).
+        var careerGoals = int.Parse(element.Element("CareerGoals")?.Value ?? "0");
+        var leagueGoals = int.Parse(element.Element("LeagueGoals")?.Value ?? "0");
+        var cupGoals = int.Parse(element.Element("CupGoals")?.Value ?? "0");
+        var friendlyGoals = int.Parse(element.Element("FriendliesGoals")?.Value ?? "0");
+        var seasonGoals = leagueGoals + cupGoals + friendlyGoals;
+        var totalGoals = careerGoals > 0 ? careerGoals : seasonGoals;
+
         var lastMatchElement = element.Element("LastMatch");
-        if (lastMatchElement != null)
+        var lastMatchRating = lastMatchElement != null
+            ? double.Parse(lastMatchElement.Element("Rating")?.Value ?? "0", CultureInfo.InvariantCulture)
+            : 0;
+
+        player.MatchStats = new PlayerMatchStats
         {
-            var careerGoals = int.Parse(element.Element("CareerGoals")?.Value ?? "0");
-            var careerHattricks = int.Parse(element.Element("CareerHattricks")?.Value ?? "0");
-            var leagueGoals = int.Parse(element.Element("LeagueGoals")?.Value ?? "0");
-            var cupGoals = int.Parse(element.Element("CupGoals")?.Value ?? "0");
-            var friendlyGoals = int.Parse(element.Element("FriendliesGoals")?.Value ?? "0");
-            
-            var totalMatches = int.Parse(element.Element("Caps")?.Value ?? "0");
-            var totalGoals = careerGoals;
-            
-            player.MatchStats = new PlayerMatchStats
-            {
-                TotalMatches = totalMatches,
-                Goals = totalGoals,
-                Assists = 0, // API Hattrick nie udostępnia asyst w podstawowym endpoint
-                YellowCards = int.Parse(element.Element("Cards")?.Value ?? "0"),
-                RedCards = 0,
-                AverageRating = 0,
-                AverageForm = player.Form,
-                GoalsPerMatch = totalMatches > 0 ? Math.Round((double)totalGoals / totalMatches, 2) : 0,
-                MatchesPerGoal = totalGoals > 0 ? Math.Round((double)totalMatches / totalGoals, 1) : 0,
-                MinutesPlayed = 0
-            };
-        }
+            TotalMatches = 0,
+            Goals = totalGoals,
+            Assists = 0, // API Hattrick nie udostępnia asyst
+            YellowCards = int.Parse(element.Element("Cards")?.Value ?? "0"),
+            RedCards = 0,
+            AverageRating = lastMatchRating,
+            AverageForm = player.Form,
+            GoalsPerMatch = 0,
+            MatchesPerGoal = 0,
+            MinutesPlayed = 0
+        };
 
         return player;
     }

@@ -21,7 +21,7 @@ public class LineupOptimizerService
 
     private Lineup GenerateOptimalLineup(List<Player> players, TeamRatings opponentRatings, string tactic)
     {
-        var availablePlayers = players.Where(p => p.InjuryLevel == 0).ToList();
+        var availablePlayers = players.Where(p => p.InjuryLevel <= 0).ToList();
         var lineup = new Lineup { TacticType = tactic };
 
         var keeper = availablePlayers.OrderByDescending(p => p.Skills.Keeper).First();

@@ -30,7 +30,8 @@ public class AdvancedLineupOptimizer
         var myTeam = await _hattrickApi.GetTeamDetailsAsync(request.MyTeamId);
         var opponentRatings = await _hattrickApi.GetOpponentRatingsAsync(request.OpponentTeamId, 0);
 
-        var available = myTeam.Players.Where(p => p.InjuryLevel == 0).ToList();
+        // InjuryLevel: -1 = zdrowy, 0 = siniak (moze grac), >=1 = tygodnie kontuzji (nie moze grac)
+        var available = myTeam.Players.Where(p => p.InjuryLevel <= 0).ToList();
         if (available.Count < 11)
         {
             throw new InvalidOperationException($"Zbyt malo zdrowych graczy ({available.Count}) zeby ulozyc sklad.");

@@ -607,7 +607,7 @@ export class LineupOptimizerComponent implements OnInit {
       formation: formation
     };
 
-    const availablePlayers = [...this.opponentTeamPlayers].filter(p => p.injuryLevel === 0);
+    const availablePlayers = [...this.opponentTeamPlayers].filter(p => p.injuryLevel <= 0);
     const usedPlayers = new Set<number>();
 
     for (const pos of positions) {

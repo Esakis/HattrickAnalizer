@@ -19,6 +19,9 @@ public class OptimizerRequest
 
     // Wymuszona formacja (np. "4-4-2"). "Auto" lub pusta -> optymalizator iteruje po wszystkich.
     public string PreferredFormation { get; set; } = "Auto";
+
+    // Jezyk odpowiedzi: "pl" lub "en"
+    public string Language { get; set; } = "pl";
 }
 
 public class OptimizerResponse

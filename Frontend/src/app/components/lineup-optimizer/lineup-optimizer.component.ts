@@ -172,7 +172,8 @@ export class LineupOptimizerComponent implements OnInit {
       coachType: this.coachType,
       assistantManagerLevel: this.assistantManagerLevel,
       formationExperience: this.formationExperience,
-      preferredFormation: this.selectedMyFormation
+      preferredFormation: this.selectedMyFormation,
+      language: this.translate.currentLang || 'pl'
     };
 
     this.hattrickApi.optimizeLineup(request).subscribe({

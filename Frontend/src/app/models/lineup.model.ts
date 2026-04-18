@@ -36,6 +36,7 @@ export interface OptimizerRequest {
   assistantManagerLevel: number;
   formationExperience: { [formation: string]: number };
   preferredFormation?: string;
+  language: string;
 }
 
 export interface FormationAlternative {

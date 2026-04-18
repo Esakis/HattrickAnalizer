@@ -47,6 +47,7 @@
     "sortByName": "Name",
     "sortByAge": "Age",
     "sortByForm": "Form",
+    "sortByPosition": "Position",
     "sortByStamina": "Stamina",
     "playersCount": "Players",
     "averageAge": "Average Age",

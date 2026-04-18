@@ -29,7 +29,7 @@
     </div>
 
     <div class="filters" *ngIf="players.length > 0">
-      <div class="form-group" *ngIf="viewMode === 'cards'">
+      <div class="form-group">
         <label for="filterPosition">{{ 'players.positionFilter' | translate }}</label>
         <select id="filterPosition" [(ngModel)]="filterPosition">
           <option *ngFor="let pos of positions" [value]="pos.value">
@@ -109,6 +109,10 @@
               Imię i Nazwisko
               <span class="sort-icon" *ngIf="playerSortColumn === 'name'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
             </th>
+            <th (click)="sortTable('position')" class="sortable">
+              Pozycja
+              <span class="sort-icon" *ngIf="playerSortColumn === 'position'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            </th>
             <th (click)="sortTable('age')" class="sortable">
               Wiek
               <span class="sort-icon" *ngIf="playerSortColumn === 'age'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
@@ -182,6 +186,7 @@
               {{ player.firstName }} {{ player.lastName }}
               <span class="debug-icon" *ngIf="isDebug" title="Historia dostępna">📊</span>
             </td>
+            <td>{{ getPositionLabel(getPlayerPosition(player)) }}</td>
             <td>{{ player.age }}</td>
             <td [class]="'form-' + player.form">{{ player.form }}</td>
             <td>{{ player.stamina }}</td>

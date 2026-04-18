@@ -33,12 +33,12 @@ export class PlayersComponent implements OnInit {
   error: string | null = null;
   sessionId: string | null = null;
 
-  sortBy: string = 'name';
+  sortBy: string = 'position';
   filterPosition: string = 'all';
 
   viewMode: 'table' | 'cards' = 'table';
-  playerSortColumn: string = 'form';
-  playerSortDirection: 'asc' | 'desc' = 'desc';
+  playerSortColumn: string = 'position';
+  playerSortDirection: 'asc' | 'desc' = 'asc';
 
   isDebug = isDevMode();
   selectedPlayerId: number | null = null;
@@ -102,6 +102,7 @@ export class PlayersComponent implements OnInit {
     ];
 
     this.sortOptions = [
+      { value: 'position', label: 'players.sortByPosition' },
       { value: 'name', label: 'players.sortByName' },
       { value: 'age', label: 'players.sortByAge' },
       { value: 'form', label: 'players.sortByForm' },
@@ -139,6 +140,8 @@ export class PlayersComponent implements OnInit {
 
     filtered.sort((a, b) => {
       switch (this.sortBy) {
+        case 'position':
+          return this.getPositionOrder(a) - this.getPositionOrder(b);
         case 'name':
           return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
         case 'age':
@@ -168,10 +171,10 @@ export class PlayersComponent implements OnInit {
   }
 
   getPlayerPosition(player: Player): string {
-    const skills = player.skills;
-    if (skills.keeper > 5) return 'GK';
-    if (skills.defending > skills.playmaking && skills.defending > skills.scoring) return 'DEF';
-    if (skills.playmaking > skills.scoring) return 'MID';
+    const { keeper, defending, playmaking, scoring } = player.skills;
+    if (keeper > 3 && keeper >= defending && keeper >= playmaking && keeper >= scoring) return 'GK';
+    if (defending > playmaking && defending > scoring) return 'DEF';
+    if (playmaking > scoring) return 'MID';
     return 'FW';
   }
 
@@ -239,18 +242,27 @@ export class PlayersComponent implements OnInit {
     return 'poor';
   }
 
+  getPositionOrder(player: Player): number {
+    const pos = this.getPlayerPosition(player);
+    const order: { [key: string]: number } = { GK: 1, DEF: 2, MID: 3, FW: 4 };
+    return order[pos] ?? 5;
+  }
+
   sortTable(column: string): void {
     if (this.playerSortColumn === column) {
       this.playerSortDirection = this.playerSortDirection === 'asc' ? 'desc' : 'asc';
     } else {
       this.playerSortColumn = column;
-      this.playerSortDirection = 'desc';
+      this.playerSortDirection = column === 'position' ? 'asc' : 'desc';
     }
   }
 
   get sortedPlayers(): Player[] {
     if (!this.players || this.players.length === 0) return [];
-    return [...this.players].sort((a, b) => {
+    const source = this.filterPosition !== 'all'
+      ? this.players.filter(p => this.getPlayerPosition(p) === this.filterPosition)
+      : this.players;
+    return [...source].sort((a, b) => {
       let valueA = this.getPlayerSortValue(a, this.playerSortColumn);
       let valueB = this.getPlayerSortValue(b, this.playerSortColumn);
       if (typeof valueA === 'string') {
@@ -296,6 +308,7 @@ export class PlayersComponent implements OnInit {
 
   getPlayerSortValue(player: Player, column: string): any {
     switch (column) {
+      case 'position': return this.getPositionOrder(player);
       case 'name': return `${player.firstName} ${player.lastName}`;
       case 'age': return player.age;
       case 'form': return player.form;

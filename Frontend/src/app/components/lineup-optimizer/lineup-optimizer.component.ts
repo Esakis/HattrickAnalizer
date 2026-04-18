@@ -901,10 +901,10 @@ export class LineupOptimizerComponent implements OnInit {
   }
 
   getSkillLevel(value: number): string {
-    const levels = ['', 'nędzny', 'marny', 'słaby', 'kiepski', 'niewystarczający', 
-                    'przeciętny', 'przyzwoity', 'solidny', 'znakomity', 'wybitny',
-                    'wspaniały', 'genialny', 'nadludzki', 'nieziemski', 'boski',
-                    'nadprzyrodzony', 'tytaniczny', 'magiczny', 'mistyczny', 'legendarny'];
+    const levels = ['beznadziejny', 'fatalny', 'nędzny', 'kiepski', 'słaby', 'przeciętny',
+                    'zadowalający', 'solidny', 'znakomity', 'fantastyczny', 'olśniewający',
+                    'błyskotliwy', 'mistrzowski', 'światowej klasy', 'nadprzyrodzony', 'tytaniczny',
+                    'nieziemski', 'mityczny', 'magiczny', 'utopijny', 'boski'];
     return levels[Math.min(value, levels.length - 1)] || `${value}`;
   }
 }

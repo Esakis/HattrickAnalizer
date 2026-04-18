@@ -97,25 +97,98 @@ export class LineupOptimizerComponent implements OnInit {
     this.translate.onLangChange.subscribe(() => this.initializeTranslations());
     this.translate.onTranslationChange.subscribe(() => this.initializeTranslations());
 
+    this.restoreFromCache();
+
     this.cache.auth$.subscribe(auth => {
-      if (auth.authorized && auth.ownTeamId && !this.myTeamId) {
-        this.myTeamId = auth.ownTeamId;
+      if (auth.authorized && auth.ownTeamId) {
+        if (!this.myTeamId) this.myTeamId = auth.ownTeamId;
         this.loadMyTeam();
         this.loadMyTeamStats();
       }
     });
     this.cache.nextOpponent$.subscribe(opp => {
-      if (opp?.opponentTeamId && !this.opponentTeamId) {
-        this.opponentTeamId = opp.opponentTeamId;
+      if (opp?.opponentTeamId) {
+        if (!this.opponentTeamId) this.opponentTeamId = opp.opponentTeamId;
         this.loadOpponentTeam();
         this.loadOpponentTeamStats();
       }
     });
+  }
 
-    const cachedTeam = this.cache.ownTeam$.value;
-    if (cachedTeam?.players?.length) {
-      this.myTeamPlayers = cachedTeam.players;
+  private restoreFromCache(): void {
+    const ui = this.cache.optimizerUi$.value;
+    this.selectedMyFormation = ui.selectedMyFormation;
+    this.selectedMyTactic = ui.selectedMyTactic;
+    this.selectedOpponentFormation = ui.selectedOpponentFormation;
+    this.selectedOpponentTactic = ui.selectedOpponentTactic;
+    this.coachType = ui.coachType;
+    this.assistantManagerLevel = ui.assistantManagerLevel;
+    this.teamAttitude = ui.teamAttitude;
+    this.preferredTactic = ui.preferredTactic;
+    this.selectedAlternative = ui.selectedAlternative;
+    this.playerSortColumn = ui.playerSortColumn;
+    this.playerSortDirection = ui.playerSortDirection;
+
+    const cachedOwn = this.cache.ownTeam$.value;
+    if (cachedOwn?.players?.length) {
+      this.myTeamId = cachedOwn.teamId;
+      this.myTeamName = cachedOwn.teamName;
+      this.myTeamPlayers = cachedOwn.players;
+      this.lastLoadedMyTeamId = cachedOwn.teamId;
     }
+
+    const cachedOpponentTeam = this.cache.opponentTeam$.value;
+    if (cachedOpponentTeam) {
+      this.opponentTeamId = cachedOpponentTeam.teamId;
+      this.opponentTeamName = cachedOpponentTeam.teamName;
+    } else {
+      const nextOpp = this.cache.nextOpponent$.value;
+      if (nextOpp?.opponentTeamId) {
+        this.opponentTeamId = nextOpp.opponentTeamId;
+        this.opponentTeamName = nextOpp.opponentTeamName;
+      }
+    }
+
+    const cachedOpponentPlayers = this.cache.opponentPlayers$.value;
+    if (cachedOpponentPlayers?.length) {
+      this.opponentTeamPlayers = cachedOpponentPlayers;
+      this.lastLoadedOpponentId = this.opponentTeamId;
+    }
+
+    const cachedMyStats = this.cache.myTeamStats$.value;
+    if (cachedMyStats) this.myTeamStats = cachedMyStats;
+
+    const cachedOppStats = this.cache.opponentTeamStats$.value;
+    if (cachedOppStats) this.opponentTeamStats = cachedOppStats;
+
+    const cachedExp = this.cache.formationExperience$.value;
+    if (cachedExp) {
+      for (const f of this.availableFormations) {
+        if (cachedExp[f] !== undefined) this.formationExperience[f] = cachedExp[f];
+      }
+    }
+
+    const cachedResult = this.cache.optimizerResult$.value;
+    if (cachedResult) this.result = cachedResult;
+
+    const cachedOppLineup = this.cache.opponentOptimalLineup$.value;
+    if (cachedOppLineup) this.opponentOptimalLineup = cachedOppLineup;
+  }
+
+  private persistUiState(): void {
+    this.cache.optimizerUi$.next({
+      selectedMyFormation: this.selectedMyFormation,
+      selectedMyTactic: this.selectedMyTactic,
+      selectedOpponentFormation: this.selectedOpponentFormation,
+      selectedOpponentTactic: this.selectedOpponentTactic,
+      coachType: this.coachType,
+      assistantManagerLevel: this.assistantManagerLevel,
+      teamAttitude: this.teamAttitude,
+      preferredTactic: this.preferredTactic,
+      selectedAlternative: this.selectedAlternative,
+      playerSortColumn: this.playerSortColumn,
+      playerSortDirection: this.playerSortDirection
+    });
   }
 
   private initializeTranslations(): void {
@@ -181,6 +254,8 @@ export class LineupOptimizerComponent implements OnInit {
         this.result = response;
         this.selectedAlternative = 0;
         this.loading = false;
+        this.cache.optimizerResult$.next(response);
+        this.persistUiState();
       },
       error: (err) => {
         this.error = this.translate.instant('optimizer.errorOptimizing') + err.message;
@@ -221,6 +296,7 @@ export class LineupOptimizerComponent implements OnInit {
 
   selectAlternative(index: number): void {
     this.selectedAlternative = index;
+    this.persistUiState();
   }
 
   getPositionLabel(position: string): string {
@@ -301,6 +377,7 @@ export class LineupOptimizerComponent implements OnInit {
         this.myTeamName = team.teamName;
         this.lastLoadedMyTeamId = this.myTeamId;
         this.loadingMyTeam = false;
+        this.cache.ownTeam$.next(team);
         // Generuj statystyki dla graczy
         this.generatePlayerStats();
         // Pobierz doświadczenie formacji
@@ -314,7 +391,17 @@ export class LineupOptimizerComponent implements OnInit {
 
   loadFormationExperience(): void {
     if (!this.myTeamId) return;
-    
+
+    if (this.cache.formationExperience$.value) {
+      const cached = this.cache.formationExperience$.value;
+      for (const formation of this.availableFormations) {
+        if (cached[formation] !== undefined) {
+          this.formationExperience[formation] = cached[formation];
+        }
+      }
+      return;
+    }
+
     this.hattrickApi.getFormationExperience(this.myTeamId).subscribe({
       next: (experience) => {
         // Aktualizuj doświadczenie formacji z danych API
@@ -323,6 +410,7 @@ export class LineupOptimizerComponent implements OnInit {
             this.formationExperience[formation] = experience[formation];
           }
         }
+        this.cache.formationExperience$.next({ ...this.formationExperience });
       },
       error: (err) => {
         console.error('Error loading formation experience:', err);
@@ -340,21 +428,28 @@ export class LineupOptimizerComponent implements OnInit {
     }
     
     this.loadingOpponentTeam = true;
-    
-    // Najpierw pobierz podstawowe info o drużynie (nazwa)
-    this.hattrickApi.getTeam(this.opponentTeamId).subscribe({
-      next: (team) => {
-        this.opponentTeamName = team.teamName;
-      },
-      error: () => {}
-    });
-    
+
+    // Najpierw pobierz podstawowe info o drużynie (nazwa) – tylko jeśli nie mamy w cache
+    const cachedOpp = this.cache.opponentTeam$.value;
+    if (cachedOpp?.teamId === this.opponentTeamId) {
+      this.opponentTeamName = cachedOpp.teamName;
+    } else {
+      this.hattrickApi.getTeam(this.opponentTeamId).subscribe({
+        next: (team) => {
+          this.opponentTeamName = team.teamName;
+          this.cache.opponentTeam$.next(team);
+        },
+        error: () => {}
+      });
+    }
+
     // Następnie pobierz graczy z wzbogaconymi statystykami
     this.hattrickApi.getPlayers(this.opponentTeamId).subscribe({
       next: (players) => {
         this.opponentTeamPlayers = players;
         this.lastLoadedOpponentId = this.opponentTeamId;
         this.loadingOpponentTeam = false;
+        this.cache.opponentPlayers$.next(players);
         // Generuj statystyki dla graczy przeciwnika (tylko jeśli brak danych z API)
         this.generatePlayerStats();
         // Zbuduj optymalny skład dla przeciwnika
@@ -373,6 +468,8 @@ export class LineupOptimizerComponent implements OnInit {
         this.myTeamPlayers = [];
         this.myTeamName = '';
         this.myTeamStats = null;
+        this.cache.myTeamStats$.next(null);
+        this.cache.formationExperience$.next(null);
       }
       this.loadMyTeam();
       this.loadMyTeamStats();
@@ -386,6 +483,10 @@ export class LineupOptimizerComponent implements OnInit {
         this.opponentTeamPlayers = [];
         this.opponentTeamName = '';
         this.opponentTeamStats = null;
+        this.opponentOptimalLineup = null;
+        this.cache.opponentPlayers$.next(null);
+        this.cache.opponentTeamStats$.next(null);
+        this.cache.opponentOptimalLineup$.next(null);
       }
       this.loadOpponentTeam();
       this.loadOpponentTeamStats();
@@ -418,30 +519,46 @@ export class LineupOptimizerComponent implements OnInit {
 
   loadMyTeamStats(): void {
     if (!this.myTeamId) return;
-    
+
+    if (this.cache.myTeamStats$.value) {
+      this.myTeamStats = this.cache.myTeamStats$.value;
+      return;
+    }
+
     this.loadingMyTeamStats = true;
     this.hattrickApi.getTeamMatchStats(this.myTeamId).subscribe({
       next: (stats: any) => {
         this.myTeamStats = stats;
         this.loadingMyTeamStats = false;
+        this.cache.myTeamStats$.next(stats);
       },
       error: (err: any) => {
         console.error('Error loading team stats:', err);
         // Fallback do mockowych danych w razie bdu
         this.myTeamStats = this.generateMockTeamStats(this.myTeamId);
         this.loadingMyTeamStats = false;
+        this.cache.myTeamStats$.next(this.myTeamStats);
       }
     });
   }
 
   loadOpponentTeamStats(): void {
     if (!this.opponentTeamId) return;
-    
+
+    if (this.cache.opponentTeamStats$.value) {
+      this.opponentTeamStats = this.cache.opponentTeamStats$.value;
+      if (this.opponentTeamPlayers.length > 0 && !this.opponentOptimalLineup) {
+        this.buildOpponentOptimalLineup();
+      }
+      return;
+    }
+
     this.loadingOpponentTeamStats = true;
     this.hattrickApi.getTeamMatchStats(this.opponentTeamId).subscribe({
       next: (stats: any) => {
         this.opponentTeamStats = stats;
         this.loadingOpponentTeamStats = false;
+        this.cache.opponentTeamStats$.next(stats);
         // Przebuduj skład przeciwnika z poprawną formacją
         if (this.opponentTeamPlayers.length > 0) {
           this.buildOpponentOptimalLineup();
@@ -452,6 +569,7 @@ export class LineupOptimizerComponent implements OnInit {
         // Fallback do mockowych danych w razie bdu
         this.opponentTeamStats = this.generateMockTeamStats(this.opponentTeamId);
         this.loadingOpponentTeamStats = false;
+        this.cache.opponentTeamStats$.next(this.opponentTeamStats);
         // Przebuduj skład przeciwnika z poprawną formacją
         if (this.opponentTeamPlayers.length > 0) {
           this.buildOpponentOptimalLineup();
@@ -581,6 +699,7 @@ export class LineupOptimizerComponent implements OnInit {
   // ==================== ZMIANA FORMACJI I TAKTYKI ====================
   
   onMyFormationChange(): void {
+    this.persistUiState();
     // Po zmianie formacji natychmiast przelicz sklad z ograniczeniem do tej formacji.
     if (this.myTeamId && this.opponentTeamId && this.myTeamPlayers.length >= 11) {
       this.optimizeLineup();
@@ -589,18 +708,21 @@ export class LineupOptimizerComponent implements OnInit {
 
   onMyTacticChange(): void {
     this.preferredTactic = this.selectedMyTactic;
+    this.persistUiState();
     if (this.result && this.myTeamId && this.opponentTeamId) {
       this.optimizeLineup();
     }
   }
 
   onOpponentFormationChange(): void {
+    this.persistUiState();
     if (this.selectedOpponentFormation !== 'Auto' && this.opponentTeamPlayers.length > 0) {
       this.buildOpponentOptimalLineup();
     }
   }
 
   onOpponentTacticChange(): void {
+    this.persistUiState();
     if (this.opponentTeamPlayers.length > 0) {
       this.buildOpponentOptimalLineup();
     }
@@ -645,6 +767,7 @@ export class LineupOptimizerComponent implements OnInit {
     }
 
     this.opponentOptimalLineup = lineup;
+    this.cache.opponentOptimalLineup$.next(lineup);
   }
 
   getFormationPositions(formation: string): string[] {

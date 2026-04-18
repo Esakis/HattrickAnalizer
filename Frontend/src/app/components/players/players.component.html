@@ -78,6 +78,28 @@
       </div>
     </div>
 
+    <!-- PRZYCISK DEBUG: ZAPISZ HISTORIĘ -->
+    <div *ngIf="isDebug" class="debug-save-bar">
+      <button class="btn-save-history" (click)="checkAndSaveHistory()" [disabled]="savingHistory">
+        {{ savingHistory ? '⏳ Sprawdzam...' : '💾 Sprawdź i zapisz zmiany do bazy' }}
+      </button>
+      <div *ngIf="saveResultsVisible && saveResults" class="save-summary">
+        <span class="save-ok" *ngIf="saveChangedCount > 0">
+          ✅ Zapisano zmiany dla {{ saveChangedCount }} zawodników:
+        </span>
+        <span class="save-none" *ngIf="saveChangedCount === 0">
+          ℹ️ Brak zmian – wszystko aktualne
+        </span>
+        <ul *ngIf="saveChangedCount > 0" class="save-changes-list">
+          <li *ngFor="let r of saveResults">
+            <ng-container *ngIf="r.changed">
+              <strong>{{ r.playerName }}</strong>: {{ r.changedFields.join(', ') }}
+            </ng-container>
+          </li>
+        </ul>
+      </div>
+    </div>
+
     <!-- WIDOK TABELI -->
     <div *ngIf="viewMode === 'table'" class="table-container">
       <table class="players-table">
@@ -150,10 +172,15 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let player of sortedPlayers" [class.injured]="player.injuryLevel > 0">
+          <tr *ngFor="let player of sortedPlayers"
+              [class.injured]="player.injuryLevel > 0"
+              [class.clickable-row]="isDebug"
+              (click)="isDebug ? openPlayerHistory(player) : null"
+              [title]="isDebug ? 'Kliknij aby zobaczyć historię umiejętności' : ''">
             <td class="player-name-cell">
               <span class="injury-icon" *ngIf="player.injuryLevel > 0">🤕</span>
               {{ player.firstName }} {{ player.lastName }}
+              <span class="debug-icon" *ngIf="isDebug" title="Historia dostępna">📊</span>
             </td>
             <td>{{ player.age }}</td>
             <td [class]="'form-' + player.form">{{ player.form }}</td>
@@ -177,7 +204,11 @@
 
     <!-- WIDOK KART -->
     <div *ngIf="viewMode === 'cards'" class="players-grid">
-      <div class="player-card" *ngFor="let player of filteredPlayers">
+      <div class="player-card" *ngFor="let player of filteredPlayers"
+           [class.clickable-card]="isDebug"
+           (click)="isDebug ? openPlayerHistory(player) : null"
+           [title]="isDebug ? 'Kliknij aby zobaczyć historię umiejętności' : ''"
+      >
         <div class="player-header">
           <div class="player-info">
             <h3>{{ player.firstName }} {{ player.lastName }}</h3>
@@ -255,3 +286,10 @@
     <p class="hint">{{ 'players.checkTeamId' | translate }}</p>
   </div>
 </div>
+
+<app-player-history-modal
+  *ngIf="isDebug && selectedPlayerId !== null"
+  [playerId]="selectedPlayerId"
+  [playerName]="selectedPlayerName"
+  (closed)="closePlayerHistory()">
+</app-player-history-modal>

@@ -2,7 +2,6 @@ using HattrickAnalizer.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Enable console logging for debugging
 Console.WriteLine("========== APPLICATION STARTING ==========");
 
 builder.Services.AddControllers();
@@ -14,6 +13,7 @@ builder.Services.AddHttpClient<OAuthService>();
 builder.Services.AddScoped<LineupOptimizerService>();
 builder.Services.AddSingleton<OAuthService>();
 builder.Services.AddSingleton<TokenStore>();
+builder.Services.AddSingleton<PlayerHistoryService>();
 
 builder.Services.AddCors(options =>
 {

@@ -13,6 +13,12 @@ Frontend/node_modules/
 Frontend/dist/
 Frontend/.angular/
 Frontend/.env
+Frontend/.pnp.cjs
+Frontend/.pnp.loader.mjs
+Frontend/.yarn/cache/
+Frontend/.yarn/unplugged/
+Frontend/.yarn/build-state.yml
+Frontend/.yarn/install-state.gz
 
 ## General
 *.log

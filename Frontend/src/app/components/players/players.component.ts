@@ -1,9 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, isDevMode } from '@angular/core';
 import { HattrickApiService } from '../../services/hattrick-api.service';
 import { Player } from '../../models/player.model';
 import { TranslateService } from '@ngx-translate/core';
 import { DataCacheService } from '../../services/data-cache.service';
 import { LoadStatusService } from '../../services/load-status.service';
+import { PlayerHistoryService, PlayerChangeResult } from '../../services/player-history.service';
 import {
   SkillLevel,
   FormLevel,
@@ -39,6 +40,14 @@ export class PlayersComponent implements OnInit {
   playerSortColumn: string = 'form';
   playerSortDirection: 'asc' | 'desc' = 'desc';
 
+  isDebug = isDevMode();
+  selectedPlayerId: number | null = null;
+  selectedPlayerName: string = '';
+
+  savingHistory = false;
+  saveResults: PlayerChangeResult[] | null = null;
+  saveResultsVisible = false;
+
   positions: { value: string; label: string }[] = [];
   sortOptions: { value: string; label: string }[] = [];
 
@@ -46,7 +55,8 @@ export class PlayersComponent implements OnInit {
     private hattrickApi: HattrickApiService,
     private translate: TranslateService,
     private cache: DataCacheService,
-    private loadStatus: LoadStatusService
+    private loadStatus: LoadStatusService,
+    private playerHistory: PlayerHistoryService
   ) {}
 
   ngOnInit(): void {
@@ -251,6 +261,37 @@ export class PlayersComponent implements OnInit {
       if (valueA > valueB) return this.playerSortDirection === 'asc' ? 1 : -1;
       return 0;
     });
+  }
+
+  checkAndSaveHistory(): void {
+    if (!this.teamId || this.players.length === 0) return;
+    this.savingHistory = true;
+    this.saveResults = null;
+    this.playerHistory.checkAndSave(this.players, this.teamId).subscribe({
+      next: (results) => {
+        this.saveResults = results;
+        this.saveResultsVisible = true;
+        this.savingHistory = false;
+      },
+      error: () => {
+        this.savingHistory = false;
+      }
+    });
+  }
+
+  get saveChangedCount(): number {
+    return this.saveResults?.filter(r => r.changed).length ?? 0;
+  }
+
+  openPlayerHistory(player: Player): void {
+    if (!this.isDebug) return;
+    this.selectedPlayerId = player.playerId;
+    this.selectedPlayerName = `${player.firstName} ${player.lastName}`;
+  }
+
+  closePlayerHistory(): void {
+    this.selectedPlayerId = null;
+    this.selectedPlayerName = '';
   }
 
   getPlayerSortValue(player: Player, column: string): any {

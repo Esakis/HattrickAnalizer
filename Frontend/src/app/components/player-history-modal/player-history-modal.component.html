@@ -1,0 +1,110 @@
+<div class="modal-backdrop" (click)="close()">
+  <div class="modal-box" (click)="$event.stopPropagation()">
+
+    <div class="modal-header">
+      <h2>📈 {{ playerName }}</h2>
+      <button class="btn-close" (click)="close()">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <div *ngIf="loading" class="modal-loading">Wczytywanie historii...</div>
+      <div *ngIf="error" class="modal-error">{{ error }}</div>
+
+      <div *ngIf="!loading && !error && history.length === 0" class="modal-empty">
+        Brak danych historycznych.<br>
+        <small>Kliknij „Sprawdź i zapisz zmiany" na liście zawodników.</small>
+      </div>
+
+      <ng-container *ngIf="!loading && history.length > 0">
+
+        <!-- Zakładki -->
+        <div class="tabs">
+          <button [class.active]="activeTab === 'skills'"  (click)="setTab('skills')">Umiejętności</button>
+          <button [class.active]="activeTab === 'basic'"   (click)="setTab('basic')">Forma / Atrybuty</button>
+          <button [class.active]="activeTab === 'matches'" (click)="setTab('matches')">Mecze</button>
+        </div>
+
+        <!-- Wykres -->
+        <div class="chart-wrapper">
+          <canvas #chartCanvas></canvas>
+        </div>
+
+        <!-- Tabela szczegółów -->
+        <div class="history-table-wrapper">
+
+          <!-- Umiejętności -->
+          <table *ngIf="activeTab === 'skills'" class="history-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>BK</th><th>OBR</th><th>ROZ</th><th>SKR</th><th>POD</th><th>SKU</th><th>SF</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of history; let i = index">
+                <td class="date-cell">{{ row.recordedDate | date:'dd.MM.yy' }}</td>
+                <td [class.ch]="changed(i,'keeper')">{{ row.keeper }}</td>
+                <td [class.ch]="changed(i,'defending')">{{ row.defending }}</td>
+                <td [class.ch]="changed(i,'playmaking')">{{ row.playmaking }}</td>
+                <td [class.ch]="changed(i,'winger')">{{ row.winger }}</td>
+                <td [class.ch]="changed(i,'passing')">{{ row.passing }}</td>
+                <td [class.ch]="changed(i,'scoring')">{{ row.scoring }}</td>
+                <td [class.ch]="changed(i,'setPieces')">{{ row.setPieces }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Forma / Atrybuty -->
+          <table *ngIf="activeTab === 'basic'" class="history-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Forma</th><th>Kond.</th><th>Wiek</th><th>TSI</th>
+                <th>Dośw.</th><th>Loj.</th><th>Przyw.</th><th>Kontr.</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of history; let i = index">
+                <td class="date-cell">{{ row.recordedDate | date:'dd.MM.yy' }}</td>
+                <td [class.ch]="changed(i,'form')">{{ row.form }}</td>
+                <td [class.ch]="changed(i,'stamina')">{{ row.stamina }}</td>
+                <td [class.ch]="changed(i,'age')">{{ row.age }}</td>
+                <td [class.ch]="changed(i,'tsi')">{{ row.tsi }}</td>
+                <td [class.ch]="changed(i,'experience')">{{ row.experience }}</td>
+                <td [class.ch]="changed(i,'loyalty')">{{ row.loyalty }}</td>
+                <td [class.ch]="changed(i,'leadership')">{{ row.leadership }}</td>
+                <td [class.ch]="changed(i,'injuryLevel')" [class.injury]="row.injuryLevel > 0">{{ row.injuryLevel > 0 ? ('🤕 ' + row.injuryLevel) : '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Mecze -->
+          <table *ngIf="activeTab === 'matches'" class="history-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Mecze</th><th>Gole</th><th>Asysty</th>
+                <th>Żółte</th><th>Czerwone</th>
+                <th>Śr. ocena</th><th>Śr. forma</th><th>Minuty</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of history; let i = index">
+                <td class="date-cell">{{ row.recordedDate | date:'dd.MM.yy' }}</td>
+                <td [class.ch]="changed(i,'totalMatches')">{{ row.totalMatches }}</td>
+                <td [class.ch]="changed(i,'goals')">{{ row.goals }}</td>
+                <td [class.ch]="changed(i,'assists')">{{ row.assists }}</td>
+                <td [class.ch]="changed(i,'yellowCards')">{{ row.yellowCards || '—' }}</td>
+                <td [class.ch]="changed(i,'redCards')">{{ row.redCards || '—' }}</td>
+                <td [class.ch]="changed(i,'averageRating')">{{ fmt(row.averageRating, 2) }}</td>
+                <td [class.ch]="changed(i,'averageForm')">{{ fmt(row.averageForm, 2) }}</td>
+                <td [class.ch]="changed(i,'minutesPlayed')">{{ row.minutesPlayed }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+        </div>
+      </ng-container>
+    </div>
+  </div>
+</div>

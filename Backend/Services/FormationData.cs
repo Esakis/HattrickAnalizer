@@ -16,7 +16,8 @@ public static class FormationData
             Forwards = 0,
             Positions = new[] { "GK", "RWB", "RCD", "CD", "LCD", "LWB", "RW", "RIM", "IM", "LIM", "LW" },
             Style = FormationStyle.UltraDefensive,
-            Description = "Maksymalna obrona i pomoc, brak napastników"
+            Description = "Maksymalna obrona i pomoc, brak napastników",
+            DescriptionEn = "Maximum defense and midfield, no forwards"
         },
         ["5-4-1"] = new FormationDefinition
         {
@@ -26,7 +27,8 @@ public static class FormationData
             Forwards = 1,
             Positions = new[] { "GK", "RWB", "RCD", "CD", "LCD", "LWB", "RW", "RIM", "LIM", "LW", "FW" },
             Style = FormationStyle.Defensive,
-            Description = "Defensywna formacja, idealna do kontry"
+            Description = "Defensywna formacja, idealna do kontry",
+            DescriptionEn = "Defensive formation, ideal for counter-attacks"
         },
         ["5-3-2"] = new FormationDefinition
         {
@@ -36,7 +38,8 @@ public static class FormationData
             Forwards = 2,
             Positions = new[] { "GK", "RWB", "RCD", "CD", "LCD", "LWB", "RIM", "IM", "LIM", "RFW", "LFW" },
             Style = FormationStyle.Defensive,
-            Description = "Solidna obrona z dwoma napastnikami"
+            Description = "Solidna obrona z dwoma napastnikami",
+            DescriptionEn = "Solid defense with two forwards"
         },
         ["4-5-1"] = new FormationDefinition
         {
@@ -46,7 +49,8 @@ public static class FormationData
             Forwards = 1,
             Positions = new[] { "GK", "RWB", "RCD", "LCD", "LWB", "RW", "RIM", "IM", "LIM", "LW", "FW" },
             Style = FormationStyle.MidfieldControl,
-            Description = "Kontrola pomocy z jednym napastnikiem"
+            Description = "Kontrola pomocy z jednym napastnikiem",
+            DescriptionEn = "Midfield control with one forward"
         },
         ["4-4-2"] = new FormationDefinition
         {
@@ -56,7 +60,8 @@ public static class FormationData
             Forwards = 2,
             Positions = new[] { "GK", "RWB", "RCD", "LCD", "LWB", "RW", "RIM", "LIM", "LW", "RFW", "LFW" },
             Style = FormationStyle.Balanced,
-            Description = "Zbalansowana formacja"
+            Description = "Zbalansowana formacja",
+            DescriptionEn = "Balanced formation"
         },
         ["4-3-3"] = new FormationDefinition
         {
@@ -66,7 +71,8 @@ public static class FormationData
             Forwards = 3,
             Positions = new[] { "GK", "RWB", "RCD", "LCD", "LWB", "RW", "IM", "LW", "RFW", "FW", "LFW" },
             Style = FormationStyle.Offensive,
-            Description = "Ofensywna formacja z trzema napastnikami"
+            Description = "Ofensywna formacja z trzema napastnikami",
+            DescriptionEn = "Offensive formation with three forwards"
         },
         ["3-5-2"] = new FormationDefinition
         {
@@ -76,7 +82,8 @@ public static class FormationData
             Forwards = 2,
             Positions = new[] { "GK", "RCD", "CD", "LCD", "RW", "RIM", "IM", "LIM", "LW", "RFW", "LFW" },
             Style = FormationStyle.MidfieldControl,
-            Description = "Ofensywna z mocnym pomocy"
+            Description = "Ofensywna z mocnym pomocy",
+            DescriptionEn = "Offensive with strong midfield"
         },
         ["3-4-3"] = new FormationDefinition
         {
@@ -86,7 +93,8 @@ public static class FormationData
             Forwards = 3,
             Positions = new[] { "GK", "RCD", "CD", "LCD", "RW", "RIM", "LIM", "LW", "RFW", "FW", "LFW" },
             Style = FormationStyle.UltraOffensive,
-            Description = "Bardzo ofensywna formacja"
+            Description = "Bardzo ofensywna formacja",
+            DescriptionEn = "Very offensive formation"
         },
         ["2-5-3"] = new FormationDefinition
         {
@@ -96,7 +104,8 @@ public static class FormationData
             Forwards = 3,
             Positions = new[] { "GK", "RCD", "LCD", "RW", "RIM", "IM", "LIM", "LW", "RFW", "FW", "LFW" },
             Style = FormationStyle.UltraOffensive,
-            Description = "Ekstremalnie ofensywna, saba obrona"
+            Description = "Ekstremalnie ofensywna, saba obrona",
+            DescriptionEn = "Extremely offensive, weak defense"
         },
         ["5-2-3"] = new FormationDefinition
         {
@@ -106,7 +115,8 @@ public static class FormationData
             Forwards = 3,
             Positions = new[] { "GK", "RWB", "RCD", "CD", "LCD", "LWB", "RW", "LW", "RFW", "FW", "LFW" },
             Style = FormationStyle.Offensive,
-            Description = "Silna obrona z trójk napastników"
+            Description = "Silna obrona z trójką napastników",
+            DescriptionEn = "Strong defense with three forwards"
         }
     };
 
@@ -500,6 +510,7 @@ public class FormationDefinition
     public string[] Positions { get; set; } = Array.Empty<string>();
     public FormationStyle Style { get; set; }
     public string Description { get; set; } = "";
+    public string DescriptionEn { get; set; } = "";
 }
 
 public enum FormationStyle

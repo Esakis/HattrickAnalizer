@@ -829,7 +829,7 @@ public class AdvancedLineupOptimizer
     {
         var rec = new List<string>
         {
-            $"Formacja: {best.Lineup.Formation.Name} ({best.Lineup.Formation.Description}). / Formation: {best.Lineup.Formation.Name} ({best.Lineup.Formation.Description}).",
+            $"Formacja: {best.Lineup.Formation.Name} ({best.Lineup.Formation.Description}). / Formation: {best.Lineup.Formation.Name} ({best.Lineup.Formation.DescriptionEn}).",
             $"Taktyka: {TranslateTactic(best.Tactic)}.",
             $"Postawa druzyny: {TranslateAttitude(best.Attitude)}.",
             $"Trener: {TranslateCoach(best.Coach)}.",

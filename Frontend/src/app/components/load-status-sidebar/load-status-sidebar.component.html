@@ -7,7 +7,14 @@
         [class.is-success]="item.state === 'success'"
         [class.is-error]="item.state === 'error'"
         [title]="item.message || ''">
-      <span class="load-sidebar__icon">{{ icon(item.state) }}</span>
+      <div class="load-sidebar__icon">
+        <div class="status-indicator"
+             [class.empty]="item.state === 'idle'"
+             [class.loading]="item.state === 'loading'"
+             [class.error]="item.state === 'error'"
+             [class.success]="item.state === 'success'">
+        </div>
+      </div>
       <span class="load-sidebar__label">{{ getLabel(item.label) }}</span>
       <span *ngIf="item.state === 'error' && item.message" class="load-sidebar__msg">{{ item.message }}</span>
     </li>

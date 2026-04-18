@@ -887,6 +887,12 @@ export class LineupOptimizerComponent implements OnInit {
     { key: 'rightAttack', label: 'optimizer.comparison.rightAttack' }
   ];
 
+  localizeText(text: string): string {
+    const parts = text.split(' / ');
+    if (parts.length < 2) return text;
+    return this.translate.currentLang === 'en' ? parts[1].trim() : parts[0].trim();
+  }
+
   getSectorBarWidth(myValue: number, oppValue: number, side: 'my' | 'opp'): number {
     const total = (myValue || 0) + (oppValue || 0);
     if (total <= 0) return 50;

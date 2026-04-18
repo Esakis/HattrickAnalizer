@@ -447,14 +447,14 @@
           <div class="strengths" *ngIf="result.comparison.strengths.length > 0">
             <h3>{{ 'optimizer.strengths' | translate }}</h3>
             <ul>
-              <li *ngFor="let strength of result.comparison.strengths">{{ strength }}</li>
+              <li *ngFor="let strength of result.comparison.strengths">{{ localizeText(strength) }}</li>
             </ul>
           </div>
 
           <div class="weaknesses" *ngIf="result.comparison.weaknesses.length > 0">
             <h3>{{ 'optimizer.weaknesses' | translate }}</h3>
             <ul>
-              <li *ngFor="let weakness of result.comparison.weaknesses">{{ weakness }}</li>
+              <li *ngFor="let weakness of result.comparison.weaknesses">{{ localizeText(weakness) }}</li>
             </ul>
           </div>
         </div>
@@ -465,7 +465,7 @@
         <h2>{{ 'optimizer.recommendations' | translate }}</h2>
         <ul class="recommendations-list">
           <li *ngFor="let recommendation of result.recommendations">
-            {{ recommendation }}
+            {{ localizeText(recommendation) }}
           </li>
         </ul>
       </div>

@@ -171,7 +171,8 @@
     "settings": "Ustawienia",
     "myTeam": "Moja Drużyna",
     "opponentTeam": "Drużyna Przeciwnika",
-    "enterTeamId": "Wprowadź ID drużyny"
+    "enterTeamId": "Wprowadź ID drużyny",
+    "predictedOpponentLineup": "Przewidywany Skład Przeciwnika"
   },
   "oauth": {
     "title": "Konfiguracja OAuth Hattrick",

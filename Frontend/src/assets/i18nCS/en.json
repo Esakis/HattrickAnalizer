@@ -171,7 +171,8 @@
     "settings": "Settings",
     "myTeam": "My Team",
     "opponentTeam": "Opponent Team",
-    "enterTeamId": "Enter Team ID"
+    "enterTeamId": "Enter Team ID",
+    "predictedOpponentLineup": "Predicted Opponent Lineup"
   },
   "oauth": {
     "title": "Hattrick OAuth Configuration",

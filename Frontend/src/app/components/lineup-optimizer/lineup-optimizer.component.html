@@ -279,7 +279,7 @@
     <div class="lineups-side-by-side">
       <!-- MÓJ OPTYMALNY SKŁAD -->
       <div class="lineup-section my-lineup-section">
-        <h2>🏠 {{ 'optimizer.optimalLineup' | translate }}</h2>
+        <h2> {{ 'optimizer.optimalLineup' | translate }}</h2>
         <div *ngIf="result.optimalLineup.formation" class="formation-info">
           <span class="formation-label">{{ 'optimizer.formation' | translate }}:</span>
           <span class="formation-value">{{ result.optimalLineup.formation }}</span>
@@ -351,7 +351,7 @@
 
       <!-- PRZEWIDYWANY SKŁAD PRZECIWNIKA -->
       <div class="lineup-section opponent-lineup-section" *ngIf="opponentOptimalLineup && opponentTeamPlayers.length > 0">
-        <h2>⚔️ Przewidywany Skład Przeciwnika</h2>
+        <h2>{{ 'optimizer.predictedOpponentLineup' | translate }}</h2>
         <div class="formation-info">
           <span class="formation-label">{{ 'optimizer.formation' | translate }}:</span>
           <span class="formation-value">{{ opponentOptimalLineup.formation }}</span>
@@ -422,9 +422,7 @@
       </div>
     </div>
 
-    <!-- TEAM COMPARISON I TACTICAL RECOMMENDATIONS OBOK SIEBIE -->
-    <div class="comparison-recommendations-side-by-side">
-      <!-- TEAM COMPARISON -->
+    <div class="comparison-section-wrapper">
       <div class="comparison-section">
         <h2>{{ 'optimizer.comparison.title' | translate }}</h2>
         <div class="ratings-comparison">
@@ -445,30 +443,30 @@
 
         <div class="strengths-weaknesses">
           <div class="strengths" *ngIf="result.comparison.strengths.length > 0">
-            <h3>{{ 'optimizer.strengths' | translate }}</h3>
+            <h3>💪 {{ 'optimizer.strengths' | translate }}</h3>
             <ul>
-              <li *ngFor="let strength of result.comparison.strengths">{{ localizeText(strength) }}</li>
+              <li *ngFor="let strength of result.comparison.strengths">{{ strength }}</li>
             </ul>
           </div>
 
           <div class="weaknesses" *ngIf="result.comparison.weaknesses.length > 0">
-            <h3>{{ 'optimizer.weaknesses' | translate }}</h3>
+            <h3>⚠️ {{ 'optimizer.weaknesses' | translate }}</h3>
             <ul>
-              <li *ngFor="let weakness of result.comparison.weaknesses">{{ localizeText(weakness) }}</li>
+              <li *ngFor="let weakness of result.comparison.weaknesses">{{ weakness }}</li>
             </ul>
           </div>
         </div>
       </div>
 
-      <!-- TACTICAL RECOMMENDATIONS -->
-      <div class="recommendations-section">
-        <h2>{{ 'optimizer.recommendations' | translate }}</h2>
-        <ul class="recommendations-list">
-          <li *ngFor="let recommendation of result.recommendations">
-            {{ localizeText(recommendation) }}
-          </li>
-        </ul>
-      </div>
+    </div>
+
+    <div class="recommendations-section">
+      <h2>📋 {{ 'optimizer.recommendations' | translate }}</h2>
+      <ul class="recommendations-list">
+        <li *ngFor="let recommendation of result.recommendations">
+          {{ recommendation }}
+        </li>
+      </ul>
     </div>
 
     <div class="alternatives-section" *ngIf="result.alternatives?.length">

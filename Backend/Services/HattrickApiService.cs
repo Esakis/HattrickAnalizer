@@ -118,6 +118,13 @@ public class HattrickApiService
             
             if (matchPlayers.Count > 0)
             {
+                // Usuń sprzedanych graczy — zostawiamy tylko tych, którzy są w aktualnym składzie
+                if (playersFromApi.Count > 0)
+                {
+                    matchPlayers = matchPlayers.Where(mp => playersFromApi.ContainsKey(mp.PlayerId)).ToList();
+                    Console.WriteLine($"[GetTeamPlayersAsync] After filtering sold players: {matchPlayers.Count} players");
+                }
+
                 // Uzupełnij dane z API players (imiona, skille, forma) jeśli dostępne
                 foreach (var mp in matchPlayers)
                 {
@@ -144,6 +151,21 @@ public class HattrickApiService
                         }
                     }
                 }
+
+                // Dodaj graczy z aktualnego składu, którzy nie grali w ostatnich meczach (np. nowi, kontuzjowani)
+                if (playersFromApi.Count > 0)
+                {
+                    var matchPlayerIds = new HashSet<int>(matchPlayers.Select(p => p.PlayerId));
+                    foreach (var apiPlayer in playersFromApi.Values)
+                    {
+                        if (!matchPlayerIds.Contains(apiPlayer.PlayerId))
+                        {
+                            matchPlayers.Add(apiPlayer);
+                        }
+                    }
+                    Console.WriteLine($"[GetTeamPlayersAsync] After adding non-played current players: {matchPlayers.Count} players");
+                }
+
                 return matchPlayers;
             }
         }

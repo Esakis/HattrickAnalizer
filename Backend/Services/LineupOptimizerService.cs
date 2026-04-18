@@ -149,16 +149,19 @@ public class LineupOptimizerService
         var strengths = new List<string>();
 
         if (myRatings.Midfield > opponentRatings.Midfield * 1.2)
-            strengths.Add("Dominacja w środku pola - kontroluj tempo gry");
+            strengths.Add("Dominacja w środku pola - kontroluj tempo gry / Midfield dominance - control the pace of the game");
 
         if (myRatings.CentralDefense > opponentRatings.CentralAttack * 1.15)
-            strengths.Add("Silna obrona centralna - przeciwnik będzie miał trudności ze strzelaniem");
+            strengths.Add("Silna obrona centralna - przeciwnik będzie miał trudności ze strzelaniem / Strong central defense - opponent will struggle to score through the middle");
 
-        if (myRatings.RightAttack > opponentRatings.LeftDefense * 1.15)
-            strengths.Add("Przewaga na prawej flance w ataku - wykorzystaj to skrzydło");
-
-        if (myRatings.LeftAttack > opponentRatings.RightDefense * 1.15)
-            strengths.Add("Przewaga na lewej flance w ataku - wykorzystaj to skrzydło");
+        bool rightAdv = myRatings.RightAttack > opponentRatings.LeftDefense * 1.15;
+        bool leftAdv  = myRatings.LeftAttack  > opponentRatings.RightDefense * 1.15;
+        if (rightAdv && leftAdv)
+            strengths.Add("Przewaga na obu skrzydłach — rozważ taktykę Atak skrzydłami (AOW), która wzmacnia oba skrzydła jednocześnie / Both wings advantage — consider Attack on Wings (AOW), which boosts both wings simultaneously");
+        else if (rightAdv)
+            strengths.Add("Przewaga na prawej flance — AOW wzmacnia oba skrzydła jednocześnie, wzmocnij lewe skrzydło by w pełni wykorzystać tę przewagę / Right flank advantage — AOW boosts both wings simultaneously, strengthen the left wing to fully exploit this edge");
+        else if (leftAdv)
+            strengths.Add("Przewaga na lewej flance — AOW wzmacnia oba skrzydła jednocześnie, wzmocnij prawe skrzydło by w pełni wykorzystać tę przewagę / Left flank advantage — AOW boosts both wings simultaneously, strengthen the right wing to fully exploit this edge");
 
         return strengths;
     }
@@ -168,16 +171,16 @@ public class LineupOptimizerService
         var weaknesses = new List<string>();
 
         if (myRatings.Midfield < opponentRatings.Midfield * 0.85)
-            weaknesses.Add("Słabość w środku pola - rozważ defensywną taktykę");
+            weaknesses.Add("Słabość w środku pola - rozważ defensywną taktykę / Weak midfield - consider a defensive tactic");
 
         if (myRatings.CentralDefense < opponentRatings.CentralAttack * 0.9)
-            weaknesses.Add("Obrona centralna może mieć problemy - wzmocnij środek");
+            weaknesses.Add("Obrona centralna może mieć problemy - wzmocnij środek / Central defense may struggle - reinforce the middle");
 
         if (myRatings.RightDefense < opponentRatings.LeftAttack * 0.9)
-            weaknesses.Add("Słaba prawa obrona - przeciwnik może to wykorzystać");
+            weaknesses.Add("Słaba prawa obrona - przeciwnik może to wykorzystać / Weak right defense - opponent may exploit it");
 
         if (myRatings.LeftDefense < opponentRatings.RightAttack * 0.9)
-            weaknesses.Add("Słaba lewa obrona - przeciwnik może to wykorzystać");
+            weaknesses.Add("Słaba lewa obrona - przeciwnik może to wykorzystać / Weak left defense - opponent may exploit it");
 
         return weaknesses;
     }
@@ -188,34 +191,32 @@ public class LineupOptimizerService
 
         if (comparison.Strengths.Count > comparison.Weaknesses.Count)
         {
-            recommendations.Add("Graj ofensywnie - masz przewagę nad przeciwnikiem");
-            recommendations.Add("Rozważ taktykę 'Atak środkiem' lub 'Atak skrzydłami'");
+            recommendations.Add("Graj ofensywnie - masz przewagę nad przeciwnikiem / Play offensively - you have the advantage");
+            recommendations.Add("Rozważ taktykę 'Atak środkiem' (AIM) lub 'Atak skrzydłami' (AOW — wzmacnia oba skrzydła jednocześnie) / Consider 'Attack in the Middle' (AIM) or 'Attack on Wings' (AOW — boosts both wings simultaneously)");
         }
         else if (comparison.Weaknesses.Count > comparison.Strengths.Count)
         {
-            recommendations.Add("Graj defensywnie - przeciwnik jest silniejszy");
-            recommendations.Add("Rozważ taktykę 'Kontratak' lub 'Gra defensywna'");
+            recommendations.Add("Graj defensywnie - przeciwnik jest silniejszy / Play defensively - opponent is stronger");
+            recommendations.Add("Rozważ taktykę 'Kontratak' lub 'Pressing' / Consider 'Counter-attack' or 'Pressing' tactic");
         }
         else
         {
-            recommendations.Add("Graj normalnie - siły są wyrównane");
+            recommendations.Add("Graj normalnie - siły są wyrównane / Play normally - forces are balanced");
         }
 
         if (comparison.MyTeamRatings.Midfield > comparison.OpponentRatings.Midfield)
         {
-            recommendations.Add("Postaw na rozgrywanie - masz przewagę w pomocy");
+            recommendations.Add("Postaw na rozgrywanie - masz przewagę w pomocy / Focus on possession - you have a midfield advantage");
         }
 
-        var bestAttack = Math.Max(Math.Max(comparison.MyTeamRatings.LeftAttack, 
-                                           comparison.MyTeamRatings.RightAttack), 
+        var bestAttack = Math.Max(Math.Max(comparison.MyTeamRatings.LeftAttack,
+                                           comparison.MyTeamRatings.RightAttack),
                                            comparison.MyTeamRatings.CentralAttack);
 
-        if (bestAttack == comparison.MyTeamRatings.LeftAttack)
-            recommendations.Add("Atakuj lewą stroną - to twoja najmocniejsza flanka");
-        else if (bestAttack == comparison.MyTeamRatings.RightAttack)
-            recommendations.Add("Atakuj prawą stroną - to twoja najmocniejsza flanka");
+        if (bestAttack == comparison.MyTeamRatings.CentralAttack)
+            recommendations.Add("Twój najsilniejszy atak to środek — rozważ taktykę Atak środkiem (AIM) / Your strongest attack is through the center — consider Attack in the Middle (AIM)");
         else
-            recommendations.Add("Atakuj środkiem - to twoja najmocniejsza strefa");
+            recommendations.Add("Twój atak skrzydłami jest mocny — rozważ taktykę Atak skrzydłami (AOW), która wzmacnia oba skrzydła jednocześnie / Your wing attack is strong — consider Attack on Wings (AOW), which boosts both wings simultaneously");
 
         return recommendations;
     }

@@ -1003,6 +1003,188 @@ details > summary {
   }
 }
 
+// ==================== TEAM COMPARISON I TACTICAL RECOMMENDATIONS OBOK SIEBIE ====================
+
+.comparison-recommendations-side-by-side {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+
+  @media (max-width: 1200px) {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-section {
+    background: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(46, 125, 50, 0.15);
+    border: 2px solid #a5d6a7;
+    height: 100%;
+
+    h2 {
+      color: #1b5e20;
+      margin: 0 0 12px 0;
+      font-size: 1.3em;
+      font-weight: 600;
+      border-bottom: 2px solid #66bb6a;
+      padding-bottom: 6px;
+    }
+
+    .ratings-comparison {
+      margin-bottom: 15px;
+
+      .rating-row {
+        margin-bottom: 12px;
+
+        .rating-label {
+          display: block;
+          font-weight: 600;
+          margin-bottom: 6px;
+          color: #2e7d32;
+          font-size: 0.9em;
+        }
+
+        .rating-bars {
+          display: flex;
+          height: 35px;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+
+          .bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1em;
+            transition: width 0.5s;
+
+            &.my-team {
+              background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
+            }
+
+            &.opponent {
+              background: linear-gradient(135deg, #ef5350 0%, #d32f2f 100%);
+            }
+          }
+        }
+      }
+    }
+
+    .strengths-weaknesses {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+
+      .strengths, .weaknesses {
+        padding: 12px;
+        border-radius: 8px;
+
+        h3 {
+          margin-bottom: 8px;
+          font-size: 1.05em;
+        }
+
+        ul {
+          list-style: none;
+          padding: 0;
+
+          li {
+            padding: 8px 10px;
+            margin-bottom: 6px;
+            background: white;
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-weight: 500;
+            transition: all 0.3s;
+
+            &:hover {
+              transform: translateX(5px);
+            }
+          }
+        }
+      }
+
+      .strengths {
+        background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+        border-left: 5px solid #43a047;
+
+        h3 {
+          color: #2e7d32;
+        }
+
+        li {
+          border-left: 3px solid #66bb6a;
+        }
+      }
+
+      .weaknesses {
+        background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+        border-left: 5px solid #d32f2f;
+
+        h3 {
+          color: #c62828;
+        }
+
+        li {
+          border-left: 3px solid #ef5350;
+        }
+      }
+    }
+  }
+
+  .recommendations-section {
+    background: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(46, 125, 50, 0.15);
+    border: 2px solid #a5d6a7;
+    height: 100%;
+    border-left: 5px solid #ff9800;
+
+    h2 {
+      color: #1b5e20;
+      margin: 0 0 12px 0;
+      font-size: 1.3em;
+      font-weight: 600;
+      border-bottom: 2px solid #66bb6a;
+      padding-bottom: 6px;
+    }
+
+    .recommendations-list {
+      list-style: none;
+      padding: 0;
+
+      li {
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+        border-left: 4px solid #ff9800;
+        border-radius: 8px;
+        font-size: 0.85em;
+        color: #e65100;
+        font-weight: 500;
+        transition: all 0.3s;
+        box-shadow: 0 1px 4px rgba(255, 152, 0, 0.1);
+
+        &:hover {
+          transform: translateX(6px);
+          box-shadow: 0 2px 10px rgba(255, 152, 0, 0.2);
+        }
+
+        &:before {
+          content: " ";
+          font-size: 1.1em;
+          margin-right: 6px;
+        }
+      }
+    }
+  }
+}
+
 // ==================== OPTIMAL LINEUP PRZECIWNIKA (styl boiska) ====================
 
 .opponent-field {

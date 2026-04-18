@@ -796,20 +796,32 @@ public class AdvancedLineupOptimizer
     private List<string> IdentifyStrengths(LineupRatings me, LineupRatings opp)
     {
         var r = new List<string>();
-        if (me.Midfield > opp.Midfield * 1.15) r.Add("Przewaga w pomocy — wiecej szans na twoja druzyne.");
-        if (me.CentralDefense > opp.CentralAttack * 1.15) r.Add("Mocna obrona centralna — przeciwnik bedzie mial trudno w srodku.");
-        if (me.RightAttack > opp.LeftDefense * 1.15) r.Add("Atakuj prawym skrzydlem — slabosc w obronie przeciwnika.");
-        if (me.LeftAttack > opp.RightDefense * 1.15) r.Add("Atakuj lewym skrzydlem — slabosc w obronie przeciwnika.");
+        if (me.Midfield > opp.Midfield * 1.15)
+            r.Add("Przewaga w pomocy — wiecej szans na twoja druzyne. / Midfield advantage — more chances for your team.");
+        if (me.CentralDefense > opp.CentralAttack * 1.15)
+            r.Add("Mocna obrona centralna — przeciwnik bedzie mial trudno w srodku. / Strong central defense — opponent will struggle through the middle.");
+        bool rightAdv = me.RightAttack > opp.LeftDefense * 1.15;
+        bool leftAdv  = me.LeftAttack  > opp.RightDefense * 1.15;
+        if (rightAdv && leftAdv)
+            r.Add("Obie flanki silne wzgledem obrony przeciwnika — idealny moment na taktike AOW (Atak skrzydlami, wzmacnia oba skrzydla jednoczesnie). / Both flanks strong vs opponent defense — ideal for AOW (Attack on Wings, boosts both wings simultaneously).");
+        else if (rightAdv)
+            r.Add("Prawa flanka silna, jednak AOW wzmacnia oba skrzydla jednoczesnie — wzmocnij lewe skrzydlo, by w pelni wykorzystac te przewage. / Right flank strong, but AOW boosts both wings simultaneously — strengthen the left wing to fully exploit this advantage.");
+        else if (leftAdv)
+            r.Add("Lewa flanka silna, jednak AOW wzmacnia oba skrzydla jednoczesnie — wzmocnij prawe skrzydlo, by w pelni wykorzystac te przewage. / Left flank strong, but AOW boosts both wings simultaneously — strengthen the right wing to fully exploit this advantage.");
         return r;
     }
 
     private List<string> IdentifyWeaknesses(LineupRatings me, LineupRatings opp)
     {
         var r = new List<string>();
-        if (me.Midfield < opp.Midfield * 0.9) r.Add("Slabsza pomoc — przeciwnik bedzie mial posiadanie.");
-        if (me.CentralDefense < opp.CentralAttack * 0.9) r.Add("Zagrozenie w srodku obrony — wzmocnij.");
-        if (me.RightDefense < opp.LeftAttack * 0.9) r.Add("Prawa obrona pod presja.");
-        if (me.LeftDefense < opp.RightAttack * 0.9) r.Add("Lewa obrona pod presja.");
+        if (me.Midfield < opp.Midfield * 0.9)
+            r.Add("Slabsza pomoc — przeciwnik bedzie mial posiadanie. / Weak midfield — opponent will dominate possession.");
+        if (me.CentralDefense < opp.CentralAttack * 0.9)
+            r.Add("Zagrozenie w srodku obrony — wzmocnij. / Central defense under threat — reinforce it.");
+        if (me.RightDefense < opp.LeftAttack * 0.9)
+            r.Add("Prawa obrona pod presja — ryzyko straty z lewego ataku przeciwnika. / Right defense under pressure — risk from opponent's left attack.");
+        if (me.LeftDefense < opp.RightAttack * 0.9)
+            r.Add("Lewa obrona pod presja — ryzyko straty z prawego ataku przeciwnika. / Left defense under pressure — risk from opponent's right attack.");
         return r;
     }
 
@@ -817,23 +829,23 @@ public class AdvancedLineupOptimizer
     {
         var rec = new List<string>
         {
-            $"Formacja: {best.Lineup.Formation.Name} ({best.Lineup.Formation.Description}).",
+            $"Formacja: {best.Lineup.Formation.Name} ({best.Lineup.Formation.Description}). / Formation: {best.Lineup.Formation.Name} ({best.Lineup.Formation.Description}).",
             $"Taktyka: {TranslateTactic(best.Tactic)}.",
             $"Postawa druzyny: {TranslateAttitude(best.Attitude)}.",
             $"Trener: {TranslateCoach(best.Coach)}.",
-            $"Szacowane prawdopodobienstwo: wygrana {best.WinProbability:P1}, remis {best.DrawProbability:P1}, porazka {best.LossProbability:P1}.",
-            $"Oczekiwany wynik (lambda): {best.ExpectedGoalsFor:F2}:{best.ExpectedGoalsAgainst:F2}."
+            $"Szacowane prawdopodobienstwo: wygrana {best.WinProbability:P1}, remis {best.DrawProbability:P1}, porazka {best.LossProbability:P1}. / Estimated probability: win {best.WinProbability:P1}, draw {best.DrawProbability:P1}, loss {best.LossProbability:P1}.",
+            $"Oczekiwany wynik (lambda): {best.ExpectedGoalsFor:F2}:{best.ExpectedGoalsAgainst:F2}. / Expected score (lambda): {best.ExpectedGoalsFor:F2}:{best.ExpectedGoalsAgainst:F2}."
         };
         if (best.DisorderRisk > 0.01)
         {
-            rec.Add($"Ryzyko nieladu (niskie doswiadczenie formacji): {best.DisorderRisk:P0} — rozwaz czestsze granie ta formacja lub wybor formacji o wyzszym poziomie doswiadczenia.");
+            rec.Add($"Ryzyko nieladu (niskie doswiadczenie formacji): {best.DisorderRisk:P0} — rozwaz czestsze granie ta formacja lub wybor formacji o wyzszym poziomie doswiadczenia. / Disorder risk (low formation experience): {best.DisorderRisk:P0} — consider playing this formation more often or choosing one with higher experience.");
         }
 
         var bhvSummary = best.Lineup.Slots
             .Where(kv => kv.Key != "GK")
             .Select(kv => $"{kv.Key}={kv.Value.Behaviour}")
             .ToList();
-        rec.Add("Ustawienia per slot: " + string.Join(", ", bhvSummary));
+        rec.Add("Ustawienia per slot / Per-slot settings: " + string.Join(", ", bhvSummary));
 
         rec.AddRange(cmp.Strengths);
         rec.AddRange(cmp.Weaknesses);
@@ -842,28 +854,28 @@ public class AdvancedLineupOptimizer
 
     private static string TranslateTactic(string t) => t switch
     {
-        "Normal" => "Zwykla",
-        "Counter" => "Kontratak",
-        "AttackInMiddle" => "Atak srodkiem (AIM)",
-        "AttackOnWings" => "Atak skrzydlami (AOW)",
-        "Pressing" => "Pressing",
-        "PlayCreatively" => "Kreatywna gra",
-        "LongShots" => "Strzaly z dystansu",
+        "Normal"         => "Zwykla / Normal",
+        "Counter"        => "Kontratak / Counter-attack",
+        "AttackInMiddle" => "Atak srodkiem (AIM) — wzmacnia centralny atak, oslabia oba skrzydla / Attack in the Middle (AIM) — boosts central attack, weakens both wings",
+        "AttackOnWings"  => "Atak skrzydlami (AOW) — wzmacnia oba skrzydla jednoczesnie, oslabia centralny atak / Attack on Wings (AOW) — boosts both wings simultaneously, weakens central attack",
+        "Pressing"       => "Pressing / Pressing",
+        "PlayCreatively" => "Kreatywna gra / Play Creatively",
+        "LongShots"      => "Strzaly z dystansu / Long Shots",
         _ => t
     };
 
     private static string TranslateAttitude(string a) => a switch
     {
-        "PIC" => "Gra na luzie (PIC)",
-        "MOTS" => "Mecz sezonu (MOTS)",
-        _ => "Normalne spotkanie"
+        "PIC"  => "Gra na luzie (PIC) / Play It Cool (PIC)",
+        "MOTS" => "Mecz sezonu (MOTS) / Match of the Season (MOTS)",
+        _ => "Normalne spotkanie / Normal match"
     };
 
     private static string TranslateCoach(string c) => c switch
     {
-        "Offensive" => "Ofensywny",
-        "Defensive" => "Defensywny",
-        _ => "Neutralny"
+        "Offensive" => "Ofensywny / Offensive",
+        "Defensive" => "Defensywny / Defensive",
+        _ => "Neutralny / Neutral"
     };
 }
 

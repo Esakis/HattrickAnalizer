@@ -1024,6 +1024,19 @@ export class LineupOptimizerComponent implements OnInit {
     return Math.max(5, Math.min(95, pct));
   }
 
+  // Przewidywana liczba akcji w meczu wg poradnik (Umanx):
+  // 6 akcji wspolnych + 4 unikatowe na druzyne. Szansa na akcje: x^a / (x^a + y^a),
+  // gdzie a ~ 2.75 (przedzial 2.5-3), x/y = poziom pomocy. Max 10 akcji na zespol.
+  getPredictedActions(myMid: number, oppMid: number, side: 'my' | 'opp'): number {
+    const x = Math.max(myMid || 0, 0.01);
+    const y = Math.max(oppMid || 0, 0.01);
+    const a = 2.75;
+    const xa = Math.pow(x, a);
+    const ya = Math.pow(y, a);
+    const pMy = xa / (xa + ya);
+    return 10 * (side === 'my' ? pMy : 1 - pMy);
+  }
+
   getSkillLevel(value: number): string {
     const levels = ['beznadziejny', 'fatalny', 'nędzny', 'kiepski', 'słaby', 'przeciętny',
                     'zadowalający', 'solidny', 'znakomity', 'fantastyczny', 'olśniewający',

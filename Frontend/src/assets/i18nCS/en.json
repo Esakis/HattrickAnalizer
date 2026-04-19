@@ -95,7 +95,8 @@
       "rightDefense": "Right Defense:",
       "leftAttack": "Left Attack:",
       "centralAttack": "Central Attack:",
-      "rightAttack": "Right Attack:"
+      "rightAttack": "Right Attack:",
+      "predictedActions": "Expected actions:"
     },
     "strengths": "Your Strengths",
     "weaknesses": "Weaknesses",

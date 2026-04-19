@@ -376,6 +376,25 @@
           }
         }
       }
+
+      &.predicted-actions-row {
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 2px dashed #bdbdbd;
+
+        .rating-label {
+          color: #1565c0;
+        }
+
+        .rating-bars .bar {
+          &.my-team {
+            background: linear-gradient(135deg, #42a5f5 0%, #1565c0 100%);
+          }
+          &.opponent {
+            background: linear-gradient(135deg, #ab47bc 0%, #6a1b9a 100%);
+          }
+        }
+      }
     }
   }
 

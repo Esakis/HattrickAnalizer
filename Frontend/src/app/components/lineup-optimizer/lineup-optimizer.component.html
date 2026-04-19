@@ -439,6 +439,20 @@
               </div>
             </div>
           </div>
+
+          <div class="rating-row predicted-actions-row">
+            <span class="rating-label">{{ 'optimizer.comparison.predictedActions' | translate }}</span>
+            <div class="rating-bars">
+              <div class="bar my-team"
+                   [style.width.%]="getSectorBarWidth(getPredictedActions(result.comparison.myTeamRatings.midfield, result.comparison.opponentRatings.midfield, 'my'), getPredictedActions(result.comparison.myTeamRatings.midfield, result.comparison.opponentRatings.midfield, 'opp'), 'my')">
+                {{ getPredictedActions(result.comparison.myTeamRatings.midfield, result.comparison.opponentRatings.midfield, 'my') | number:'1.1-1' }}
+              </div>
+              <div class="bar opponent"
+                   [style.width.%]="getSectorBarWidth(getPredictedActions(result.comparison.myTeamRatings.midfield, result.comparison.opponentRatings.midfield, 'my'), getPredictedActions(result.comparison.myTeamRatings.midfield, result.comparison.opponentRatings.midfield, 'opp'), 'opp')">
+                {{ getPredictedActions(result.comparison.myTeamRatings.midfield, result.comparison.opponentRatings.midfield, 'opp') | number:'1.1-1' }}
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="strengths-weaknesses">

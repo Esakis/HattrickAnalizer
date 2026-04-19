@@ -95,7 +95,8 @@
       "rightDefense": "Obrona prawa:",
       "leftAttack": "Atak lewy:",
       "centralAttack": "Atak centralny:",
-      "rightAttack": "Atak prawy:"
+      "rightAttack": "Atak prawy:",
+      "predictedActions": "Przewidywana ilość akcji:"
     },
     "strengths": "Twoje Mocne Strony",
     "weaknesses": "Słabe Punkty",

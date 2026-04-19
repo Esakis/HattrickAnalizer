@@ -77,8 +77,45 @@
           </select>
         </div>
 
+        <!-- Trener i sztab -->
+        <div class="staff-section">
+          <h4>Trener i Sztab</h4>
+          <div class="staff-grid">
+            <div class="staff-item">
+              <label>Typ trenera:</label>
+              <select [(ngModel)]="coachType" class="form-control-sm">
+                <option *ngFor="let c of coachTypes" [value]="c.value">{{ c.label }}</option>
+              </select>
+            </div>
+            <div class="staff-item">
+              <label>Asystent (taktyka):</label>
+              <select [(ngModel)]="assistantManagerLevel" class="form-control-sm">
+                <option [ngValue]="0">0 - Brak</option>
+                <option [ngValue]="1">1 - Słaby</option>
+                <option [ngValue]="2">2 - Przeciętny</option>
+                <option [ngValue]="3">3 - Dobry</option>
+                <option [ngValue]="4">4 - Bardzo dobry</option>
+                <option [ngValue]="5">5 - Znakomity</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Poziomy doświadczenia formacji -->
+          <details class="formation-exp-details">
+            <summary>📊 Doświadczenie formacji</summary>
+            <div class="formation-exp-compact">
+              <div *ngFor="let f of availableFormations" class="formation-exp-item">
+                <span class="formation-name">{{ f }}</span>
+                <select [(ngModel)]="formationExperience[f]" class="form-control-xs">
+                  <option *ngFor="let lvl of experienceLevels" [ngValue]="lvl.value">{{ lvl.value }}</option>
+                </select>
+              </div>
+            </div>
+          </details>
+        </div>
+
         <button
-          (click)="optimizeLineup()" 
+          (click)="optimizeLineup()"
           [disabled]="loading"
           class="btn-primary">
           {{ loading ? ('optimizer.optimizing' | translate) : ('optimizer.optimizeLineup' | translate) }}
@@ -106,43 +143,6 @@
           <div class="stat-item">
             <span class="stat-label">{{ 'players.averageForm' | translate }}:</span>
             <span class="stat-value">{{ myTeamAverageForm }}</span>
-          </div>
-          
-          <!-- Trener i sztab -->
-          <div class="staff-section">
-            <h4>Trener i Sztab</h4>
-            <div class="staff-grid">
-              <div class="staff-item">
-                <label>Typ trenera:</label>
-                <select [(ngModel)]="coachType" class="form-control-sm">
-                  <option *ngFor="let c of coachTypes" [value]="c.value">{{ c.label }}</option>
-                </select>
-              </div>
-              <div class="staff-item">
-                <label>Asystent (taktyka):</label>
-                <select [(ngModel)]="assistantManagerLevel" class="form-control-sm">
-                  <option [ngValue]="0">0 - Brak</option>
-                  <option [ngValue]="1">1 - Słaby</option>
-                  <option [ngValue]="2">2 - Przeciętny</option>
-                  <option [ngValue]="3">3 - Dobry</option>
-                  <option [ngValue]="4">4 - Bardzo dobry</option>
-                  <option [ngValue]="5">5 - Znakomity</option>
-                </select>
-              </div>
-            </div>
-            
-            <!-- Poziomy doświadczenia formacji -->
-            <details class="formation-exp-details">
-              <summary>📊 Doświadczenie formacji</summary>
-              <div class="formation-exp-compact">
-                <div *ngFor="let f of availableFormations" class="formation-exp-item">
-                  <span class="formation-name">{{ f }}</span>
-                  <select [(ngModel)]="formationExperience[f]" class="form-control-xs">
-                    <option *ngFor="let lvl of experienceLevels" [ngValue]="lvl.value">{{ lvl.value }}</option>
-                  </select>
-                </div>
-              </div>
-            </details>
           </div>
           
           <!-- Statystyki druzy -->

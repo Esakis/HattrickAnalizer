@@ -1037,6 +1037,29 @@ export class LineupOptimizerComponent implements OnInit {
     return 10 * (side === 'my' ? pMy : 1 - pMy);
   }
 
+  // Przewidywana liczba bramek: akcje * sredni P(gol) wazony rozkladem akcji.
+  // Rozklad: 35% srodek, 25% prawe skrzydlo, 25% lewe skrzydlo, 15% SFG.
+  // SFG przyblizone porownaniem srodek-srodek (brak ratingu SP w modelu).
+  // Wzor finalizacji: x^a / (x^a + y^a), a ~ 3.5.
+  getExpectedGoals(result: any, side: 'my' | 'opp'): number {
+    const my = result.comparison.myTeamRatings;
+    const opp = result.comparison.opponentRatings;
+    const actions = this.getPredictedActions(my.midfield, opp.midfield, side);
+    const attack = side === 'my' ? my : opp;
+    const defense = side === 'my' ? opp : my;
+    const a = 3.5;
+    const p = (x: number, y: number) => {
+      const xa = Math.pow(Math.max(x || 0, 0.01), a);
+      const ya = Math.pow(Math.max(y || 0, 0.01), a);
+      return xa / (xa + ya);
+    };
+    const pCentral = p(attack.centralAttack, defense.centralDefense);
+    const pRight = p(attack.rightAttack, defense.leftDefense);
+    const pLeft = p(attack.leftAttack, defense.rightDefense);
+    const pGoal = 0.35 * pCentral + 0.25 * pRight + 0.25 * pLeft + 0.15 * pCentral;
+    return actions * pGoal;
+  }
+
   getSkillLevel(value: number): string {
     const levels = ['beznadziejny', 'fatalny', 'nędzny', 'kiepski', 'słaby', 'przeciętny',
                     'zadowalający', 'solidny', 'znakomity', 'fantastyczny', 'olśniewający',

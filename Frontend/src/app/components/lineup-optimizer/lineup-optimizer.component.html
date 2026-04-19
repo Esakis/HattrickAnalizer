@@ -453,6 +453,20 @@
               </div>
             </div>
           </div>
+
+          <div class="rating-row expected-goals-row">
+            <span class="rating-label">{{ 'optimizer.comparison.expectedGoals' | translate }}</span>
+            <div class="rating-bars">
+              <div class="bar my-team"
+                   [style.width.%]="getSectorBarWidth(getExpectedGoals(result, 'my'), getExpectedGoals(result, 'opp'), 'my')">
+                {{ getExpectedGoals(result, 'my') | number:'1.2-2' }}
+              </div>
+              <div class="bar opponent"
+                   [style.width.%]="getSectorBarWidth(getExpectedGoals(result, 'my'), getExpectedGoals(result, 'opp'), 'opp')">
+                {{ getExpectedGoals(result, 'opp') | number:'1.2-2' }}
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="strengths-weaknesses">

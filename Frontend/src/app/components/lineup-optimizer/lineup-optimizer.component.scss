@@ -395,6 +395,21 @@
           }
         }
       }
+
+      &.expected-goals-row {
+        .rating-label {
+          color: #e65100;
+        }
+
+        .rating-bars .bar {
+          &.my-team {
+            background: linear-gradient(135deg, #ffb74d 0%, #f57c00 100%);
+          }
+          &.opponent {
+            background: linear-gradient(135deg, #ff8a65 0%, #d84315 100%);
+          }
+        }
+      }
     }
   }
 

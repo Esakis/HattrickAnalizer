@@ -96,7 +96,8 @@
       "leftAttack": "Atak lewy:",
       "centralAttack": "Atak centralny:",
       "rightAttack": "Atak prawy:",
-      "predictedActions": "Przewidywana ilość akcji:"
+      "predictedActions": "Przewidywana ilość akcji:",
+      "expectedGoals": "Przewidywane bramki z akcji:"
     },
     "strengths": "Twoje Mocne Strony",
     "weaknesses": "Słabe Punkty",

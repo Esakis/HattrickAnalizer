@@ -18,51 +18,55 @@
     <div class="three-column-input">
       <div class="input-form">
         <h3>⚙️ {{ 'optimizer.settings' | translate }}</h3>
-        <div class="form-group">
-          <label for="myTeamId">{{ 'optimizer.myTeamIdLabel' | translate }}</label>
-          <input 
-            type="number" 
-            id="myTeamId" 
-            [(ngModel)]="myTeamId" 
-            (change)="onMyTeamIdChange()"
-            placeholder="{{ 'optimizer.teamIdPlaceholder' | translate }}"
-            class="form-control">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="myTeamId">{{ 'optimizer.myTeamIdLabel' | translate }}</label>
+            <input 
+              type="number" 
+              id="myTeamId" 
+              [(ngModel)]="myTeamId" 
+              (change)="onMyTeamIdChange()"
+              placeholder="{{ 'optimizer.teamIdPlaceholder' | translate }}"
+              class="form-control">
+          </div>
+
+          <div class="form-group">
+            <label for="opponentTeamId">{{ 'optimizer.opponentTeamIdLabel' | translate }}</label>
+            <input 
+              type="number" 
+              id="opponentTeamId" 
+              [(ngModel)]="opponentTeamId" 
+              (change)="onOpponentTeamIdChange()"
+              placeholder="{{ 'optimizer.teamIdPlaceholder' | translate }}"
+              class="form-control">
+          </div>
         </div>
 
-        <div class="form-group">
-          <label for="opponentTeamId">{{ 'optimizer.opponentTeamIdLabel' | translate }}</label>
-          <input 
-            type="number" 
-            id="opponentTeamId" 
-            [(ngModel)]="opponentTeamId" 
-            (change)="onOpponentTeamIdChange()"
-            placeholder="{{ 'optimizer.teamIdPlaceholder' | translate }}"
-            class="form-control">
-        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="myFormation">Formacja mojej drużyny</label>
+            <select
+              id="myFormation"
+              [(ngModel)]="selectedMyFormation"
+              (change)="onMyFormationChange()"
+              class="form-control">
+              <option value="Auto">Auto (najlepsza)</option>
+              <option *ngFor="let f of availableFormations" [value]="f">{{ f }}</option>
+            </select>
+          </div>
 
-        <div class="form-group">
-          <label for="myFormation">Formacja mojej drużyny</label>
-          <select
-            id="myFormation"
-            [(ngModel)]="selectedMyFormation"
-            (change)="onMyFormationChange()"
-            class="form-control">
-            <option value="Auto">Auto (najlepsza)</option>
-            <option *ngFor="let f of availableFormations" [value]="f">{{ f }}</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label for="tactic">{{ 'optimizer.tacticLabel' | translate }}</label>
-          <select
-            id="tactic"
-            [(ngModel)]="selectedMyTactic"
-            (change)="onMyTacticChange()"
-            class="form-control">
-            <option *ngFor="let tactic of tactics" [value]="tactic.value">
-              {{ tactic.label }}
-            </option>
-          </select>
+          <div class="form-group">
+            <label for="tactic">{{ 'optimizer.tacticLabel' | translate }}</label>
+            <select
+              id="tactic"
+              [(ngModel)]="selectedMyTactic"
+              (change)="onMyTacticChange()"
+              class="form-control">
+              <option *ngFor="let tactic of tactics" [value]="tactic.value">
+                {{ tactic.label }}
+              </option>
+            </select>
+          </div>
         </div>
 
         <div class="form-group">

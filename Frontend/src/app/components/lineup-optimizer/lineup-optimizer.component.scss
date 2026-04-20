@@ -197,6 +197,33 @@
     }
   }
 
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 12px;
+
+    .form-group {
+      margin-bottom: 0;
+    }
+
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+      
+      .form-group {
+        margin-bottom: 12px;
+      }
+
+      &.team-ids-row {
+        flex-direction: column;
+        
+        .form-group {
+          flex: 1;
+        }
+      }
+    }
+  }
+
   .form-group {
     margin-bottom: 12px;
 
@@ -208,7 +235,28 @@
       font-size: 0.9em;
     }
 
-    input, select {
+    input {
+      width:94%;
+      padding: 8px;
+      border: 2px solid #c8e6c9;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: all 0.3s;
+      background: #f1f8e9;
+
+      &:focus {
+        outline: none;
+        border-color: #66bb6a;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(102, 187, 106, 0.1);
+      }
+
+      &:hover {
+        border-color: #81c784;
+      }
+    }
+
+    select {
       width: 100%;
       padding: 8px;
       border: 2px solid #c8e6c9;

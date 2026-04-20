@@ -437,7 +437,7 @@
       </div>
     </div>
 
-    <div class="comparison-section-wrapper">
+    <div class="comparison-recommendations-side-by-side">
       <div class="comparison-section">
         <h2>{{ 'optimizer.comparison.title' | translate }}</h2>
         <div class="ratings-comparison">
@@ -501,15 +501,14 @@
         </div>
       </div>
 
-    </div>
-
-    <div class="recommendations-section">
-      <h2>📋 {{ 'optimizer.recommendations' | translate }}</h2>
-      <ul class="recommendations-list">
-        <li *ngFor="let recommendation of result.recommendations">
-          {{ recommendation }}
-        </li>
-      </ul>
+      <div class="recommendations-section">
+        <h2>📋 {{ 'optimizer.recommendations' | translate }}</h2>
+        <ul class="recommendations-list">
+          <li *ngFor="let recommendation of result.recommendations">
+            {{ recommendation }}
+          </li>
+        </ul>
+      </div>
     </div>
 
     <div class="alternatives-section" *ngIf="result.alternatives?.length">

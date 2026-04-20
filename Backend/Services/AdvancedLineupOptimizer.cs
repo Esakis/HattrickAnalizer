@@ -59,11 +59,8 @@ public class AdvancedLineupOptimizer
             OptimizationCandidate? bestForFormation = null;
             foreach (var tactic in tactics)
             {
-                var candidate = EvaluateCandidate(formation, tactic, attitude, coach, baseLineup, opponentRatings);
-                candidate = OptimiseBehaviours(candidate, attitude, coach, opponentRatings);
-                // Kara za nielad formacji — proporcjonalnie obniza wszystkie prawdopodobienstwa wygranej.
-                candidate.DisorderRisk = disorderRisk;
-                candidate.Score = (candidate.WinProbability + 0.5 * candidate.DrawProbability) * (1.0 - 0.5 * disorderRisk);
+                var candidate = EvaluateCandidate(formation, tactic, attitude, coach, baseLineup, opponentRatings, disorderRisk);
+                candidate = OptimiseBehaviours(candidate, attitude, coach, opponentRatings, disorderRisk);
 
                 if (bestForFormation == null || candidate.Score > bestForFormation.Score)
                 {
@@ -406,12 +403,27 @@ public class AdvancedLineupOptimizer
 
     // ======================= Ratings & Evaluation =======================
 
-    private OptimizationCandidate EvaluateCandidate(FormationDefinition formation, string tactic, string attitude, string coach, AssignedLineup lineup, TeamRatings opponent)
+    private OptimizationCandidate EvaluateCandidate(FormationDefinition formation, string tactic, string attitude, string coach, AssignedLineup lineup, TeamRatings opponent, double disorderRisk = 0.0)
     {
         var ratings = ComputeRatings(lineup);
         ApplyTacticAndContext(ref ratings, tactic, lineup);
         ApplyAttitude(ref ratings, attitude);
         ApplyCoach(ref ratings, coach);
+
+        // Nielad formacji obniza ratingi proporcjonalnie do ryzyka
+        if (disorderRisk > 0)
+        {
+            double penalty = 1.0 - 0.5 * disorderRisk;
+            ratings.Midfield *= penalty;
+            ratings.CentralDefense *= penalty;
+            ratings.RightDefense *= penalty;
+            ratings.LeftDefense *= penalty;
+            ratings.CentralAttack *= penalty;
+            ratings.RightAttack *= penalty;
+            ratings.LeftAttack *= penalty;
+            ratings.Overall *= penalty;
+        }
+
         var opp = ConvertToLineupRatings(opponent);
 
         var (pWin, pDraw, pLoss, lamMe, lamOpp) = PoissonWinProbability(ratings, opp, tactic, lineup);
@@ -428,11 +440,12 @@ public class AdvancedLineupOptimizer
             LossProbability = pLoss,
             ExpectedGoalsFor = lamMe,
             ExpectedGoalsAgainst = lamOpp,
+            DisorderRisk = disorderRisk,
             Score = pWin + 0.5 * pDraw
         };
     }
 
-    private OptimizationCandidate OptimiseBehaviours(OptimizationCandidate cand, string attitude, string coach, TeamRatings opponent)
+    private OptimizationCandidate OptimiseBehaviours(OptimizationCandidate cand, string attitude, string coach, TeamRatings opponent, double disorderRisk = 0.0)
     {
         // Lekka iteracja: dla kazdego slotu sprobuj kazdego zachowania i zachowaj te,
         // ktore maksymalizuje P(win) + 0.5*P(draw).
@@ -454,7 +467,7 @@ public class AdvancedLineupOptimizer
                 {
                     if (bhv == cur.Behaviour) continue;
                     lineup.Slots[slot] = new AssignedSlot { SlotId = slot, Player = cur.Player, Behaviour = bhv };
-                    var test = EvaluateCandidate(cand.Lineup.Formation, cand.Tactic, attitude, coach, lineup, opponent);
+                    var test = EvaluateCandidate(cand.Lineup.Formation, cand.Tactic, attitude, coach, lineup, opponent, disorderRisk);
                     if (test.Score > bestScore + 1e-6)
                     {
                         bestScore = test.Score;
@@ -470,7 +483,7 @@ public class AdvancedLineupOptimizer
             }
         }
         // Przelicz na koncu dla pewnosci
-        var final = EvaluateCandidate(cand.Lineup.Formation, cand.Tactic, attitude, coach, lineup, opponent);
+        var final = EvaluateCandidate(cand.Lineup.Formation, cand.Tactic, attitude, coach, lineup, opponent, disorderRisk);
         return final;
     }
 
@@ -633,26 +646,43 @@ public class AdvancedLineupOptimizer
     private (double pWin, double pDraw, double pLoss, double lamMe, double lamOpp)
         PoissonWinProbability(LineupRatings me, LineupRatings opp, string tactic, AssignedLineup lineup)
     {
-        // Unikamy dzielenia przez 0
-        double midMe = Math.Max(1.0, me.Midfield);
-        double midOpp = Math.Max(1.0, opp.Midfield);
-        double possMe = midMe / (midMe + midOpp);
-        double possOpp = 1 - possMe;
+        // Model akcji wg poradnika Hattrick (Umanx):
+        // 10 akcji w meczu, rozdzielone wg pomocy: x^a / (x^a + y^a), a = 2.75
+        double midMe = Math.Max(0.01, me.Midfield);
+        double midOpp = Math.Max(0.01, opp.Midfield);
+        const double midExp = 2.75;
+        double midMePow = Math.Pow(midMe, midExp);
+        double midOppPow = Math.Pow(midOpp, midExp);
+        double myActionShare = midMePow / (midMePow + midOppPow);
+        double actionsMe = 10.0 * myActionShare;
+        double actionsOpp = 10.0 * (1.0 - myActionShare);
 
-        double myAttAvg = (me.CentralAttack + me.RightAttack + me.LeftAttack) / 3.0;
-        double oppDefAvg = Math.Max(1.0, (opp.CentralDefense + opp.RightDefense + opp.LeftDefense) / 3.0);
-        double oppAttAvg = (opp.CentralAttack + opp.RightAttack + opp.LeftAttack) / 3.0;
-        double myDefAvg = Math.Max(1.0, (me.CentralDefense + me.RightDefense + me.LeftDefense) / 3.0);
+        // Prawdopodobienstwo gola z akcji: atak^a / (atak^a + obrona^a), a = 3.5
+        // Rozklad akcji: 35% srodek, 25% prawe skrzydlo, 25% lewe skrzydlo, 15% SFG (staly fragment gry ~ srodek)
+        const double finExp = 3.5;
+        double FinProb(double att, double def)
+        {
+            double a2 = Math.Pow(Math.Max(att, 0.01), finExp);
+            double d2 = Math.Pow(Math.Max(def, 0.01), finExp);
+            return a2 / (a2 + d2);
+        }
 
-        double baseGoals = 1.45;                       // srednia liczba goli jednej druzyny
-        double alpha = 1.8;                            // wykladnik przewagi ataku nad obrona
-        double possFactor = 1.0 + 0.5 * (possMe - 0.5); // +- do 25% zaleznie od posiadania
+        // Moje expected goals from actions
+        double pCentralMe = FinProb(me.CentralAttack, opp.CentralDefense);
+        double pRightMe = FinProb(me.RightAttack, opp.LeftDefense);
+        double pLeftMe = FinProb(me.LeftAttack, opp.RightDefense);
+        double pGoalMe = 0.35 * pCentralMe + 0.25 * pRightMe + 0.25 * pLeftMe + 0.15 * pCentralMe;
+        double lamMe = actionsMe * pGoalMe;
 
-        double lamMe = baseGoals * Math.Pow(myAttAvg / oppDefAvg, alpha) * possFactor;
-        double lamOpp = baseGoals * Math.Pow(oppAttAvg / myDefAvg, alpha) * (2 - possFactor);
+        // Przeciwnik expected goals from actions
+        double pCentralOpp = FinProb(opp.CentralAttack, me.CentralDefense);
+        double pRightOpp = FinProb(opp.RightAttack, me.LeftDefense);
+        double pLeftOpp = FinProb(opp.LeftAttack, me.RightDefense);
+        double pGoalOpp = 0.35 * pCentralOpp + 0.25 * pRightOpp + 0.25 * pLeftOpp + 0.15 * pCentralOpp;
+        double lamOpp = actionsOpp * pGoalOpp;
 
         // Kontratak daje bonus do oczekiwanych goli przy niskim posiadaniu
-        if (tactic == "Counter" && possMe < 0.45)
+        if (tactic == "Counter" && myActionShare < 0.45)
         {
             lamMe *= 1.10;
         }

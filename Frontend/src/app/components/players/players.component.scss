@@ -585,13 +585,11 @@
 }
 
 .debug-save-bar {
-  padding: 12px 16px;
+  margin-left: 20px;
   background: rgba(0,0,0,0.05);
-  border-radius: 8px;
-  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  width: 300px;
 }
 
 .btn-save-history {

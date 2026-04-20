@@ -78,28 +78,6 @@
       </div>
     </div>
 
-    <!-- PRZYCISK DEBUG: ZAPISZ HISTORIĘ -->
-    <div *ngIf="isDebug" class="debug-save-bar">
-      <button class="btn-save-history" (click)="checkAndSaveHistory()" [disabled]="savingHistory">
-        {{ savingHistory ? '⏳ Sprawdzam...' : '💾 Sprawdź i zapisz zmiany do bazy' }}
-      </button>
-      <div *ngIf="saveResultsVisible && saveResults" class="save-summary">
-        <span class="save-ok" *ngIf="saveChangedCount > 0">
-          ✅ Zapisano zmiany dla {{ saveChangedCount }} zawodników:
-        </span>
-        <span class="save-none" *ngIf="saveChangedCount === 0">
-          ℹ️ Brak zmian – wszystko aktualne
-        </span>
-        <ul *ngIf="saveChangedCount > 0" class="save-changes-list">
-          <li *ngFor="let r of saveResults">
-            <ng-container *ngIf="r.changed">
-              <strong>{{ r.playerName }}</strong>: {{ r.changedFields.join(', ') }}
-            </ng-container>
-          </li>
-        </ul>
-      </div>
-    </div>
-
     <!-- WIDOK TABELI -->
     <div *ngIf="viewMode === 'table'" class="table-container">
       <table class="players-table">
@@ -289,6 +267,28 @@
     <div class="no-data-icon">🤷‍♂️</div>
     <p>{{ 'players.noPlayersFound' | translate }}</p>
     <p class="hint">{{ 'players.checkTeamId' | translate }}</p>
+  </div>
+
+    <!-- PRZYCISK DEBUG: ZAPISZ HISTORIĘ -->
+  <div *ngIf="isDebug" class="debug-save-bar">
+    <button class="btn-save-history" (click)="checkAndSaveHistory()" [disabled]="savingHistory">
+      {{ savingHistory ? '⏳ Sprawdzam...' : '💾 Sprawdź i zapisz zmiany do bazy' }}
+    </button>
+    <div *ngIf="saveResultsVisible && saveResults" class="save-summary">
+      <span class="save-ok" *ngIf="saveChangedCount > 0">
+        ✅ Zapisano zmiany dla {{ saveChangedCount }} zawodników:
+      </span>
+      <span class="save-none" *ngIf="saveChangedCount === 0">
+        ℹ️ Brak zmian – wszystko aktualne
+      </span>
+      <ul *ngIf="saveChangedCount > 0" class="save-changes-list">
+        <li *ngFor="let r of saveResults">
+          <ng-container *ngIf="r.changed">
+            <strong>{{ r.playerName }}</strong>: {{ r.changedFields.join(', ') }}
+          </ng-container>
+        </li>
+      </ul>
+    </div>
   </div>
 </div>
 

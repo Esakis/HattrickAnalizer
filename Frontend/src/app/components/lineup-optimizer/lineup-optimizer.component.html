@@ -44,13 +44,13 @@
 
         <div class="form-row">
           <div class="form-group">
-            <label for="myFormation">Formacja mojej drużyny</label>
+            <label for="myFormation">{{ 'optimizer.myFormationLabel' | translate }}</label>
             <select
               id="myFormation"
               [(ngModel)]="selectedMyFormation"
               (change)="onMyFormationChange()"
               class="form-control">
-              <option value="Auto">Auto (najlepsza)</option>
+              <option value="Auto">{{ 'optimizer.autoFormation' | translate }}</option>
               <option *ngFor="let f of availableFormations" [value]="f">{{ f }}</option>
             </select>
           </div>
@@ -83,30 +83,30 @@
 
         <!-- Trener i sztab -->
         <div class="staff-section">
-          <h4>Trener i Sztab</h4>
+          <h4>{{ 'optimizer.staff.title' | translate }}</h4>
           <div class="staff-grid">
             <div class="staff-item">
-              <label>Typ trenera:</label>
+              <label>{{ 'optimizer.staff.coachType' | translate }}</label>
               <select [(ngModel)]="coachType" class="form-control-sm">
                 <option *ngFor="let c of coachTypes" [value]="c.value">{{ c.label }}</option>
               </select>
             </div>
             <div class="staff-item">
-              <label>Asystent (taktyka):</label>
+              <label>{{ 'optimizer.staff.assistantTactics' | translate }}</label>
               <select [(ngModel)]="assistantManagerLevel" class="form-control-sm">
-                <option [ngValue]="0">0 - Brak</option>
-                <option [ngValue]="1">1 - Słaby</option>
-                <option [ngValue]="2">2 - Przeciętny</option>
-                <option [ngValue]="3">3 - Dobry</option>
-                <option [ngValue]="4">4 - Bardzo dobry</option>
-                <option [ngValue]="5">5 - Znakomity</option>
+                <option [ngValue]="0">{{ 'optimizer.staff.levels.none' | translate }}</option>
+                <option [ngValue]="1">{{ 'optimizer.staff.levels.weak' | translate }}</option>
+                <option [ngValue]="2">{{ 'optimizer.staff.levels.average' | translate }}</option>
+                <option [ngValue]="3">{{ 'optimizer.staff.levels.good' | translate }}</option>
+                <option [ngValue]="4">{{ 'optimizer.staff.levels.veryGood' | translate }}</option>
+                <option [ngValue]="5">{{ 'optimizer.staff.levels.excellent' | translate }}</option>
               </select>
             </div>
           </div>
 
           <!-- Poziomy doświadczenia formacji -->
           <details class="formation-exp-details">
-            <summary>📊 Doświadczenie formacji</summary>
+            <summary>📊 {{ 'optimizer.staff.formationExperience' | translate }}</summary>
             <div class="formation-exp-compact">
               <div *ngFor="let f of availableFormations" class="formation-exp-item">
                 <span class="formation-name">{{ f }}</span>
@@ -163,7 +163,7 @@
               <span class="stat-value">{{ goalDifference }}</span>
             </div>
             <div class="stat-item">
-              <span class="stat-label">Formacje (5 m.):</span>
+              <span class="stat-label">{{ 'teamStats.formationsLast5' | translate }}</span>
               <span class="stat-value">
                 <span *ngIf="myTeamStats.statistics?.last5Formations?.length > 0">
                   {{ myTeamStats.statistics.last5Formations.join(', ') }}
@@ -174,7 +174,7 @@
               </span>
             </div>
             <div class="stat-item" *ngIf="myTeamStats.statistics?.last5Formations?.length > 0">
-              <span class="stat-label">Najczęstsza:</span>
+              <span class="stat-label">{{ 'teamStats.mostCommon' | translate }}</span>
               <span class="stat-value stat-highlight">{{ myTeamStats.statistics?.mostCommonFormation }}</span>
             </div>
             <div class="stat-item">
@@ -200,14 +200,14 @@
         <!-- Wybór formacji i taktyki przeciwnika -->
         <div class="opponent-formation-select" *ngIf="opponentTeamPlayers.length > 0">
           <div class="form-group-inline">
-            <label>Formacja:</label>
+            <label>{{ 'optimizer.staff.formationLabel' | translate }}</label>
             <select [(ngModel)]="selectedOpponentFormation" (change)="onOpponentFormationChange()" class="form-control-sm">
               <option value="Auto">Auto</option>
               <option *ngFor="let f of availableFormations" [value]="f">{{ f }}</option>
             </select>
           </div>
           <div class="form-group-inline">
-            <label>Taktyka:</label>
+            <label>{{ 'optimizer.staff.tacticLabel' | translate }}</label>
             <select [(ngModel)]="selectedOpponentTactic" (change)="onOpponentTacticChange()" class="form-control-sm">
               <option *ngFor="let tactic of tactics" [value]="tactic.value">{{ tactic.label }}</option>
             </select>
@@ -245,7 +245,7 @@
               <span class="stat-value">{{ opponentTeamStats.statistics?.goalDifference }}</span>
             </div>
             <div class="stat-item">
-              <span class="stat-label">Formacje (5 m.):</span>
+              <span class="stat-label">{{ 'teamStats.formationsLast5' | translate }}</span>
               <span class="stat-value">
                 <span *ngIf="opponentTeamStats.statistics?.last5Formations?.length > 0">
                   {{ opponentTeamStats.statistics.last5Formations.join(', ') }}
@@ -256,7 +256,7 @@
               </span>
             </div>
             <div class="stat-item" *ngIf="opponentTeamStats.statistics?.last5Formations?.length > 0">
-              <span class="stat-label">Najczęstsza:</span>
+              <span class="stat-label">{{ 'teamStats.mostCommon' | translate }}</span>
               <span class="stat-value stat-highlight">{{ opponentTeamStats.statistics?.mostCommonFormation }}</span>
             </div>
             <div class="stat-item">

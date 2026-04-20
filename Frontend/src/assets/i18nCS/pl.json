@@ -172,6 +172,24 @@
       "5-4-1": "5-4-1"
     },
     "settings": "Ustawienia",
+    "myFormationLabel": "Formacja mojej drużyny",
+    "autoFormation": "Auto (najlepsza)",
+    "staff": {
+      "title": "Trener i Sztab",
+      "coachType": "Typ trenera:",
+      "assistantTactics": "Asystent (taktyka):",
+      "formationExperience": "Doświadczenie formacji",
+      "formationLabel": "Formacja:",
+      "tacticLabel": "Taktyka:",
+      "levels": {
+        "none": "0 - Brak",
+        "weak": "1 - Słaby",
+        "average": "2 - Przeciętny",
+        "good": "3 - Dobry",
+        "veryGood": "4 - Bardzo dobry",
+        "excellent": "5 - Znakomity"
+      }
+    },
     "myTeam": "Moja Drużyna",
     "opponentTeam": "Drużyna Przeciwnika",
     "enterTeamId": "Wprowadź ID drużyny",
@@ -499,6 +517,8 @@
     "goalDifference": "Róznica bramek",
     "formation": "Formacja",
     "form": "Forma",
-    "matches": "mecze"
+    "matches": "mecze",
+    "formationsLast5": "Formacje (5 m.):",
+    "mostCommon": "Najczęstsza:"
   }
 }

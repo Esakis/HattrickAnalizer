@@ -138,7 +138,7 @@
             </div>
           </details>
         </div>
-        
+
       </div>
 
       <div class="team-info my-team-info">
@@ -206,24 +206,7 @@
       </div>
 
       <div class="team-info opponent-team-info">
-        <h3>⚔️ {{ opponentTeamName || ('optimizer.opponentTeam' | translate) }}</h3>
-        
-        <!-- Wybór formacji i taktyki przeciwnika -->
-        <div class="opponent-formation-select" *ngIf="opponentTeamPlayers.length > 0">
-          <div class="form-group-inline">
-            <label>{{ 'optimizer.staff.formationLabel' | translate }}</label>
-            <select [(ngModel)]="selectedOpponentFormation" (change)="onOpponentFormationChange()" class="form-control-sm">
-              <option value="Auto">Auto</option>
-              <option *ngFor="let f of availableFormations" [value]="f">{{ f }}</option>
-            </select>
-          </div>
-          <div class="form-group-inline">
-            <label>{{ 'optimizer.staff.tacticLabel' | translate }}</label>
-            <select [(ngModel)]="selectedOpponentTactic" (change)="onOpponentTacticChange()" class="form-control-sm">
-              <option *ngFor="let tactic of tactics" [value]="tactic.value">{{ tactic.label }}</option>
-            </select>
-          </div>
-        </div>
+        <h3>⚔️ {{ opponentTeamName || ('optimizer.opponentTeam' | translate) }}</h3>       
         
         <div *ngIf="loadingOpponentTeam" class="loading-indicator">
           {{ 'common.loading' | translate }}...
@@ -284,6 +267,23 @@
         </div>
         <div *ngIf="!loadingOpponentTeam && opponentTeamPlayers.length === 0" class="no-data-small">
           {{ 'optimizer.enterTeamId' | translate }}
+        </div>
+
+        <!-- Wybór formacji i taktyki przeciwnika -->
+        <div class="opponent-formation-select" *ngIf="opponentTeamPlayers.length > 0">
+          <div class="form-group-inline">
+            <label>{{ 'optimizer.staff.formationLabel' | translate }}</label>
+            <select [(ngModel)]="selectedOpponentFormation" (change)="onOpponentFormationChange()" class="form-control-sm">
+              <option value="Auto">Auto</option>
+              <option *ngFor="let f of availableFormations" [value]="f">{{ f }}</option>
+            </select>
+          </div>
+          <div class="form-group-inline">
+            <label>{{ 'optimizer.staff.tacticLabel' | translate }}</label>
+            <select [(ngModel)]="selectedOpponentTactic" (change)="onOpponentTacticChange()" class="form-control-sm">
+              <option *ngFor="let tactic of tactics" [value]="tactic.value">{{ tactic.label }}</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>

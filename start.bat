@@ -17,7 +17,7 @@ echo Czekanie 5 sekund na uruchomienie backendu...
 timeout /t 5 /nobreak >nul
 
 echo Uruchamianie frontendu (Angular)...
-start "Frontend" cmd /k "cd /d %~dp0Frontend && npm start"
+start "Frontend" cmd /k "cd /d %~dp0Frontend && yarn start"
 
 echo Aplikacja zostala uruchomiona!
 echo Backend: https://localhost:7000 (lub inne porty z konfiguracji)

@@ -72,7 +72,8 @@ public class TeamController : ControllerBase
     {
         try
         {
-            var stored = _tokenStore.Get();
+            var sessionId = Request.Cookies["ht_session"] ?? "";
+            var stored = _tokenStore.Get(sessionId);
             if (stored == null || stored.OwnTeamId == 0)
             {
                 return BadRequest(new { error = "Brak zapisanego teamId — dokończ autoryzację OAuth." });

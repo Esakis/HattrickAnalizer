@@ -19,24 +19,48 @@ public class OAuthController : ControllerBase
         _tokenStore = tokenStore;
     }
 
+    private string GetOrCreateSessionId()
+    {
+        var sessionId = Request.Cookies["ht_session"];
+        if (string.IsNullOrEmpty(sessionId))
+        {
+            sessionId = Guid.NewGuid().ToString();
+            SetSessionCookie(sessionId);
+        }
+        return sessionId;
+    }
+
+    private void SetSessionCookie(string sessionId)
+    {
+        Response.Cookies.Append("ht_session", sessionId, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None,
+            MaxAge = TimeSpan.FromDays(30)
+        });
+    }
+
     [HttpGet("start")]
     public async Task<IActionResult> StartAuthorization()
     {
         try
         {
+            var sessionId = GetOrCreateSessionId();
             var (token, tokenSecret, authUrl) = await _oauthService.GetRequestTokenAsync();
 
             var session = new OAuthSession
             {
+                SessionId = sessionId,
                 RequestToken = token,
                 RequestTokenSecret = tokenSecret
             };
 
-            _sessions[session.SessionId] = session;
+            _sessions[sessionId] = session;
 
             return Ok(new
             {
-                sessionId = session.SessionId,
+                sessionId,
                 authorizationUrl = authUrl,
                 message = "Otwórz authorizationUrl w przeglądarce, zaloguj się i skopiuj PIN"
             });
@@ -52,7 +76,8 @@ public class OAuthController : ControllerBase
     {
         try
         {
-            if (!_sessions.TryGetValue(request.SessionId, out var session))
+            var sessionId = Request.Cookies["ht_session"] ?? request.SessionId;
+            if (!_sessions.TryGetValue(sessionId, out var session))
             {
                 return BadRequest(new { error = "Invalid session ID" });
             }
@@ -74,7 +99,7 @@ public class OAuthController : ControllerBase
 
             var (ownTeamId, ownTeamName) = await FetchOwnTeamInfoAsync(accessToken, accessTokenSecret);
 
-            _tokenStore.Save(new StoredToken
+            _tokenStore.Save(sessionId, new StoredToken
             {
                 AccessToken = accessToken,
                 AccessTokenSecret = accessTokenSecret,
@@ -83,9 +108,11 @@ public class OAuthController : ControllerBase
                 AuthorizedAt = DateTime.UtcNow
             });
 
+            SetSessionCookie(sessionId);
+
             return Ok(new
             {
-                sessionId = session.SessionId,
+                sessionId,
                 accessToken,
                 ownTeamId,
                 ownTeamName,
@@ -120,8 +147,9 @@ public class OAuthController : ControllerBase
     [HttpGet("current")]
     public IActionResult GetCurrent()
     {
-        var stored = _tokenStore.Get();
-        if (stored == null || !_tokenStore.IsAuthorized())
+        var sessionId = Request.Cookies["ht_session"] ?? "";
+        var stored = _tokenStore.Get(sessionId);
+        if (stored == null || !_tokenStore.IsAuthorized(sessionId))
         {
             return Ok(new { authorized = false });
         }
@@ -137,7 +165,9 @@ public class OAuthController : ControllerBase
     [HttpPost("logout")]
     public IActionResult Logout()
     {
-        _tokenStore.Clear();
+        var sessionId = Request.Cookies["ht_session"] ?? "";
+        _tokenStore.Clear(sessionId);
+        Response.Cookies.Delete("ht_session");
         return Ok(new { success = true });
     }
 

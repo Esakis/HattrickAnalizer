@@ -1,4 +1,4 @@
-using System.Text.Json;
+using System.Collections.Concurrent;
 
 namespace HattrickAnalizer.Services;
 
@@ -13,62 +13,32 @@ public class StoredToken
 
 public class TokenStore
 {
-    private readonly string _filePath;
-    private readonly object _lock = new();
-    private StoredToken? _cached;
+    private readonly ConcurrentDictionary<string, StoredToken> _tokens = new();
 
-    public TokenStore(IConfiguration configuration, IWebHostEnvironment env)
+    public StoredToken? Get(string sessionId)
     {
-        var dir = env.ContentRootPath;
-        _filePath = Path.Combine(dir, "oauth_tokens.json");
-        Load();
+        if (string.IsNullOrEmpty(sessionId)) return null;
+        _tokens.TryGetValue(sessionId, out var token);
+        return token;
     }
 
-    public StoredToken? Get()
+    public bool IsAuthorized(string sessionId)
     {
-        lock (_lock) return _cached;
+        var token = Get(sessionId);
+        return token != null
+            && !string.IsNullOrEmpty(token.AccessToken)
+            && !string.IsNullOrEmpty(token.AccessTokenSecret);
     }
 
-    public bool IsAuthorized()
+    public void Save(string sessionId, StoredToken token)
     {
-        lock (_lock)
-        {
-            return _cached != null
-                && !string.IsNullOrEmpty(_cached.AccessToken)
-                && !string.IsNullOrEmpty(_cached.AccessTokenSecret);
-        }
+        if (string.IsNullOrEmpty(sessionId)) return;
+        _tokens[sessionId] = token;
     }
 
-    public void Save(StoredToken token)
+    public void Clear(string sessionId)
     {
-        lock (_lock)
-        {
-            _cached = token;
-            var json = JsonSerializer.Serialize(token, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(_filePath, json);
-        }
-    }
-
-    public void Clear()
-    {
-        lock (_lock)
-        {
-            _cached = null;
-            if (File.Exists(_filePath)) File.Delete(_filePath);
-        }
-    }
-
-    private void Load()
-    {
-        if (!File.Exists(_filePath)) return;
-        try
-        {
-            var json = File.ReadAllText(_filePath);
-            _cached = JsonSerializer.Deserialize<StoredToken>(json);
-        }
-        catch
-        {
-            _cached = null;
-        }
+        if (string.IsNullOrEmpty(sessionId)) return;
+        _tokens.TryRemove(sessionId, out _);
     }
 }

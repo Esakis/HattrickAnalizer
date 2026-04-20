@@ -22,15 +22,17 @@ public class HattrickApiService
     private readonly IConfiguration _configuration;
     private readonly OAuthService _oauthService;
     private readonly TokenStore _tokenStore;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly string _baseUrl;
     private readonly Dictionary<int, TeamRatings> _mockRatingsCache = new();
 
-    public HattrickApiService(HttpClient httpClient, IConfiguration configuration, OAuthService oauthService, TokenStore tokenStore)
+    public HattrickApiService(HttpClient httpClient, IConfiguration configuration, OAuthService oauthService, TokenStore tokenStore, IHttpContextAccessor httpContextAccessor)
     {
         _httpClient = httpClient;
         _configuration = configuration;
         _oauthService = oauthService;
         _tokenStore = tokenStore;
+        _httpContextAccessor = httpContextAccessor;
         _baseUrl = _configuration["HattrickApi:BaseUrl"] ?? "https://chpp.hattrick.org/chppxml.ashx";
     }
 
@@ -653,6 +655,7 @@ public class HattrickApiService
 
     private (string? AccessToken, string? AccessTokenSecret) ResolveTokens(string? sessionId)
     {
+        // Try explicit sessionId first (from OAuthController sessions)
         if (!string.IsNullOrEmpty(sessionId))
         {
             var session = OAuthController.GetSession(sessionId);
@@ -662,7 +665,9 @@ public class HattrickApiService
             }
         }
 
-        var stored = _tokenStore.Get();
+        // Try cookie-based sessionId from TokenStore
+        var cookieSessionId = _httpContextAccessor.HttpContext?.Request.Cookies["ht_session"] ?? sessionId ?? "";
+        var stored = _tokenStore.Get(cookieSessionId);
         if (stored != null && !string.IsNullOrEmpty(stored.AccessToken))
         {
             return (stored.AccessToken, stored.AccessTokenSecret);

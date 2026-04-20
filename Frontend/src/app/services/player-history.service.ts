@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Player } from '../models/player.model';
+import { environment } from '../../environments/environment';
 
 export interface PlayerSkillHistory {
   id: number;
@@ -45,7 +46,7 @@ export interface PlayerChangeResult {
 
 @Injectable({ providedIn: 'root' })
 export class PlayerHistoryService {
-  private readonly apiUrl = 'http://localhost:5000/api/playerhistory';
+  private readonly apiUrl = `${environment.apiUrl}/playerhistory`;
 
   constructor(private http: HttpClient) {}
 

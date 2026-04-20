@@ -1,0 +1,45 @@
+name: Deploy Backend to Azure App Service
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Backend/**'
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: hattrick-analizer-api  # Zmień na nazwę swojego App Service
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore
+        working-directory: Backend
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+        working-directory: Backend
+
+      - name: Publish
+        run: dotnet publish --configuration Release --no-build --output ./publish
+        working-directory: Backend
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: Backend/publish

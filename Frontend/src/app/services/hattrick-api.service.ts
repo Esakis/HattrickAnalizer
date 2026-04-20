@@ -5,12 +5,13 @@ import { Team } from '../models/team.model';
 import { Player } from '../models/player.model';
 import { OptimizerRequest, OptimizerResponse } from '../models/lineup.model';
 import { AuthInfo, NextOpponent } from './data-cache.service';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class HattrickApiService {
-  private apiUrl = 'http://localhost:5000/api';
+  private apiUrl = environment.apiUrl;
 
   constructor(private http: HttpClient) { }
 

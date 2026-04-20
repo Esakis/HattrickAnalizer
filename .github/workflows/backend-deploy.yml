@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: hattrick-analizer-api  # Zmień na nazwę swojego App Service
+  AZURE_WEBAPP_NAME: hattrick-analizer-api  # Nazwa App Service w Azure
   DOTNET_VERSION: '8.0.x'
 
 jobs:

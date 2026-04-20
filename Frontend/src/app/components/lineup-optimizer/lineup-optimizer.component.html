@@ -81,7 +81,18 @@
           </select>
         </div>
 
-        <!-- Trener i sztab -->
+        <button
+          (click)="optimizeLineup()"
+          [disabled]="loading"
+          class="btn-primary">
+          {{ loading ? ('optimizer.optimizing' | translate) : ('optimizer.optimizeLineup' | translate) }}
+        </button>
+
+        <div *ngIf="error" class="error-message">
+          {{ error }}
+        </div>
+
+                <!-- Trener i sztab -->
         <div class="staff-section">
           <h4>{{ 'optimizer.staff.title' | translate }}</h4>
           <div class="staff-grid">
@@ -127,17 +138,7 @@
             </div>
           </details>
         </div>
-
-        <button
-          (click)="optimizeLineup()"
-          [disabled]="loading"
-          class="btn-primary">
-          {{ loading ? ('optimizer.optimizing' | translate) : ('optimizer.optimizeLineup' | translate) }}
-        </button>
-
-        <div *ngIf="error" class="error-message">
-          {{ error }}
-        </div>
+        
       </div>
 
       <div class="team-info my-team-info">

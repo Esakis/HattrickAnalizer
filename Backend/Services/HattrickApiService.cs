@@ -73,19 +73,15 @@ public class HattrickApiService
 
     public async Task<List<Player>> GetTeamPlayersAsync(int teamId, string? sessionId = null)
     {
-        Console.WriteLine($"========== GetTeamPlayersAsync CALLED for team {teamId} ==========");
-        Debug.WriteLine($"========== GetTeamPlayersAsync CALLED for team {teamId} ==========");
+        Debug.WriteLine($"[GetTeamPlayersAsync] Called for team {teamId}");
         
         var (accessToken, accessTokenSecret) = ResolveTokens(sessionId);
         if (accessToken == null || accessTokenSecret == null)
         {
-            Console.WriteLine($"No OAuth tokens available - returning mock players");
             Debug.WriteLine($"No OAuth tokens available - returning mock players");
             return GenerateMockPlayers();
         }
 
-        Console.WriteLine($"OAuth tokens found - attempting to fetch players from API");
-        
         // Pobierz graczy z API players (daje imiona, umiejętności, formę itd.)
         var playersFromApi = new Dictionary<int, Player>();
         try
@@ -103,18 +99,18 @@ public class HattrickApiService
                 var p = ParsePlayer(playerElement);
                 playersFromApi[p.PlayerId] = p;
             }
-            Console.WriteLine($"[GetTeamPlayersAsync] Got {playersFromApi.Count} players from API for team {teamId}");
+            Debug.WriteLine($"[GetTeamPlayersAsync] Got {playersFromApi.Count} players from API for team {teamId}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GetTeamPlayersAsync] Players API failed for team {teamId}: {ex.Message}");
+            Debug.WriteLine($"[GetTeamPlayersAsync] Players API failed for team {teamId}: {ex.Message}");
         }
 
         // Pobierz graczy z matchlineup XML (daje prawdziwe PlayerID z meczów + oceny)
         try
         {
             var matchPlayers = await GetTeamPlayersFromMatchesAsync(teamId, accessToken!, accessTokenSecret!);
-            Console.WriteLine($"[GetTeamPlayersAsync] Got {matchPlayers.Count} players from matches for team {teamId}");
+            Debug.WriteLine($"[GetTeamPlayersAsync] Got {matchPlayers.Count} players from matches for team {teamId}");
             
             if (matchPlayers.Count > 0)
             {
@@ -122,7 +118,7 @@ public class HattrickApiService
                 if (playersFromApi.Count > 0)
                 {
                     matchPlayers = matchPlayers.Where(mp => playersFromApi.ContainsKey(mp.PlayerId)).ToList();
-                    Console.WriteLine($"[GetTeamPlayersAsync] After filtering sold players: {matchPlayers.Count} players");
+                    Debug.WriteLine($"[GetTeamPlayersAsync] After filtering sold players: {matchPlayers.Count} players");
                 }
 
                 // Uzupełnij dane z API players (imiona, skille, forma) jeśli dostępne
@@ -163,7 +159,7 @@ public class HattrickApiService
                             matchPlayers.Add(apiPlayer);
                         }
                     }
-                    Console.WriteLine($"[GetTeamPlayersAsync] After adding non-played current players: {matchPlayers.Count} players");
+                    Debug.WriteLine($"[GetTeamPlayersAsync] After adding non-played current players: {matchPlayers.Count} players");
                 }
 
                 return matchPlayers;
@@ -171,7 +167,7 @@ public class HattrickApiService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GetTeamPlayersAsync] Match lineup extraction failed for team {teamId}: {ex.Message}");
+            Debug.WriteLine($"[GetTeamPlayersAsync] Match lineup extraction failed for team {teamId}: {ex.Message}");
         }
 
         // Fallback: zwróć graczy z API bez statystyk meczowych
@@ -185,7 +181,6 @@ public class HattrickApiService
 
     private async Task<List<Player>> GetTeamPlayersFromMatchesAsync(int teamId, string accessToken, string accessTokenSecret)
     {
-        Console.WriteLine($"[GetTeamPlayersFromMatchesAsync] Fetching players for team {teamId} from match data...");
         Debug.WriteLine($"[GetTeamPlayersFromMatchesAsync] Fetching players for team {teamId} from match data...");
         
         // Pobierz mecze drużyny (publiczne API)
@@ -214,7 +209,7 @@ public class HattrickApiService
             .Take(10)
             .ToList();
 
-        Console.WriteLine($"[GetTeamPlayersFromMatchesAsync] Found {finishedMatchIds.Count} senior matches for team {teamId}");
+        Debug.WriteLine($"[GetTeamPlayersFromMatchesAsync] Found {finishedMatchIds.Count} senior matches for team {teamId}");
         if (finishedMatchIds.Count == 0) return new List<Player>();
 
         // Pobierz składy z meczów (publiczne API)
@@ -226,31 +221,17 @@ public class HattrickApiService
             var lineupXml = await FetchMatchLineupAsync(matchId!, teamId, accessToken, accessTokenSecret);
             if (string.IsNullOrEmpty(lineupXml))
             {
-                Console.WriteLine($"[GetTeamPlayersFromMatchesAsync] Empty lineup XML for match {matchId}");
+                Debug.WriteLine($"[GetTeamPlayersFromMatchesAsync] Empty lineup XML for match {matchId}");
                 continue;
             }
 
             try
             {
-                var doc = XDocument.Parse(lineupXml);
-                var rootChildren = doc.Root?.Elements().Select(e => e.Name.LocalName).ToList() ?? new List<string>();
-                Console.WriteLine($"[GetTeamPlayersFromMatchesAsync] Match {matchId} root children: {string.Join(", ", rootChildren)}");
-                var playerCount = doc.Descendants("Player").Count();
-                Console.WriteLine($"[GetTeamPlayersFromMatchesAsync] Total <Player> elements in XML: {playerCount}");
-                if (playerCount > 0)
-                {
-                    var firstPlayer = doc.Descendants("Player").First();
-                    var parentChain = new List<string>();
-                    var p = firstPlayer.Parent;
-                    while (p != null) { parentChain.Insert(0, p.Name.LocalName); p = p.Parent; }
-                    Console.WriteLine($"[GetTeamPlayersFromMatchesAsync] First Player parent chain: {string.Join(" > ", parentChain)}");
-                }
                 ExtractPlayersFromLineup(lineupXml, teamId, playerDict, appearances);
-                Console.WriteLine($"[GetTeamPlayersFromMatchesAsync] After extract: {playerDict.Count} players so far");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[GetTeamPlayersFromMatchesAsync] EXCEPTION for match {matchId}: {ex}");
+                Debug.WriteLine($"[GetTeamPlayersFromMatchesAsync] EXCEPTION for match {matchId}: {ex.Message}");
             }
         }
 
@@ -307,7 +288,7 @@ public class HattrickApiService
         if (teamElement == null)
         {
             // The API returns lineup for the requested teamId, so <Team> should always match
-            Console.WriteLine($"[ExtractPlayersFromLineup] <Team> with TeamID={teamId} not found");
+            Debug.WriteLine($"[ExtractPlayersFromLineup] <Team> with TeamID={teamId} not found");
             return;
         }
 
@@ -317,11 +298,6 @@ public class HattrickApiService
         if (lineupContainer != null)
         {
             lineupPlayers.AddRange(lineupContainer.Elements("Player"));
-            if (lineupPlayers.Count > 0)
-            {
-                var firstEls = lineupPlayers[0].Elements().Select(e => $"{e.Name.LocalName}={e.Value}").ToList();
-                Console.WriteLine($"[ExtractPlayersFromLineup] Team {teamId}: {lineupPlayers.Count} players from <Lineup>, first: {string.Join(", ", firstEls)}");
-            }
         }
         // Fallback to StartingLineup + Substitutions if Lineup is empty
         if (lineupPlayers.Count == 0)
@@ -332,12 +308,15 @@ public class HattrickApiService
                 if (container != null)
                     lineupPlayers.AddRange(container.Elements("Player"));
             }
-            Console.WriteLine($"[ExtractPlayersFromLineup] Team {teamId}: fallback to StartingLineup, {lineupPlayers.Count} players");
         }
 
         foreach (var playerEl in lineupPlayers)
         {
             if (!int.TryParse(playerEl.Element("PlayerID")?.Value, out int pid)) continue;
+
+            // Skip bench/substitutes (RoleID >= 114) and substitution events (RoleID < 100)
+            var roleIdStr = playerEl.Element("RoleID")?.Value ?? "0";
+            if (int.TryParse(roleIdStr, out int roleIdInt) && (roleIdInt >= 114 || roleIdInt < 100)) continue;
 
             // Dodaj gracza do słownika jeśli jeszcze go nie ma
             if (!playerDict.ContainsKey(pid))
@@ -362,9 +341,9 @@ public class HattrickApiService
             var minutes = int.Parse(playerEl.Element("PlayedMinutes")?.Value ?? "90");
             if (minutes <= 0) continue;
 
-            // matchlineup v2.1 uses RatingStarsEndOfMatch / RatingStars, not RatingEndOfGame
-            var ratingStr = playerEl.Element("RatingStarsEndOfMatch")?.Value 
-                ?? playerEl.Element("RatingStars")?.Value 
+            // Use RatingStars (start-of-match) as primary - this matches what users see in match reports
+            var ratingStr = playerEl.Element("RatingStars")?.Value 
+                ?? playerEl.Element("RatingStarsEndOfMatch")?.Value 
                 ?? playerEl.Element("RatingEndOfGame")?.Value 
                 ?? playerEl.Element("Rating")?.Value ?? "0";
             var rating = double.Parse(ratingStr, System.Globalization.CultureInfo.InvariantCulture);
@@ -430,7 +409,6 @@ public class HattrickApiService
             .Take(3)
             .ToList();
         
-        Console.WriteLine($"[EnrichPlayers] Found {finishedMatchIds.Count} senior matches for team {teamId}");
         Debug.WriteLine($"[EnrichPlayers] Found {finishedMatchIds.Count} senior matches for team {teamId}");
 
         if (finishedMatchIds.Count == 0) return;
@@ -446,14 +424,11 @@ public class HattrickApiService
             if (string.IsNullOrEmpty(lineupXml)) continue;
             try
             {
-                // Log XML snippet before parsing
-                var snippet = lineupXml.Length > 500 ? lineupXml.Substring(0, 500) : lineupXml;
-                Console.WriteLine($"[EnrichPlayers] Lineup XML snippet: {snippet}");
                 AggregateLineup(lineupXml, teamId, playerIndex, appearances);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[EnrichPlayers] EXCEPTION in AggregateLineup: {ex.Message}");
+                Debug.WriteLine($"[EnrichPlayers] EXCEPTION in AggregateLineup: {ex.Message}");
             }
         }
 
@@ -467,8 +442,7 @@ public class HattrickApiService
             stats.AverageRating = agg.Matches > 0 ? Math.Round(agg.RatingSum / agg.Matches, 2) : 0;
             stats.AverageForm = player.Form;
             
-            Console.WriteLine($"[EnrichPlayers] Processing player {player.PlayerId} ({player.FirstName} {player.LastName}): {agg.Matches} matches, {agg.PositionRatings.Count} positions");
-            Debug.WriteLine($"[EnrichPlayers] Processing player {player.PlayerId} ({player.FirstName} {player.LastName}): {agg.Matches} matches, {agg.PositionRatings.Count} positions");
+            Debug.WriteLine($"[EnrichPlayers] Player {player.PlayerId}: {agg.Matches} matches, {agg.PositionRatings.Count} positions");
             
             // Calculate average ratings per position
             foreach (var kvp in agg.PositionRatings)
@@ -476,14 +450,10 @@ public class HattrickApiService
                 if (kvp.Value.Count > 0)
                 {
                     stats.PositionRatings[kvp.Key] = Math.Round(kvp.Value.Average(), 2);
-                    Console.WriteLine($"[EnrichPlayers] Player {player.PlayerId}: {kvp.Key} = {stats.PositionRatings[kvp.Key]} (from {kvp.Value.Count} matches)");
-                    Debug.WriteLine($"[EnrichPlayers] Player {player.PlayerId}: {kvp.Key} = {stats.PositionRatings[kvp.Key]} (from {kvp.Value.Count} matches)");
                 }
             }
             
             player.MatchStats = stats;
-            Console.WriteLine($"[EnrichPlayers] Player {player.PlayerId} final PositionRatings count: {stats.PositionRatings.Count}");
-            Debug.WriteLine($"[EnrichPlayers] Player {player.PlayerId} final PositionRatings count: {stats.PositionRatings.Count}");
         }
     }
 
@@ -511,25 +481,35 @@ public class HattrickApiService
     {
         var doc = XDocument.Parse(lineupXml);
         
-        // Zbierz WSZYSTKICH graczy z całego XML - niezależnie od struktury
-        var allPlayers = doc.Descendants("Player").ToList();
+        // Find <Team> element with matching TeamID (contains <Lineup> with ratings)
+        var teamElement = doc.Descendants("Team")
+            .FirstOrDefault(t => t.Element("TeamID")?.Value == teamId.ToString());
         
-        var seenPlayers = new HashSet<int>();
+        if (teamElement == null) return;
+
+        // Use <Lineup> container which has RatingStars/RatingStarsEndOfMatch
+        var lineupContainer = teamElement.Element("Lineup");
+        if (lineupContainer == null) return;
+
+        var lineupPlayers = lineupContainer.Elements("Player").ToList();
         int matched = 0;
-        foreach (var playerEl in allPlayers)
+        foreach (var playerEl in lineupPlayers)
         {
             if (!int.TryParse(playerEl.Element("PlayerID")?.Value, out int pid)) continue;
+            // Skip bench/substitutes (RoleID >= 114) and substitution events (RoleID < 100)
+            var roleIdStr = playerEl.Element("RoleID")?.Value ?? "0";
+            if (int.TryParse(roleIdStr, out int roleIdInt) && (roleIdInt >= 114 || roleIdInt < 100)) continue;
             // Sprawdź czy ten gracz jest w naszym indeksie (czyli należy do szukanej drużyny)
             if (!playerIndex.ContainsKey(pid)) continue;
             if (!appearances.TryGetValue(pid, out var agg)) continue;
-            if (!seenPlayers.Add(pid)) continue;
 
             var minutes = int.Parse(playerEl.Element("PlayedMinutes")?.Value ?? "90");
             if (minutes <= 0) continue;
 
+            // Use RatingStars (start-of-match) as primary
             var rating = double.Parse(
-                playerEl.Element("RatingStarsEndOfMatch")?.Value ?? 
-                playerEl.Element("RatingStars")?.Value ??
+                playerEl.Element("RatingStars")?.Value ?? 
+                playerEl.Element("RatingStarsEndOfMatch")?.Value ??
                 playerEl.Element("RatingEndOfGame")?.Value ?? 
                 playerEl.Element("Rating")?.Value ?? "0", 
                 CultureInfo.InvariantCulture);
@@ -551,7 +531,7 @@ public class HattrickApiService
                 agg.PositionRatings[position].Add(rating);
             }
         }
-        Console.WriteLine($"[AggregateLineup] team={teamId}: {allPlayers.Count} players in XML, {matched} matched");
+        Debug.WriteLine($"[AggregateLineup] team={teamId}: {lineupPlayers.Count} in Lineup, {matched} matched");
     }
 
     private class PlayerAppearanceAggregate
@@ -972,7 +952,7 @@ public class HattrickApiService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error getting match details for matchId {matchId}, teamId {teamId}: {ex.Message}");
+            Debug.WriteLine($"Error getting match details for matchId {matchId}, teamId {teamId}: {ex.Message}");
             return null;
         }
     }

@@ -13,6 +13,7 @@ import { PlayersComponent } from './components/players/players.component';
 import { LoadStatusSidebarComponent } from './components/load-status-sidebar/load-status-sidebar.component';
 import { PlayerHistoryModalComponent } from './components/player-history-modal/player-history-modal.component';
 import { CredentialsInterceptor } from './interceptors/credentials.interceptor';
+import { ErrorInterceptor } from './interceptors/error.interceptor';
 
 export class CustomTranslateLoader implements TranslateLoader {
   constructor(private http: HttpClient) {}
@@ -49,7 +50,8 @@ export function HttpLoaderFactory(http: HttpClient) {
     })
   ],
   providers: [
-    { provide: HTTP_INTERCEPTORS, useClass: CredentialsInterceptor, multi: true }
+    { provide: HTTP_INTERCEPTORS, useClass: CredentialsInterceptor, multi: true },
+    { provide: HTTP_INTERCEPTORS, useClass: ErrorInterceptor, multi: true }
   ],
   bootstrap: [AppComponent]
 })

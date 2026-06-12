@@ -1,26 +1,29 @@
 @echo off
-echo Uruchamianie aplikacji HattrickAnalizer...
+setlocal
+echo === HattrickAnalizer ===
 
-echo Zabijanie istniejacych procesow...
+REM Zwalniamy tylko porty aplikacji (5000/4200) zamiast zabijac wszystkie
+REM procesy node.exe/dotnet.exe - to ubijaloby tez inne aplikacje na komputerze.
+echo Zwalnianie portu 5000 (backend) i 4200 (frontend)...
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":5000 " ^| findstr "LISTENING"') do taskkill /F /PID %%p >nul 2>nul
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":4200 " ^| findstr "LISTENING"') do taskkill /F /PID %%p >nul 2>nul
 
-taskkill /F /IM "ng.exe" 2>nul
-taskkill /F /IM "node.exe" 2>nul
-taskkill /F /IM "dotnet.exe" 2>nul
+if not exist "%~dp0Frontend\node_modules" (
+    echo Brak node_modules - instalowanie zaleznosci frontendu...
+    pushd "%~dp0Frontend"
+    call npm install --no-audit --no-fund
+    popd
+)
 
-echo Czekanie 3 sekundy na zakonczenie procesow...
-timeout /t 3 /nobreak >nul
-
-echo Uruchamianie backendu (.NET 8.0)...
-start "Backend" cmd /k "cd /d %~dp0Backend && dotnet run"
-
-echo Czekanie 5 sekund na uruchomienie backendu...
-timeout /t 5 /nobreak >nul
+echo Uruchamianie backendu (.NET 8)...
+start "HattrickAnalizer Backend" cmd /k "cd /d %~dp0Backend && dotnet run"
 
 echo Uruchamianie frontendu (Angular)...
-start "Frontend" cmd /k "cd /d %~dp0Frontend && yarn start"
+start "HattrickAnalizer Frontend" cmd /k "cd /d %~dp0Frontend && npm start"
 
-echo Aplikacja zostala uruchomiona!
-echo Backend: https://localhost:7000 (lub inne porty z konfiguracji)
+echo.
+echo Backend:  http://localhost:5000   (Swagger: http://localhost:5000/swagger)
 echo Frontend: http://localhost:4200
+echo.
 echo Nacisnij dowolny klawisz, aby zamknac to okno...
 pause >nul

@@ -17,4 +17,8 @@ public class TeamRatings
     public int RightAttackRating { get; set; }
     public int CentralAttackRating { get; set; }
     public int LeftAttackRating { get; set; }
+    // Posrednie stale fragmenty gry (matchdetails: RatingIndirectSetPiecesAtt/Def).
+    // 0 = brak danych (starsze wersje API).
+    public int IndirectSetPiecesAttRating { get; set; }
+    public int IndirectSetPiecesDefRating { get; set; }
 }

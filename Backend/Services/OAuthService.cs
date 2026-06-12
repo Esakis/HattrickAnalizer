@@ -52,8 +52,11 @@ public class OAuthService
         }
 
         var responseParams = ParseQueryString(responseContent);
-        var token = responseParams["oauth_token"];
-        var tokenSecret = responseParams["oauth_token_secret"];
+        if (!responseParams.TryGetValue("oauth_token", out var token) ||
+            !responseParams.TryGetValue("oauth_token_secret", out var tokenSecret))
+        {
+            throw new Exception($"Niepoprawna odpowiedź OAuth (request token) — brak tokenów: {responseContent}");
+        }
         var authUrl = $"{AuthorizeUrl}?oauth_token={token}";
 
         return (token, tokenSecret, authUrl);
@@ -95,14 +98,31 @@ public class OAuthService
         }
 
         var responseParams = ParseQueryString(responseContent);
-        return (responseParams["oauth_token"], responseParams["oauth_token_secret"]);
+        if (!responseParams.TryGetValue("oauth_token", out var accessToken) ||
+            !responseParams.TryGetValue("oauth_token_secret", out var accessTokenSecret))
+        {
+            throw new Exception($"Niepoprawna odpowiedź OAuth (access token) — brak tokenów: {responseContent}");
+        }
+        return (accessToken, accessTokenSecret);
     }
+
+    // Cache odpowiedzi CHPP: limity API + optymalizator robi wachlarz powtarzalnych
+    // zapytan (players/matches/matchdetails). Dane zmieniaja sie rzadko — 5 min TTL.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTime FetchedAt, string Xml)> _responseCache = new();
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
+    private const int CacheMaxEntries = 500;
 
     public async Task<string> MakeAuthenticatedRequestAsync(
         string accessToken,
         string accessTokenSecret,
         Dictionary<string, string> queryParams)
     {
+        var cacheKey = accessToken + "|" + string.Join("&", queryParams.OrderBy(p => p.Key).Select(p => $"{p.Key}={p.Value}"));
+        if (_responseCache.TryGetValue(cacheKey, out var cached) && DateTime.UtcNow - cached.FetchedAt < CacheTtl)
+        {
+            return cached.Xml;
+        }
+
         var consumerKey = _configuration["HattrickApi:ConsumerKey"];
         var consumerSecret = _configuration["HattrickApi:ConsumerSecret"];
 
@@ -139,6 +159,17 @@ public class OAuthService
         {
             throw new Exception($"Failed to access protected resource: {responseContent}");
         }
+
+        if (_responseCache.Count >= CacheMaxEntries)
+        {
+            // Prosta ewikcja: usun przeterminowane, a gdy nadal pelno — wyczysc.
+            foreach (var kv in _responseCache)
+            {
+                if (DateTime.UtcNow - kv.Value.FetchedAt >= CacheTtl) _responseCache.TryRemove(kv.Key, out _);
+            }
+            if (_responseCache.Count >= CacheMaxEntries) _responseCache.Clear();
+        }
+        _responseCache[cacheKey] = (DateTime.UtcNow, responseContent);
 
         return responseContent;
     }

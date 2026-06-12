@@ -7,6 +7,7 @@
     "opponentTeam": "Drużyna przeciwnika",
     "notAuthorized": "Brak autoryzacji — kliknij, aby rozpocząć",
     "goToOAuth": "Przejdź do autoryzacji",
+    "mockMode": "⚠ Tryb danych przykładowych (UseMockData) — to NIE są dane z Hattricka!",
     "loading": "Ładowanie...",
     "success": "Sukces",
     "error": "Błąd",

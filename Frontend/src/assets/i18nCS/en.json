@@ -7,6 +7,7 @@
     "opponentTeam": "Opponent team",
     "notAuthorized": "Not authorized — click to start",
     "goToOAuth": "Go to authorization",
+    "mockMode": "⚠ Sample data mode (UseMockData) — this is NOT real Hattrick data!",
     "loading": "Loading...",
     "success": "Success",
     "error": "Error",

@@ -47,10 +47,6 @@ export class HattrickApiService {
     return this.http.post<any>(`${this.apiUrl}/oauth/complete`, { sessionId, verifier });
   }
 
-  getOAuthStatus(sessionId: string): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/oauth/status/${sessionId}`);
-  }
-
   getCurrentOAuth(): Observable<AuthInfo> {
     return this.http.get<AuthInfo>(`${this.apiUrl}/oauth/current`);
   }

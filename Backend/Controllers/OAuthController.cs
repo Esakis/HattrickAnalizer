@@ -1,7 +1,6 @@
 using System.Xml.Linq;
 using Microsoft.AspNetCore.Mvc;
 using HattrickAnalizer.Services;
-using HattrickAnalizer.Models;
 
 namespace HattrickAnalizer.Controllers;
 
@@ -11,13 +10,24 @@ public class OAuthController : ControllerBase
 {
     private readonly OAuthService _oauthService;
     private readonly TokenStore _tokenStore;
-    private static readonly Dictionary<string, OAuthSession> _sessions = new();
+    private readonly ILogger<OAuthController> _logger;
+    private readonly bool _mockMode;
 
-    public OAuthController(OAuthService oauthService, TokenStore tokenStore)
+    public OAuthController(OAuthService oauthService, TokenStore tokenStore, ILogger<OAuthController> logger, IConfiguration configuration)
     {
         _oauthService = oauthService;
         _tokenStore = tokenStore;
+        _logger = logger;
+        _mockMode = configuration.GetValue<bool>("UseMockData");
     }
+
+    private static readonly CookieOptions SessionCookieOptions = new()
+    {
+        HttpOnly = true,
+        Secure = true,
+        SameSite = SameSiteMode.None,
+        MaxAge = TimeSpan.FromDays(30)
+    };
 
     private string GetOrCreateSessionId()
     {
@@ -25,20 +35,10 @@ public class OAuthController : ControllerBase
         if (string.IsNullOrEmpty(sessionId))
         {
             sessionId = Guid.NewGuid().ToString();
-            SetSessionCookie(sessionId);
         }
+        // Odśwież cookie przy każdym wywołaniu (przesuwne 30 dni).
+        Response.Cookies.Append("ht_session", sessionId, SessionCookieOptions);
         return sessionId;
-    }
-
-    private void SetSessionCookie(string sessionId)
-    {
-        Response.Cookies.Append("ht_session", sessionId, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.None,
-            MaxAge = TimeSpan.FromDays(30)
-        });
     }
 
     [HttpGet("start")]
@@ -49,14 +49,11 @@ public class OAuthController : ControllerBase
             var sessionId = GetOrCreateSessionId();
             var (token, tokenSecret, authUrl) = await _oauthService.GetRequestTokenAsync();
 
-            var session = new OAuthSession
+            _tokenStore.SavePending(sessionId, new PendingAuth
             {
-                SessionId = sessionId,
                 RequestToken = token,
                 RequestTokenSecret = tokenSecret
-            };
-
-            _sessions[sessionId] = session;
+            });
 
             return Ok(new
             {
@@ -67,6 +64,7 @@ public class OAuthController : ControllerBase
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Błąd przy starcie autoryzacji OAuth");
             return StatusCode(500, new { error = ex.Message });
         }
     }
@@ -76,26 +74,19 @@ public class OAuthController : ControllerBase
     {
         try
         {
+            // Fallback na sessionId z body: pierwszy request mógł nie mieć jeszcze cookie.
             var sessionId = Request.Cookies["ht_session"] ?? request.SessionId;
-            if (!_sessions.TryGetValue(sessionId, out var session))
+            var pending = _tokenStore.GetPending(sessionId);
+            if (pending == null)
             {
-                return BadRequest(new { error = "Invalid session ID" });
-            }
-
-            if (string.IsNullOrEmpty(session.RequestToken) || string.IsNullOrEmpty(session.RequestTokenSecret))
-            {
-                return BadRequest(new { error = "Session not initialized properly" });
+                return BadRequest(new { error = "Sesja autoryzacji wygasła lub nie istnieje — zacznij od nowa." });
             }
 
             var (accessToken, accessTokenSecret) = await _oauthService.ExchangeRequestTokenAsync(
-                session.RequestToken,
-                session.RequestTokenSecret,
+                pending.RequestToken,
+                pending.RequestTokenSecret,
                 request.Verifier
             );
-
-            session.AccessToken = accessToken;
-            session.AccessTokenSecret = accessTokenSecret;
-            session.AuthorizedAt = DateTime.UtcNow;
 
             var (ownTeamId, ownTeamName) = await FetchOwnTeamInfoAsync(accessToken, accessTokenSecret);
 
@@ -107,13 +98,14 @@ public class OAuthController : ControllerBase
                 OwnTeamName = ownTeamName,
                 AuthorizedAt = DateTime.UtcNow
             });
+            _tokenStore.ClearPending(sessionId);
 
-            SetSessionCookie(sessionId);
+            Response.Cookies.Append("ht_session", sessionId, SessionCookieOptions);
 
+            // Celowo bez accessToken — sekret nie opuszcza serwera.
             return Ok(new
             {
                 sessionId,
-                accessToken,
                 ownTeamId,
                 ownTeamName,
                 message = "Autoryzacja zakończona pomyślnie! Token zapisany."
@@ -121,27 +113,9 @@ public class OAuthController : ControllerBase
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Błąd przy finalizacji autoryzacji OAuth");
             return StatusCode(500, new { error = ex.Message });
         }
-    }
-
-    [HttpGet("status/{sessionId}")]
-    public IActionResult GetStatus(string sessionId)
-    {
-        if (!_sessions.TryGetValue(sessionId, out var session))
-        {
-            return NotFound(new { error = "Session not found" });
-        }
-
-        return Ok(new
-        {
-            sessionId = session.SessionId,
-            hasRequestToken = !string.IsNullOrEmpty(session.RequestToken),
-            hasAccessToken = !string.IsNullOrEmpty(session.AccessToken),
-            isAuthorized = session.AuthorizedAt.HasValue,
-            createdAt = session.CreatedAt,
-            authorizedAt = session.AuthorizedAt
-        });
     }
 
     [HttpGet("current")]
@@ -151,11 +125,12 @@ public class OAuthController : ControllerBase
         var stored = _tokenStore.Get(sessionId);
         if (stored == null || !_tokenStore.IsAuthorized(sessionId))
         {
-            return Ok(new { authorized = false });
+            return Ok(new { authorized = false, mockMode = _mockMode });
         }
         return Ok(new
         {
             authorized = true,
+            mockMode = _mockMode,
             ownTeamId = stored.OwnTeamId,
             ownTeamName = stored.OwnTeamName,
             authorizedAt = stored.AuthorizedAt
@@ -167,58 +142,14 @@ public class OAuthController : ControllerBase
     {
         var sessionId = Request.Cookies["ht_session"] ?? "";
         _tokenStore.Clear(sessionId);
-        Response.Cookies.Delete("ht_session");
+        // Usunięcie cross-site cookie wymaga tych samych opcji, z którymi było ustawione.
+        Response.Cookies.Delete("ht_session", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None
+        });
         return Ok(new { success = true });
-    }
-
-    [HttpPost("test")]
-    public async Task<IActionResult> TestConnection([FromBody] TestConnectionRequest request)
-    {
-        try
-        {
-            if (!_sessions.TryGetValue(request.SessionId, out var session))
-            {
-                return BadRequest(new { error = "Invalid session ID" });
-            }
-
-            if (string.IsNullOrEmpty(session.AccessToken) || string.IsNullOrEmpty(session.AccessTokenSecret))
-            {
-                return BadRequest(new { error = "Not authorized. Complete authorization first." });
-            }
-
-            var queryParams = new Dictionary<string, string>
-            {
-                { "file", "teamdetails" },
-                { "version", "3.9" }
-            };
-
-            if (request.TeamId.HasValue)
-            {
-                queryParams["teamId"] = request.TeamId.Value.ToString();
-            }
-
-            var response = await _oauthService.MakeAuthenticatedRequestAsync(
-                session.AccessToken,
-                session.AccessTokenSecret,
-                queryParams
-            );
-
-            return Ok(new
-            {
-                success = true,
-                data = response
-            });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { error = ex.Message });
-        }
-    }
-
-    public static OAuthSession? GetSession(string sessionId)
-    {
-        _sessions.TryGetValue(sessionId, out var session);
-        return session;
     }
 
     private async Task<(int teamId, string teamName)> FetchOwnTeamInfoAsync(string accessToken, string accessTokenSecret)
@@ -242,10 +173,4 @@ public class CompleteAuthRequest
 {
     public string SessionId { get; set; } = string.Empty;
     public string Verifier { get; set; } = string.Empty;
-}
-
-public class TestConnectionRequest
-{
-    public string SessionId { get; set; } = string.Empty;
-    public int? TeamId { get; set; }
 }

@@ -8,9 +8,9 @@ namespace HattrickAnalizer.Controllers;
 [Route("api/[controller]")]
 public class OptimizerController : ControllerBase
 {
-    private readonly LineupOptimizerService _optimizer;
+    private readonly AdvancedLineupOptimizer _optimizer;
 
-    public OptimizerController(LineupOptimizerService optimizer)
+    public OptimizerController(AdvancedLineupOptimizer optimizer)
     {
         _optimizer = optimizer;
     }
@@ -18,14 +18,7 @@ public class OptimizerController : ControllerBase
     [HttpPost("optimize")]
     public async Task<IActionResult> OptimizeLineup([FromBody] OptimizerRequest request)
     {
-        try
-        {
-            var result = await _optimizer.OptimizeLineupAsync(request);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { error = ex.Message });
-        }
+        var result = await _optimizer.OptimizeLineupAsync(request);
+        return Ok(result);
     }
 }

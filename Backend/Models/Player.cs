@@ -12,6 +12,9 @@ public class Player
     public int Stamina { get; set; }
     public int Experience { get; set; }
     public int Loyalty { get; set; }
+    // Bonus klubu macierzystego: gracz wychowany w klubie dostaje +1.5 poziomu
+    // do kazdej umiejetnosci (zamiast bonusu z lojalnosci).
+    public bool MotherClubBonus { get; set; }
     public int Leadership { get; set; }
     public string Specialty { get; set; } = string.Empty;
     public int InjuryLevel { get; set; }

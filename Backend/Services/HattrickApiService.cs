@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Xml.Linq;
 using HattrickAnalizer.Models;
-using HattrickAnalizer.Controllers;
 
 namespace HattrickAnalizer.Services;
 
@@ -16,6 +15,16 @@ public class NextOpponentInfo
     public bool IsHomeMatch { get; set; }
 }
 
+// Oceny przeciwnika z informacją o pochodzeniu: "lastMatch" (matchdetails ostatniego
+// rozegranego meczu), "default" (brak meczów), "mock" (tryb deweloperski).
+public class OpponentRatingsResult
+{
+    public TeamRatings Ratings { get; set; } = new();
+    public string Source { get; set; } = "default";
+    public long? SourceMatchId { get; set; }
+    public DateTime? SourceMatchDate { get; set; }
+}
+
 public class HattrickApiService
 {
     private readonly HttpClient _httpClient;
@@ -23,20 +32,57 @@ public class HattrickApiService
     private readonly OAuthService _oauthService;
     private readonly TokenStore _tokenStore;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ILogger<HattrickApiService> _logger;
     private readonly string _baseUrl;
+    private readonly bool _useMockData;
     private readonly Dictionary<int, TeamRatings> _mockRatingsCache = new();
 
-    public HattrickApiService(HttpClient httpClient, IConfiguration configuration, OAuthService oauthService, TokenStore tokenStore, IHttpContextAccessor httpContextAccessor)
+    public HattrickApiService(HttpClient httpClient, IConfiguration configuration, OAuthService oauthService, TokenStore tokenStore, IHttpContextAccessor httpContextAccessor, ILogger<HattrickApiService> logger)
     {
         _httpClient = httpClient;
         _configuration = configuration;
         _oauthService = oauthService;
         _tokenStore = tokenStore;
         _httpContextAccessor = httpContextAccessor;
+        _logger = logger;
         _baseUrl = _configuration["HattrickApi:BaseUrl"] ?? "https://chpp.hattrick.org/chppxml.ashx";
+        _useMockData = _configuration.GetValue<bool>("UseMockData");
     }
 
-    public async Task<Team> GetTeamDetailsAsync(int teamId, string? sessionId = null)
+    public bool MockMode => _useMockData;
+
+    // Zwraca tokeny zalogowanego użytkownika albo rzuca 401 — nigdy nie podmieniamy
+    // danych na mockowe po cichu. Mocki tylko jawnie przez UseMockData (dev).
+    private (string AccessToken, string AccessTokenSecret) RequireTokens()
+    {
+        var (accessToken, accessTokenSecret) = ResolveTokens();
+        if (accessToken == null || accessTokenSecret == null)
+        {
+            throw new UnauthorizedAccessException("Brak autoryzacji OAuth — zaloguj się do Hattricka.");
+        }
+        return (accessToken, accessTokenSecret);
+    }
+
+    private static XDocument ParseChppXml(string xml, string context)
+    {
+        try
+        {
+            var doc = XDocument.Parse(xml);
+            // CHPP zwraca błędy jako poprawny XML z węzłem <Error>.
+            var error = doc.Descendants("Error").FirstOrDefault();
+            if (error != null)
+            {
+                throw new ChppApiException($"CHPP zwróciło błąd ({context}): {error.Value}");
+            }
+            return doc;
+        }
+        catch (System.Xml.XmlException ex)
+        {
+            throw new ChppApiException($"Niepoprawny XML z CHPP ({context}): {ex.Message}", ex);
+        }
+    }
+
+    public async Task<Team> GetTeamDetailsAsync(int teamId)
     {
         var team = new Team
         {
@@ -44,48 +90,52 @@ public class HattrickApiService
             TeamName = $"Team {teamId}"
         };
 
-        var (accessToken, accessTokenSecret) = ResolveTokens(sessionId);
-        if (accessToken != null && accessTokenSecret != null)
+        if (_useMockData)
         {
-            try
-            {
-                var queryParams = new Dictionary<string, string>
-                {
-                    { "file", "teamdetails" },
-                    { "teamId", teamId.ToString() },
-                    { "version", "3.6" }
-                };
-                var xml = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
-                var doc = XDocument.Parse(xml);
-                var teamElement = doc.Descendants("Team").FirstOrDefault(t => int.Parse(t.Element("TeamID")?.Value ?? "0") == teamId)
-                                  ?? doc.Descendants("Team").FirstOrDefault();
-                if (teamElement != null)
-                {
-                    team.TeamName = teamElement.Element("TeamName")?.Value ?? team.TeamName;
-                }
-            }
-            catch
-            {
-            }
+            team.Players = GenerateMockPlayers();
+            return team;
         }
 
-        team.Players = await GetTeamPlayersAsync(teamId, sessionId);
+        var (accessToken, accessTokenSecret) = RequireTokens();
+        try
+        {
+            var queryParams = new Dictionary<string, string>
+            {
+                { "file", "teamdetails" },
+                { "teamId", teamId.ToString() },
+                { "version", "3.6" }
+            };
+            var xml = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
+            var doc = ParseChppXml(xml, $"teamdetails teamId={teamId}");
+            var teamElement = doc.Descendants("Team").FirstOrDefault(t => int.Parse(t.Element("TeamID")?.Value ?? "0") == teamId)
+                              ?? doc.Descendants("Team").FirstOrDefault();
+            if (teamElement != null)
+            {
+                team.TeamName = teamElement.Element("TeamName")?.Value ?? team.TeamName;
+            }
+        }
+        catch (ChppApiException ex)
+        {
+            // Nazwa drużyny to dane niekrytyczne — gracze niżej i tak rzucą przy twardym błędzie.
+            _logger.LogWarning(ex, "Nie udało się pobrać teamdetails dla {TeamId}", teamId);
+        }
+
+        team.Players = await GetTeamPlayersAsync(teamId);
         return team;
     }
 
-    public async Task<List<Player>> GetTeamPlayersAsync(int teamId, string? sessionId = null)
+    public async Task<List<Player>> GetTeamPlayersAsync(int teamId)
     {
-        Debug.WriteLine($"[GetTeamPlayersAsync] Called for team {teamId}");
-        
-        var (accessToken, accessTokenSecret) = ResolveTokens(sessionId);
-        if (accessToken == null || accessTokenSecret == null)
+        if (_useMockData)
         {
-            Debug.WriteLine($"No OAuth tokens available - returning mock players");
             return GenerateMockPlayers();
         }
 
+        var (accessToken, accessTokenSecret) = RequireTokens();
+
         // Pobierz graczy z API players (daje imiona, umiejętności, formę itd.)
         var playersFromApi = new Dictionary<int, Player>();
+        Exception? playersApiError = null;
         try
         {
             var queryParams = new Dictionary<string, string>
@@ -95,24 +145,23 @@ public class HattrickApiService
                 { "version", "2.8" }
             };
             var response = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
-            var doc = XDocument.Parse(response);
+            var doc = ParseChppXml(response, $"players teamId={teamId}");
             foreach (var playerElement in doc.Descendants("Player"))
             {
                 var p = ParsePlayer(playerElement);
                 playersFromApi[p.PlayerId] = p;
             }
-            Debug.WriteLine($"[GetTeamPlayersAsync] Got {playersFromApi.Count} players from API for team {teamId}");
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[GetTeamPlayersAsync] Players API failed for team {teamId}: {ex.Message}");
+            playersApiError = ex;
+            _logger.LogWarning(ex, "Players API nie powiodło się dla drużyny {TeamId}", teamId);
         }
 
         // Pobierz graczy z matchlineup XML (daje prawdziwe PlayerID z meczów + oceny)
         try
         {
-            var matchPlayers = await GetTeamPlayersFromMatchesAsync(teamId, accessToken!, accessTokenSecret!);
-            Debug.WriteLine($"[GetTeamPlayersAsync] Got {matchPlayers.Count} players from matches for team {teamId}");
+            var matchPlayers = await GetTeamPlayersFromMatchesAsync(teamId, accessToken, accessTokenSecret);
             
             if (matchPlayers.Count > 0)
             {
@@ -120,7 +169,6 @@ public class HattrickApiService
                 if (playersFromApi.Count > 0)
                 {
                     matchPlayers = matchPlayers.Where(mp => playersFromApi.ContainsKey(mp.PlayerId)).ToList();
-                    Debug.WriteLine($"[GetTeamPlayersAsync] After filtering sold players: {matchPlayers.Count} players");
                 }
 
                 // Uzupełnij dane z API players (imiona, skille, forma) jeśli dostępne
@@ -161,7 +209,6 @@ public class HattrickApiService
                             matchPlayers.Add(apiPlayer);
                         }
                     }
-                    Debug.WriteLine($"[GetTeamPlayersAsync] After adding non-played current players: {matchPlayers.Count} players");
                 }
 
                 return matchPlayers;
@@ -169,7 +216,7 @@ public class HattrickApiService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[GetTeamPlayersAsync] Match lineup extraction failed for team {teamId}: {ex.Message}");
+            _logger.LogWarning(ex, "Pobieranie składów z meczów nie powiodło się dla drużyny {TeamId}", teamId);
         }
 
         // Fallback: zwróć graczy z API bez statystyk meczowych
@@ -178,7 +225,9 @@ public class HattrickApiService
             return playersFromApi.Values.ToList();
         }
 
-        return GenerateMockPlayers();
+        throw new ChppApiException(
+            $"Nie udało się pobrać zawodników drużyny {teamId} z CHPP.",
+            playersApiError);
     }
 
     private async Task<List<Player>> GetTeamPlayersFromMatchesAsync(int teamId, string accessToken, string accessTokenSecret)
@@ -193,10 +242,10 @@ public class HattrickApiService
             { "version", "2.8" }
         };
         var matchesXml = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, matchQuery);
-        var matchesDoc = XDocument.Parse(matchesXml);
+        var matchesDoc = ParseChppXml(matchesXml, $"matches teamId={teamId}");
 
         var finishedMatchIds = matchesDoc.Descendants("Match")
-            .Where(m => 
+            .Where(m =>
             {
                 var status = m.Element("Status")?.Value ?? "";
                 var matchType = int.Parse(m.Element("MatchType")?.Value ?? "0");
@@ -275,7 +324,7 @@ public class HattrickApiService
 
     private void ExtractPlayersFromLineup(string lineupXml, int teamId, Dictionary<int, Player> playerDict, Dictionary<int, PlayerAppearanceAggregate> appearances)
     {
-        var doc = XDocument.Parse(lineupXml);
+        var doc = ParseChppXml(lineupXml, $"matchlineup teamId={teamId}");
         
         // matchlineup XML structure:
         //   <HattrickData>
@@ -382,7 +431,7 @@ public class HattrickApiService
             { "version", "2.8" }
         };
         var matchesXml = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, matchQuery);
-        var matchesDoc = XDocument.Parse(matchesXml);
+        var matchesDoc = ParseChppXml(matchesXml, $"matches teamId={teamId}");
 
         // Pobierz tylko mecze seniorskie (MatchType 1-3: League, Qualification, Cup)
         // Wyklucz mecze młodzieżówki (MatchType 50+)
@@ -481,7 +530,7 @@ public class HattrickApiService
 
     private void AggregateLineup(string lineupXml, int teamId, Dictionary<int, Player> playerIndex, Dictionary<int, PlayerAppearanceAggregate> appearances)
     {
-        var doc = XDocument.Parse(lineupXml);
+        var doc = ParseChppXml(lineupXml, $"matchlineup teamId={teamId}");
         
         // Find <Team> element with matching TeamID (contains <Lineup> with ratings)
         var teamElement = doc.Descendants("Team")
@@ -545,13 +594,9 @@ public class HattrickApiService
         public Dictionary<string, List<double>> PositionRatings { get; set; } = new();
     }
 
-    public async Task<NextOpponentInfo?> GetNextOpponentAsync(int teamId, string? sessionId = null)
+    public async Task<NextOpponentInfo?> GetNextOpponentAsync(int teamId)
     {
-        var (accessToken, accessTokenSecret) = ResolveTokens(sessionId);
-        if (accessToken == null || accessTokenSecret == null)
-        {
-            throw new InvalidOperationException("Brak autoryzacji OAuth — autoryzuj aplikację najpierw.");
-        }
+        var (accessToken, accessTokenSecret) = RequireTokens();
 
         var queryParams = new Dictionary<string, string>
         {
@@ -560,7 +605,7 @@ public class HattrickApiService
             { "version", "2.8" }
         };
         var xml = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
-        var doc = XDocument.Parse(xml);
+        var doc = ParseChppXml(xml, $"matches teamId={teamId}");
 
         var upcoming = doc.Descendants("Match")
             .Select(m => new
@@ -597,77 +642,103 @@ public class HattrickApiService
         };
     }
 
-    public async Task<TeamMatchStats> GetTeamMatchStatsAsync(int teamId, string? sessionId = null)
+    public async Task<TeamMatchStats> GetTeamMatchStatsAsync(int teamId)
     {
-        var (accessToken, accessTokenSecret) = ResolveTokens(sessionId);
-        if (accessToken == null || accessTokenSecret == null)
+        if (_useMockData)
         {
             return GenerateMockTeamMatchStats(teamId);
         }
 
-        try
-        {
-            // Pobierz mecze druyny
-            var matches = await GetTeamMatchesAsync(teamId, accessToken, accessTokenSecret);
-            var teamStats = new TeamMatchStats
-            {
-                TeamId = teamId,
-                TeamName = $"Team {teamId}",
-                MatchHistory = matches,
-                Statistics = new TeamStatisticsSummary()
-            };
+        var (accessToken, accessTokenSecret) = RequireTokens();
 
-            // Oblicz statystyki
-            teamStats.CalculateStatistics();
-            return teamStats;
-        }
-        catch
+        var matches = await GetTeamMatchesAsync(teamId, accessToken, accessTokenSecret);
+        var teamStats = new TeamMatchStats
         {
-            return GenerateMockTeamMatchStats(teamId);
-        }
+            TeamId = teamId,
+            TeamName = $"Team {teamId}",
+            MatchHistory = matches,
+            Statistics = new TeamStatisticsSummary()
+        };
+
+        teamStats.CalculateStatistics();
+        return teamStats;
     }
 
-    public async Task<TeamRatings> GetOpponentRatingsAsync(int teamId, int matchId, string? sessionId = null)
+    // Oceny sektorowe przeciwnika z jego ostatniego ROZEGRANEGO meczu ligowego.
+    // Przyszły mecz nie ma jeszcze ocen, więc matchId nadchodzącego spotkania jest bezużyteczny.
+    public async Task<OpponentRatingsResult> GetOpponentRatingsAsync(int teamId)
     {
-        var (accessToken, accessTokenSecret) = ResolveTokens(sessionId);
-        if (accessToken == null || accessTokenSecret == null)
+        if (_useMockData)
         {
-            return GenerateMockRatings(teamId);
+            return new OpponentRatingsResult { Ratings = GenerateMockRatings(teamId), Source = "mock" };
         }
 
-        try
+        var (accessToken, accessTokenSecret) = RequireTokens();
+
+        var matchQuery = new Dictionary<string, string>
         {
-            var queryParams = new Dictionary<string, string>
+            { "file", "matches" },
+            { "teamId", teamId.ToString() },
+            { "version", "2.8" }
+        };
+        var matchesXml = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, matchQuery);
+        var matchesDoc = ParseChppXml(matchesXml, $"matches teamId={teamId}");
+
+        var lastPlayed = matchesDoc.Descendants("Match")
+            .Where(m =>
             {
-                { "file", "matchdetails" },
-                { "matchId", matchId.ToString() },
-                { "version", "3.1" }
-            };
-            var response = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
-            var doc = XDocument.Parse(response);
-            return ParseTeamRatings(doc, teamId);
-        }
-        catch
+                var status = m.Element("Status")?.Value ?? "";
+                var matchType = int.Parse(m.Element("MatchType")?.Value ?? "0");
+                return status.Equals("FINISHED", StringComparison.OrdinalIgnoreCase)
+                    && matchType >= 1 && matchType <= 12;
+            })
+            .OrderByDescending(m => ParseDate(m.Element("MatchDate")?.Value) ?? DateTime.MinValue)
+            .FirstOrDefault();
+
+        if (lastPlayed == null)
         {
-            return GenerateMockRatings(teamId);
+            // Świeża drużyna bez rozegranych meczów — neutralne wartości, jawnie oznaczone.
+            _logger.LogWarning("Brak rozegranych meczów przeciwnika {TeamId} — używam wartości domyślnych.", teamId);
+            return new OpponentRatingsResult { Ratings = GetDefaultOpponentRatings(), Source = "default" };
         }
+
+        var matchId = lastPlayed.Element("MatchID")?.Value ?? "0";
+        var queryParams = new Dictionary<string, string>
+        {
+            { "file", "matchdetails" },
+            { "matchId", matchId },
+            { "version", "3.0" }
+        };
+        var response = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
+        var doc = ParseChppXml(response, $"matchdetails matchId={matchId}");
+        return new OpponentRatingsResult
+        {
+            Ratings = ParseTeamRatings(doc, teamId),
+            Source = "lastMatch",
+            SourceMatchId = long.Parse(matchId),
+            SourceMatchDate = ParseDate(lastPlayed.Element("MatchDate")?.Value)
+        };
     }
 
-    private (string? AccessToken, string? AccessTokenSecret) ResolveTokens(string? sessionId)
+    private static TeamRatings GetDefaultOpponentRatings()
     {
-        // Try explicit sessionId first (from OAuthController sessions)
-        if (!string.IsNullOrEmpty(sessionId))
+        // Środek skali ocen HT (~„słaby/zadowalający” poziom) — neutralny punkt odniesienia.
+        return new TeamRatings
         {
-            var session = OAuthController.GetSession(sessionId);
-            if (session?.AccessToken != null && session.AccessTokenSecret != null)
-            {
-                return (session.AccessToken, session.AccessTokenSecret);
-            }
-        }
+            MidfieldRating = 30,
+            RightDefenseRating = 30,
+            CentralDefenseRating = 30,
+            LeftDefenseRating = 30,
+            RightAttackRating = 30,
+            CentralAttackRating = 30,
+            LeftAttackRating = 30
+        };
+    }
 
-        // Try cookie-based sessionId from TokenStore
-        var cookieSessionId = _httpContextAccessor.HttpContext?.Request.Cookies["ht_session"] ?? sessionId ?? "";
-        var stored = _tokenStore.Get(cookieSessionId);
+    private (string? AccessToken, string? AccessTokenSecret) ResolveTokens()
+    {
+        var sessionId = _httpContextAccessor.HttpContext?.Request.Cookies["ht_session"] ?? "";
+        var stored = _tokenStore.Get(sessionId);
         if (stored != null && !string.IsNullOrEmpty(stored.AccessToken))
         {
             return (stored.AccessToken, stored.AccessTokenSecret);
@@ -683,7 +754,15 @@ public class HattrickApiService
         return null;
     }
 
-    private Player ParsePlayer(XElement element)
+    /// <summary>Surowe zapytanie CHPP z tokenami biezacej sesji — dla serwisow pomocniczych (kalibracja).</summary>
+    internal async Task<XDocument> FetchChppXmlAsync(Dictionary<string, string> queryParams, string context)
+    {
+        var (accessToken, accessTokenSecret) = RequireTokens();
+        var xml = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
+        return ParseChppXml(xml, context);
+    }
+
+    internal Player ParsePlayer(XElement element)
     {
         var playerId = int.Parse(element.Element("PlayerID")?.Value ?? "0");
         
@@ -702,6 +781,8 @@ public class HattrickApiService
             InjuryLevel = int.Parse(element.Element("InjuryLevel")?.Value ?? "0"),
             Specialty = element.Element("Specialty")?.Value ?? "",
             Loyalty = int.Parse(element.Element("Loyalty")?.Value ?? "0"),
+            MotherClubBonus = string.Equals(element.Element("MotherClubBonus")?.Value, "True", StringComparison.OrdinalIgnoreCase)
+                              || element.Element("MotherClubBonus")?.Value == "1",
             Leadership = int.Parse(element.Element("Leadership")?.Value ?? "0"),
             Skills = new PlayerSkills
             {
@@ -746,23 +827,34 @@ public class HattrickApiService
         return player;
     }
 
-    private TeamRatings ParseTeamRatings(XDocument doc, int teamId)
+    private static TeamRatings ParseTeamRatings(XDocument doc, int teamId)
     {
-        var teamElement = doc.Descendants("Team")
-            .FirstOrDefault(t => int.Parse(t.Element("TeamID")?.Value ?? "0") == teamId);
+        // matchdetails: oceny sektorowe są w <HomeTeam>/<AwayTeam> jako Rating* —
+        // nie ma elementu <Team> ani pól w stylu "MidfieldRating".
+        var homeTeam = doc.Descendants("HomeTeam").FirstOrDefault();
+        var awayTeam = doc.Descendants("AwayTeam").FirstOrDefault();
+        var homeTeamId = int.Parse(homeTeam?.Element("HomeTeamID")?.Value ?? "0");
+        var awayTeamId = int.Parse(awayTeam?.Element("AwayTeamID")?.Value ?? "0");
 
+        var teamElement = homeTeamId == teamId ? homeTeam
+                        : awayTeamId == teamId ? awayTeam
+                        : null;
         if (teamElement == null)
-            return GenerateMockRatings(teamId);
+        {
+            throw new ChppApiException($"Drużyna {teamId} nie występuje w matchdetails (home={homeTeamId}, away={awayTeamId}).");
+        }
 
         return new TeamRatings
         {
-            MidfieldRating = int.Parse(teamElement.Element("MidfieldRating")?.Value ?? "0"),
-            RightDefenseRating = int.Parse(teamElement.Element("RightDefense")?.Value ?? "0"),
-            CentralDefenseRating = int.Parse(teamElement.Element("CentralDefense")?.Value ?? "0"),
-            LeftDefenseRating = int.Parse(teamElement.Element("LeftDefense")?.Value ?? "0"),
-            RightAttackRating = int.Parse(teamElement.Element("RightAttack")?.Value ?? "0"),
-            CentralAttackRating = int.Parse(teamElement.Element("CentralAttack")?.Value ?? "0"),
-            LeftAttackRating = int.Parse(teamElement.Element("LeftAttack")?.Value ?? "0")
+            MidfieldRating = int.Parse(teamElement.Element("RatingMidfield")?.Value ?? "0"),
+            RightDefenseRating = int.Parse(teamElement.Element("RatingRightDef")?.Value ?? "0"),
+            CentralDefenseRating = int.Parse(teamElement.Element("RatingMidDef")?.Value ?? "0"),
+            LeftDefenseRating = int.Parse(teamElement.Element("RatingLeftDef")?.Value ?? "0"),
+            RightAttackRating = int.Parse(teamElement.Element("RatingRightAtt")?.Value ?? "0"),
+            CentralAttackRating = int.Parse(teamElement.Element("RatingMidAtt")?.Value ?? "0"),
+            LeftAttackRating = int.Parse(teamElement.Element("RatingLeftAtt")?.Value ?? "0"),
+            IndirectSetPiecesAttRating = int.Parse(teamElement.Element("RatingIndirectSetPiecesAtt")?.Value ?? "0"),
+            IndirectSetPiecesDefRating = int.Parse(teamElement.Element("RatingIndirectSetPiecesDef")?.Value ?? "0")
         };
     }
 
@@ -828,7 +920,7 @@ public class HattrickApiService
         };
         
         var response = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
-        var doc = XDocument.Parse(response);
+        var doc = ParseChppXml(response, $"matches teamId={teamId}");
         var matches = new List<MatchRecord>();
 
         foreach (var matchElement in doc.Descendants("Match"))
@@ -906,7 +998,7 @@ public class HattrickApiService
             };
 
             var response = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
-            var doc = XDocument.Parse(response);
+            var doc = ParseChppXml(response, $"matchdetails matchId={matchId}");
 
             // matchdetails zwraca <Match><HomeTeam> i <AwayTeam>
             var homeTeam = doc.Descendants("HomeTeam").FirstOrDefault();
@@ -1106,13 +1198,14 @@ public class HattrickApiService
         };
     }
 
-    public async Task<Dictionary<string, int>> GetFormationExperienceAsync(int teamId, string? sessionId = null)
+    public async Task<Dictionary<string, int>> GetFormationExperienceAsync(int teamId)
     {
-        var (accessToken, accessTokenSecret) = ResolveTokens(sessionId);
-        if (accessToken == null || accessTokenSecret == null)
+        if (_useMockData)
         {
             return GetDefaultFormationExperience();
         }
+
+        var (accessToken, accessTokenSecret) = RequireTokens();
 
         try
         {
@@ -1123,7 +1216,7 @@ public class HattrickApiService
                 { "version", "2.2" }
             };
             var response = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
-            var doc = XDocument.Parse(response);
+            var doc = ParseChppXml(response, $"training teamId={teamId}");
 
             var teamElement = doc.Descendants("Team").FirstOrDefault();
             if (teamElement == null)
@@ -1163,8 +1256,10 @@ public class HattrickApiService
 
             return formationExperience;
         }
-        catch
+        catch (Exception ex)
         {
+            // Dane niekrytyczne — optymalizator działa z wartościami domyślnymi.
+            _logger.LogWarning(ex, "Nie udało się pobrać doświadczenia formacji dla {TeamId} — używam domyślnych.", teamId);
             return GetDefaultFormationExperience();
         }
     }

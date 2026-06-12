@@ -12,7 +12,8 @@ public class PlayerHistoryService
     public PlayerHistoryService(IConfiguration configuration)
     {
         _connectionString = configuration.GetConnectionString("HattrickDb")
-            ?? "Server=DESKTOP-UMO1TMH\\SQLEXPRESS;Database=HattrickAnalizer;Trusted_Connection=True;TrustServerCertificate=True;";
+            ?? throw new InvalidOperationException(
+                "Brak connection stringa 'HattrickDb' w konfiguracji (ConnectionStrings:HattrickDb) — historia zawodników wymaga bazy SQL.");
     }
 
     private async Task<PlayerSkillHistory?> GetLastSnapshotAsync(SqlConnection conn, int playerId)

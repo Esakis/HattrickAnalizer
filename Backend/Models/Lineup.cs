@@ -15,6 +15,8 @@ public class LineupPosition
     public Player? Player { get; set; }
     public string Behavior { get; set; } = "Normal";
     public double Rating { get; set; }
+    // InjuryLevel == 0 (siniak): gracz moze grac, ale z ryzykiem pogorszenia kontuzji.
+    public bool IsBruised { get; set; }
 }
 
 public class LineupRatings

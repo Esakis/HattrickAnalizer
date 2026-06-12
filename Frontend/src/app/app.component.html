@@ -17,6 +17,9 @@
   </header>
   <div class="app-body">
     <main class="app-content">
+      <div *ngIf="showMockBanner" class="auth-banner mock-banner">
+        <span>{{ 'loadStatus.mockMode' | translate }}</span>
+      </div>
       <div *ngIf="showAuthBanner" class="auth-banner">
         <span>{{ 'loadStatus.notAuthorized' | translate }}</span>
         <button class="auth-banner__btn" (click)="goToOAuth()">

@@ -1,16 +1,19 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { HattrickApiService } from '../../services/hattrick-api.service';
 import { OptimizerRequest, OptimizerResponse, LineupPosition, Lineup } from '../../models/lineup.model';
 import { TranslateService } from '@ngx-translate/core';
 import { DataCacheService } from '../../services/data-cache.service';
-import { Player, PlayerMatchStats } from '../../models/player.model';
+import { Player } from '../../models/player.model';
 
 @Component({
   selector: 'app-lineup-optimizer',
   templateUrl: './lineup-optimizer.component.html',
   styleUrls: ['./lineup-optimizer.component.scss']
 })
-export class LineupOptimizerComponent implements OnInit {
+export class LineupOptimizerComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   myTeamId: number = 0;
   opponentTeamId: number = 0;
   preferredTactic: string = 'Auto';
@@ -94,25 +97,30 @@ export class LineupOptimizerComponent implements OnInit {
 
   ngOnInit(): void {
     this.initializeTranslations();
-    this.translate.onLangChange.subscribe(() => this.initializeTranslations());
-    this.translate.onTranslationChange.subscribe(() => this.initializeTranslations());
+    this.translate.onLangChange.pipe(takeUntil(this.destroy$)).subscribe(() => this.initializeTranslations());
+    this.translate.onTranslationChange.pipe(takeUntil(this.destroy$)).subscribe(() => this.initializeTranslations());
 
     this.restoreFromCache();
 
-    this.cache.auth$.subscribe(auth => {
+    this.cache.auth$.pipe(takeUntil(this.destroy$)).subscribe(auth => {
       if (auth.authorized && auth.ownTeamId) {
         if (!this.myTeamId) this.myTeamId = auth.ownTeamId;
         this.loadMyTeam();
         this.loadMyTeamStats();
       }
     });
-    this.cache.nextOpponent$.subscribe(opp => {
+    this.cache.nextOpponent$.pipe(takeUntil(this.destroy$)).subscribe(opp => {
       if (opp?.opponentTeamId) {
         if (!this.opponentTeamId) this.opponentTeamId = opp.opponentTeamId;
         this.loadOpponentTeam();
         this.loadOpponentTeamStats();
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   private restoreFromCache(): void {
@@ -236,6 +244,9 @@ export class LineupOptimizerComponent implements OnInit {
     this.loading = true;
     this.error = null;
 
+    const nextOpp = this.cache.nextOpponent$.value;
+    const isNextOpponent = nextOpp?.opponentTeamId === this.opponentTeamId;
+
     const request: OptimizerRequest = {
       myTeamId: this.myTeamId,
       opponentTeamId: this.opponentTeamId,
@@ -246,7 +257,9 @@ export class LineupOptimizerComponent implements OnInit {
       assistantManagerLevel: this.assistantManagerLevel,
       formationExperience: this.formationExperience,
       preferredFormation: this.selectedMyFormation,
-      language: this.translate.currentLang || 'pl'
+      language: this.translate.currentLang || 'pl',
+      matchId: isNextOpponent ? nextOpp!.matchId : 0,
+      isHomeMatch: isNextOpponent ? !!nextOpp!.isHomeMatch : false
     };
 
     this.hattrickApi.optimizeLineup(request).subscribe({
@@ -533,11 +546,10 @@ export class LineupOptimizerComponent implements OnInit {
         this.cache.myTeamStats$.next(stats);
       },
       error: (err: any) => {
+        // Bez fallbacku do mocków — sekcja statystyk pozostaje pusta, błąd w konsoli.
         console.error('Error loading team stats:', err);
-        // Fallback do mockowych danych w razie bdu
-        this.myTeamStats = this.generateMockTeamStats(this.myTeamId);
+        this.myTeamStats = null;
         this.loadingMyTeamStats = false;
-        this.cache.myTeamStats$.next(this.myTeamStats);
       }
     });
   }
@@ -565,55 +577,15 @@ export class LineupOptimizerComponent implements OnInit {
         }
       },
       error: (err: any) => {
+        // Bez fallbacku do mocków — skład przeciwnika budujemy z dostępnych danych graczy.
         console.error('Error loading opponent stats:', err);
-        // Fallback do mockowych danych w razie bdu
-        this.opponentTeamStats = this.generateMockTeamStats(this.opponentTeamId);
+        this.opponentTeamStats = null;
         this.loadingOpponentTeamStats = false;
-        this.cache.opponentTeamStats$.next(this.opponentTeamStats);
-        // Przebuduj skład przeciwnika z poprawną formacją
         if (this.opponentTeamPlayers.length > 0) {
           this.buildOpponentOptimalLineup();
         }
       }
     });
-  }
-
-  generateMockTeamStats(teamId: number): any {
-    // Prosty seed dla random
-    let seed = teamId;
-    const random = () => {
-      seed = (seed * 9301 + 49297) % 233280;
-      return seed / 233280;
-    };
-    
-    const formations = ['4-4-2', '3-5-2', '4-3-3', '5-4-1'];
-    const mostUsed = formations[Math.floor(random() * formations.length)];
-    
-    const randomBetween = (min: number, max: number) => Math.floor(random() * (max - min + 1)) + min;
-    
-    return {
-      totalMatches: 20,
-      wins: randomBetween(5, 15),
-      draws: randomBetween(3, 8),
-      losses: randomBetween(2, 8),
-      goalsFor: randomBetween(15, 35),
-      goalsAgainst: randomBetween(10, 25),
-      mostCommonFormation: mostUsed,
-      formationFrequency: {
-        '4-4-2': randomBetween(3, 8),
-        '3-5-2': randomBetween(2, 6),
-        '4-3-3': randomBetween(2, 6),
-        '5-4-1': randomBetween(1, 4)
-      },
-      formationWinRate: {
-        '4-4-2': randomBetween(30, 70),
-        '3-5-2': randomBetween(25, 65),
-        '4-3-3': randomBetween(20, 60),
-        '5-4-1': randomBetween(15, 55)
-      },
-      currentForm: this.generateRandomForm(random),
-      recentResults: this.generateRandomResults(random)
-    };
   }
 
   get winRate(): string {
@@ -625,24 +597,6 @@ export class LineupOptimizerComponent implements OnInit {
   get goalDifference(): number {
     if (!this.myTeamStats?.statistics) return 0;
     return this.myTeamStats.statistics.goalDifference;
-  }
-
-  generateRandomForm(random: () => number): string {
-    const results = ['W', 'D', 'L'];
-    let form = '';
-    for (let i = 0; i < 5; i++) {
-      form += results[Math.floor(random() * results.length)];
-    }
-    return form;
-  }
-
-  generateRandomResults(random: () => number): string[] {
-    const results = ['W', 'D', 'L'];
-    const recentResults = [];
-    for (let i = 0; i < 5; i++) {
-      recentResults.push(results[Math.floor(random() * results.length)]);
-    }
-    return recentResults;
   }
 
   // ==================== SORTOWANIE GRACZY ====================
@@ -869,70 +823,6 @@ export class LineupOptimizerComponent implements OnInit {
       }
       return player;
     });
-  }
-
-  generateMockPlayerStats(player: Player): PlayerMatchStats {
-    // Generuj realistyczne statystyki na podstawie umiejętności gracza
-    let seed = player.playerId;
-    const random = () => {
-      seed = (seed * 9301 + 49297) % 233280;
-      return seed / 233280;
-    };
-
-    const isForward = player.skills.scoring > 10;
-    const isMidfielder = player.skills.playmaking > 10;
-    const isDefender = player.skills.defending > 10;
-    const isKeeper = player.skills.keeper > 10;
-
-    const totalMatches = Math.floor(random() * 20) + 10;
-    let goals = 0;
-    let assists = 0;
-
-    if (isForward) {
-      goals = Math.floor(random() * totalMatches * 0.6) + Math.floor(player.skills.scoring / 3);
-      assists = Math.floor(random() * totalMatches * 0.2);
-    } else if (isMidfielder) {
-      goals = Math.floor(random() * totalMatches * 0.2);
-      assists = Math.floor(random() * totalMatches * 0.4) + Math.floor(player.skills.passing / 4);
-    } else if (isDefender) {
-      goals = Math.floor(random() * 3);
-      assists = Math.floor(random() * 5);
-    } else if (isKeeper) {
-      goals = 0;
-      assists = 0;
-    }
-
-    const goalsPerMatch = totalMatches > 0 ? goals / totalMatches : 0;
-    const matchesPerGoal = goals > 0 ? totalMatches / goals : 0;
-
-    return {
-      totalMatches,
-      goals,
-      assists,
-      yellowCards: Math.floor(random() * 5),
-      redCards: Math.floor(random() * 2),
-      averageRating: 5 + random() * 4,
-      averageForm: player.form - 1 + random() * 2,
-      goalsPerMatch,
-      matchesPerGoal,
-      minutesPlayed: totalMatches * 90 - Math.floor(random() * totalMatches * 20),
-      positionRatings: this.generatePositionRatings(player, random)
-    };
-  }
-
-  generatePositionRatings(player: Player, random: () => number): { [position: string]: number } {
-    const ratings: { [position: string]: number } = {};
-    const positions = ['GK', 'RWB', 'LWB', 'RCD', 'LCD', 'CD', 'RW', 'LW', 'RIM', 'LIM', 'IM', 'RFW', 'LFW', 'FW'];
-    
-    for (const pos of positions) {
-      // Oblicz bazową ocenę na podstawie umiejętności gracza (skala Hattrick 0-20)
-      const skillScore = this.calculateSkillBasedRating(player, pos);
-      // Dodaj losową wariację ±1.5 żeby symulować różnice między meczami
-      const variation = (random() - 0.5) * 3;
-      ratings[pos] = Math.max(1, Math.min(20, skillScore + variation));
-    }
-    
-    return ratings;
   }
 
   calculateSkillBasedRating(player: Player, position: string): number {

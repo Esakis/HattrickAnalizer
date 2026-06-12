@@ -22,6 +22,11 @@ public class OptimizerRequest
 
     // Jezyk odpowiedzi: "pl" lub "en"
     public string Language { get; set; } = "pl";
+
+    // ID nadchodzacego meczu (z next-opponent) — do atutu wlasnego boiska i kontekstu.
+    public long MatchId { get; set; }
+    // Czy gramy u siebie (atut wlasnego boiska — srodek pola x1.19892).
+    public bool IsHomeMatch { get; set; }
 }
 
 public class OptimizerResponse
@@ -31,6 +36,10 @@ public class OptimizerResponse
     public TeamComparison Comparison { get; set; } = new();
     // Alternatywne formacje (top N) do podgladu przez uzytkownika
     public List<FormationAlternative> Alternatives { get; set; } = new();
+    // Pochodzenie ocen przeciwnika: "lastMatch" | "default" | "mock"
+    public string OpponentRatingsSource { get; set; } = "";
+    public long? OpponentRatingsMatchId { get; set; }
+    public DateTime? OpponentRatingsMatchDate { get; set; }
 }
 
 public class FormationAlternative

@@ -1,4 +1,6 @@
-import { Component, OnInit, isDevMode } from '@angular/core';
+import { Component, OnDestroy, OnInit, isDevMode } from '@angular/core';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { HattrickApiService } from '../../services/hattrick-api.service';
 import { Player } from '../../models/player.model';
 import { TranslateService } from '@ngx-translate/core';
@@ -26,12 +28,12 @@ import {
   templateUrl: './players.component.html',
   styleUrls: ['./players.component.scss']
 })
-export class PlayersComponent implements OnInit {
+export class PlayersComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
   teamId: number | null = null;
   players: Player[] = [];
   loading: boolean = false;
   error: string | null = null;
-  sessionId: string | null = null;
 
   sortBy: string = 'position';
   filterPosition: string = 'all';
@@ -60,7 +62,6 @@ export class PlayersComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.sessionId = localStorage.getItem('hattrick_session_id');
     this.initializeTranslations();
 
     const cachedTeam = this.cache.ownTeam$.value;
@@ -76,7 +77,7 @@ export class PlayersComponent implements OnInit {
       this.loading = true;
     }
 
-    this.cache.ownTeam$.subscribe(team => {
+    this.cache.ownTeam$.pipe(takeUntil(this.destroy$)).subscribe(team => {
       if (team?.players?.length) {
         this.teamId = team.teamId;
         this.players = team.players;
@@ -84,12 +85,17 @@ export class PlayersComponent implements OnInit {
       }
     });
 
-    this.cache.auth$.subscribe(a => {
+    this.cache.auth$.pipe(takeUntil(this.destroy$)).subscribe(a => {
       if (a.authorized && a.ownTeamId && !this.teamId) {
         this.teamId = a.ownTeamId;
         this.loadPlayers();
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   private initializeTranslations(): void {

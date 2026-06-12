@@ -15,6 +15,7 @@ export interface NextOpponent {
 
 export interface AuthInfo {
   authorized: boolean;
+  mockMode?: boolean;
   ownTeamId?: number;
   ownTeamName?: string;
   authorizedAt?: string;

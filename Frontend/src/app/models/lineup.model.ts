@@ -13,6 +13,8 @@ export interface LineupPosition {
   player: Player | null;
   behavior: string;
   rating?: number;
+  // Gracz z siniakiem (InjuryLevel == 0) — może grać, ale z ryzykiem.
+  isBruised?: boolean;
 }
 
 export interface LineupRatings {
@@ -37,6 +39,8 @@ export interface OptimizerRequest {
   formationExperience: { [formation: string]: number };
   preferredFormation?: string;
   language: string;
+  matchId?: number;
+  isHomeMatch?: boolean;
 }
 
 export interface FormationAlternative {
@@ -57,6 +61,10 @@ export interface OptimizerResponse {
   recommendations: string[];
   comparison: TeamComparison;
   alternatives: FormationAlternative[];
+  // Pochodzenie ocen przeciwnika: "lastMatch" | "default" | "mock"
+  opponentRatingsSource?: string;
+  opponentRatingsMatchId?: number;
+  opponentRatingsMatchDate?: string;
 }
 
 export interface TeamComparison {

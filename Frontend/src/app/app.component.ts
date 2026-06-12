@@ -15,6 +15,7 @@ import { TranslateService } from '@ngx-translate/core';
 export class AppComponent implements OnInit {
   title = 'Frontend';
   showAuthBanner = false;
+  showMockBanner = false;
 
   constructor(
     public translationService: TranslationService,
@@ -57,6 +58,7 @@ export class AppComponent implements OnInit {
     }
 
     this.cache.auth$.next(auth);
+    this.showMockBanner = !!auth.mockMode;
 
     if (!auth.authorized) {
       this.loadStatus.set('auth', 'error', this.translate.instant('loadStatus.notAuthorized'));

@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { HattrickApiService } from '../../services/hattrick-api.service';
 import { TranslateService } from '@ngx-translate/core';
 
@@ -23,7 +24,7 @@ export class OAuthSetupComponent {
     this.error = null;
 
     try {
-      const response = await this.hattrickApi.startOAuthFlow().toPromise();
+      const response = await firstValueFrom(this.hattrickApi.startOAuthFlow());
       this.sessionId = response.sessionId;
       this.authorizationUrl = response.authorizationUrl;
       this.step = 2;
@@ -48,11 +49,10 @@ export class OAuthSetupComponent {
     this.error = null;
 
     try {
-      const response = await this.hattrickApi.completeOAuthFlow(this.sessionId, this.verifier).toPromise();
+      await firstValueFrom(this.hattrickApi.completeOAuthFlow(this.sessionId, this.verifier));
       this.success = true;
       this.step = 3;
-      
-      localStorage.setItem('hattrick_session_id', this.sessionId);
+      // Sesję trzyma cookie ht_session — nie duplikujemy jej w localStorage.
     } catch (err: any) {
       this.error = this.translate.instant('oauth.errorFinalize') + err.message;
     } finally {

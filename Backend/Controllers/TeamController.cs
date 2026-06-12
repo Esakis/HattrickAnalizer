@@ -1,7 +1,5 @@
-using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using HattrickAnalizer.Services;
-using HattrickAnalizer.Models;
 
 namespace HattrickAnalizer.Controllers;
 
@@ -21,87 +19,45 @@ public class TeamController : ControllerBase
     [HttpGet("{teamId}")]
     public async Task<IActionResult> GetTeam(int teamId)
     {
-        Debug.WriteLine($"[TeamController] GetTeam called for teamId: {teamId}");
-        try
-        {
-            var team = await _hattrickApi.GetTeamDetailsAsync(teamId);
-            Debug.WriteLine($"[TeamController] GetTeam returned team: {team.TeamName}");
-            return Ok(team);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[TeamController] GetTeam error: {ex.Message}");
-            return StatusCode(500, new { error = ex.Message });
-        }
+        var team = await _hattrickApi.GetTeamDetailsAsync(teamId);
+        return Ok(team);
     }
 
     [HttpGet("{teamId}/players")]
     public async Task<IActionResult> GetPlayers(int teamId)
     {
-        Debug.WriteLine($"[TeamController] GetPlayers called for teamId: {teamId}");
-        try
-        {
-            var players = await _hattrickApi.GetTeamPlayersAsync(teamId);
-            var playersWithRatings = players.Count(p => p.MatchStats?.PositionRatings?.Count > 0);
-            Debug.WriteLine($"[TeamController] GetPlayers returned {players.Count} players, {playersWithRatings} have position ratings");
-            return Ok(players);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[TeamController] GetPlayers error: {ex.Message}");
-            return StatusCode(500, new { error = ex.Message });
-        }
+        var players = await _hattrickApi.GetTeamPlayersAsync(teamId);
+        return Ok(players);
     }
 
     [HttpGet("{teamId}/match-stats")]
     public async Task<IActionResult> GetTeamMatchStats(int teamId)
     {
-        try
-        {
-            var teamStats = await _hattrickApi.GetTeamMatchStatsAsync(teamId);
-            return Ok(teamStats);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { error = ex.Message });
-        }
+        var teamStats = await _hattrickApi.GetTeamMatchStatsAsync(teamId);
+        return Ok(teamStats);
     }
 
     [HttpGet("next-opponent")]
     public async Task<IActionResult> GetNextOpponent()
     {
-        try
+        var sessionId = Request.Cookies["ht_session"] ?? "";
+        var stored = _tokenStore.Get(sessionId);
+        if (stored == null || stored.OwnTeamId == 0)
         {
-            var sessionId = Request.Cookies["ht_session"] ?? "";
-            var stored = _tokenStore.Get(sessionId);
-            if (stored == null || stored.OwnTeamId == 0)
-            {
-                return BadRequest(new { error = "Brak zapisanego teamId — dokończ autoryzację OAuth." });
-            }
-            var info = await _hattrickApi.GetNextOpponentAsync(stored.OwnTeamId);
-            if (info == null)
-            {
-                return NotFound(new { error = "Brak nadchodzących meczów." });
-            }
-            return Ok(info);
+            return Unauthorized(new { error = "Brak zapisanego teamId — dokończ autoryzację OAuth." });
         }
-        catch (Exception ex)
+        var info = await _hattrickApi.GetNextOpponentAsync(stored.OwnTeamId);
+        if (info == null)
         {
-            return StatusCode(500, new { error = ex.Message });
+            return NotFound(new { error = "Brak nadchodzących meczów." });
         }
+        return Ok(info);
     }
 
     [HttpGet("{teamId}/formation-experience")]
     public async Task<IActionResult> GetFormationExperience(int teamId)
     {
-        try
-        {
-            var formationExperience = await _hattrickApi.GetFormationExperienceAsync(teamId);
-            return Ok(formationExperience);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { error = ex.Message });
-        }
+        var formationExperience = await _hattrickApi.GetFormationExperienceAsync(teamId);
+        return Ok(formationExperience);
     }
 }

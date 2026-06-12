@@ -20,6 +20,8 @@ public class AdvancedLineupOptimizer
         "Pressing", "PlayCreatively", "LongShots"
     };
 
+    private readonly RatingEngine _engine = new();
+
     public AdvancedLineupOptimizer(HattrickApiService hattrickApi)
     {
         _hattrickApi = hattrickApi;
@@ -28,7 +30,14 @@ public class AdvancedLineupOptimizer
     public async Task<OptimizerResponse> OptimizeLineupAsync(OptimizerRequest request)
     {
         var myTeam = await _hattrickApi.GetTeamDetailsAsync(request.MyTeamId);
-        var opponentRatings = await _hattrickApi.GetOpponentRatingsAsync(request.OpponentTeamId, 0);
+        var opponentResult = await _hattrickApi.GetOpponentRatingsAsync(request.OpponentTeamId);
+        var opponentRatings = opponentResult.Ratings;
+        var context = new MatchContext
+        {
+            IsHomeMatch = request.IsHomeMatch,
+            OpponentIspAtt = opponentRatings.IndirectSetPiecesAttRating,
+            OpponentIspDef = opponentRatings.IndirectSetPiecesDefRating
+        };
 
         // InjuryLevel: -1 = zdrowy, 0 = siniak (moze grac), >=1 = tygodnie kontuzji (nie moze grac)
         var available = myTeam.Players.Where(p => p.InjuryLevel <= 0).ToList();
@@ -59,8 +68,8 @@ public class AdvancedLineupOptimizer
             OptimizationCandidate? bestForFormation = null;
             foreach (var tactic in tactics)
             {
-                var candidate = EvaluateCandidate(formation, tactic, attitude, coach, baseLineup, opponentRatings, disorderRisk);
-                candidate = OptimiseBehaviours(candidate, attitude, coach, opponentRatings, disorderRisk);
+                var candidate = EvaluateCandidate(formation, tactic, attitude, coach, baseLineup, opponentRatings, context, disorderRisk);
+                candidate = OptimiseBehaviours(candidate, attitude, coach, opponentRatings, context, disorderRisk);
 
                 if (bestForFormation == null || candidate.Score > bestForFormation.Score)
                 {
@@ -121,7 +130,10 @@ public class AdvancedLineupOptimizer
             OptimalLineup = lineup,
             Recommendations = recommendations,
             Comparison = comparison,
-            Alternatives = alternatives
+            Alternatives = alternatives,
+            OpponentRatingsSource = opponentResult.Source,
+            OpponentRatingsMatchId = opponentResult.SourceMatchId,
+            OpponentRatingsMatchDate = opponentResult.SourceMatchDate
         };
     }
 
@@ -355,78 +367,34 @@ public class AdvancedLineupOptimizer
     private double PlayerContributionScore(Player p, string slot, PositionContribution c, RatingWeights? w)
     {
         w ??= RatingWeights.Uniform;
-        double eff = EffectiveMultiplier(p);
-
-        double mid = c.MidfieldPM * p.Skills.Playmaking;
-        double cd = c.CentralDefenseDef * p.Skills.Defending + c.CentralDefenseGK * p.Skills.Keeper;
-        double sd = c.SideDefenseDef * p.Skills.Defending + c.SideDefenseGK * p.Skills.Keeper;
-        double ca = c.CentralAttackSc * p.Skills.Scoring + c.CentralAttackPs * p.Skills.Passing;
-        double sa = c.SideAttackSc * p.Skills.Scoring + c.SideAttackPs * p.Skills.Passing + c.SideAttackWg * p.Skills.Winger;
-
-        // Rozrzuc sd/sa na odpowiednia strone wg slotu
-        double rd = 0, ld = 0, ra = 0, la = 0;
-        var side = FormationData.SlotSide.GetValueOrDefault(slot, "C");
-        if (side == "R") { rd = sd; ra = sa; }
-        else if (side == "L") { ld = sd; la = sa; }
-        else
-        {
-            // Centralnie — rozlaczamy po rowno na obie flanki
-            rd = sd * 0.5; ld = sd * 0.5;
-            ra = sa * 0.5; la = sa * 0.5;
-        }
-
-        double score = eff * (
-            w.Midfield * mid +
-            w.CentralDefense * cd +
-            w.RightDefense * rd + w.LeftDefense * ld +
-            w.CentralAttack * ca +
-            w.RightAttack * ra + w.LeftAttack * la);
-
-        return score;
+        var contrib = RatingEngine.ContributionFor(p, slot, c);
+        return w.Midfield * contrib.Mid +
+               w.CentralDefense * contrib.Cd +
+               w.RightDefense * contrib.Rd + w.LeftDefense * contrib.Ld +
+               w.CentralAttack * contrib.Ca +
+               w.RightAttack * contrib.Ra + w.LeftAttack * contrib.La;
     }
 
-    /// <summary>Mnoznik efektywnych umiejetnosci: forma, doswiadczenie, lojalnosc, stamina.</summary>
-    private double EffectiveMultiplier(Player p)
-    {
-        double form = FormationData.FormPerformance.GetValueOrDefault(p.Form, 0.9);
-        // XP wg poradnika: 1 + 0.0716 * sqrt(xp-1)
-        double xp = 1.0 + 0.0716 * Math.Sqrt(Math.Max(0, p.Experience - 1));
-        // Lojalnosc: max +1 do skilla gdy Motherclub, upraszczamy: 1 + loyalty*0.01 (0-9)
-        double loy = 1.0 + Math.Min(0.1, Math.Max(0, p.Loyalty) * 0.01);
-        // Kondycja: ((stamina+6.5)/14)^0.6 — dla sredniej staminy ~8 daje ~0.98
-        double stamina = p.Stamina > 0 ? Math.Pow((p.Stamina + 6.5) / 14.0, 0.6) : 1.0;
-        // XP ma sens tylko czesciowo — cap tak by nie rosl nadmiernie
-        return form * Math.Min(1.35, xp) * loy * Math.Min(1.05, stamina);
-    }
-
-    private double EffectiveSkill(Player p, int rawSkill) => rawSkill * EffectiveMultiplier(p);
+    private static double EffectiveSkill(Player p, int rawSkill) =>
+        RatingEngine.EffSkill(p, rawSkill) * RatingEngine.EffectiveMultiplier(p);
 
     // ======================= Ratings & Evaluation =======================
 
-    private OptimizationCandidate EvaluateCandidate(FormationDefinition formation, string tactic, string attitude, string coach, AssignedLineup lineup, TeamRatings opponent, double disorderRisk = 0.0)
+    private OptimizationCandidate EvaluateCandidate(FormationDefinition formation, string tactic, string attitude, string coach, AssignedLineup lineup, TeamRatings opponent, MatchContext context, double disorderRisk = 0.0)
     {
-        var ratings = ComputeRatings(lineup);
-        ApplyTacticAndContext(ref ratings, tactic, lineup);
-        ApplyAttitude(ref ratings, attitude);
-        ApplyCoach(ref ratings, coach);
-
-        // Nielad formacji obniza ratingi proporcjonalnie do ryzyka
-        if (disorderRisk > 0)
-        {
-            double penalty = 1.0 - 0.5 * disorderRisk;
-            ratings.Midfield *= penalty;
-            ratings.CentralDefense *= penalty;
-            ratings.RightDefense *= penalty;
-            ratings.LeftDefense *= penalty;
-            ratings.CentralAttack *= penalty;
-            ratings.RightAttack *= penalty;
-            ratings.LeftAttack *= penalty;
-            ratings.Overall *= penalty;
-        }
+        var ratings = _engine.ComputeRatings(lineup);
+        _engine.ApplyTactic(ratings, tactic);
+        _engine.ApplyAttitude(ratings, attitude);
+        _engine.ApplyCoach(ratings, coach);
+        _engine.ApplyHomeAdvantage(ratings, context.IsHomeMatch);
+        _engine.ApplyDisorder(ratings, disorderRisk);
 
         var opp = ConvertToLineupRatings(opponent);
 
-        var (pWin, pDraw, pLoss, lamMe, lamOpp) = PoissonWinProbability(ratings, opp, tactic, lineup);
+        var (myIspAtt, myIspDef) = _engine.ComputeIndirectSetPieces(lineup);
+        var prediction = _engine.PredictOutcome(
+            ratings, opp, tactic, lineup,
+            myIspAtt, myIspDef, context.OpponentIspAtt, context.OpponentIspDef);
 
         return new OptimizationCandidate
         {
@@ -435,17 +403,17 @@ public class AdvancedLineupOptimizer
             Attitude = attitude,
             Coach = coach,
             Ratings = ratings,
-            WinProbability = pWin,
-            DrawProbability = pDraw,
-            LossProbability = pLoss,
-            ExpectedGoalsFor = lamMe,
-            ExpectedGoalsAgainst = lamOpp,
+            WinProbability = prediction.WinProbability,
+            DrawProbability = prediction.DrawProbability,
+            LossProbability = prediction.LossProbability,
+            ExpectedGoalsFor = prediction.ExpectedGoalsFor,
+            ExpectedGoalsAgainst = prediction.ExpectedGoalsAgainst,
             DisorderRisk = disorderRisk,
-            Score = pWin + 0.5 * pDraw
+            Score = prediction.WinProbability + 0.5 * prediction.DrawProbability
         };
     }
 
-    private OptimizationCandidate OptimiseBehaviours(OptimizationCandidate cand, string attitude, string coach, TeamRatings opponent, double disorderRisk = 0.0)
+    private OptimizationCandidate OptimiseBehaviours(OptimizationCandidate cand, string attitude, string coach, TeamRatings opponent, MatchContext context, double disorderRisk = 0.0)
     {
         // Lekka iteracja: dla kazdego slotu sprobuj kazdego zachowania i zachowaj te,
         // ktore maksymalizuje P(win) + 0.5*P(draw).
@@ -467,7 +435,7 @@ public class AdvancedLineupOptimizer
                 {
                     if (bhv == cur.Behaviour) continue;
                     lineup.Slots[slot] = new AssignedSlot { SlotId = slot, Player = cur.Player, Behaviour = bhv };
-                    var test = EvaluateCandidate(cand.Lineup.Formation, cand.Tactic, attitude, coach, lineup, opponent, disorderRisk);
+                    var test = EvaluateCandidate(cand.Lineup.Formation, cand.Tactic, attitude, coach, lineup, opponent, context, disorderRisk);
                     if (test.Score > bestScore + 1e-6)
                     {
                         bestScore = test.Score;
@@ -483,280 +451,18 @@ public class AdvancedLineupOptimizer
             }
         }
         // Przelicz na koncu dla pewnosci
-        var final = EvaluateCandidate(cand.Lineup.Formation, cand.Tactic, attitude, coach, lineup, opponent, disorderRisk);
+        var final = EvaluateCandidate(cand.Lineup.Formation, cand.Tactic, attitude, coach, lineup, opponent, context, disorderRisk);
         return final;
     }
-
-    // Typ trenera: ofensywny bumpuje ataki, defensywny bumpuje obrony. Neutralny — bez zmian.
-    private void ApplyCoach(ref LineupRatings r, string coach)
-    {
-        if (coach == "Offensive")
-        {
-            r.CentralAttack *= FormationData.CoachModifiers.OffensiveAttackBonus;
-            r.RightAttack *= FormationData.CoachModifiers.OffensiveAttackBonus;
-            r.LeftAttack *= FormationData.CoachModifiers.OffensiveAttackBonus;
-            r.CentralDefense *= FormationData.CoachModifiers.OffensiveDefensePenalty;
-            r.RightDefense *= FormationData.CoachModifiers.OffensiveDefensePenalty;
-            r.LeftDefense *= FormationData.CoachModifiers.OffensiveDefensePenalty;
-        }
-        else if (coach == "Defensive")
-        {
-            r.CentralDefense *= FormationData.CoachModifiers.DefensiveDefenseBonus;
-            r.RightDefense *= FormationData.CoachModifiers.DefensiveDefenseBonus;
-            r.LeftDefense *= FormationData.CoachModifiers.DefensiveDefenseBonus;
-            r.CentralAttack *= FormationData.CoachModifiers.DefensiveAttackPenalty;
-            r.RightAttack *= FormationData.CoachModifiers.DefensiveAttackPenalty;
-            r.LeftAttack *= FormationData.CoachModifiers.DefensiveAttackPenalty;
-        }
-        else
-        {
-            return;
-        }
-        r.Overall = (r.Midfield + r.CentralDefense + r.RightDefense + r.LeftDefense +
-                     r.CentralAttack + r.RightAttack + r.LeftAttack) / 7.0;
-    }
-
-    // Postawa druzyny (PIC/Normal/MOTS) — wybor trenera, niezalezny od taktyki.
-    private void ApplyAttitude(ref LineupRatings r, string attitude)
-    {
-        double mult = attitude switch
-        {
-            "PIC" => FormationData.TacticModifiers.PICMidfieldPenalty,
-            "MOTS" => FormationData.TacticModifiers.MOTSMidfieldBonus,
-            _ => 1.0
-        };
-        if (Math.Abs(mult - 1.0) > 1e-9)
-        {
-            r.Midfield *= mult;
-            r.Overall = (r.Midfield + r.CentralDefense + r.RightDefense + r.LeftDefense +
-                         r.CentralAttack + r.RightAttack + r.LeftAttack) / 7.0;
-        }
-    }
-
-    private LineupRatings ComputeRatings(AssignedLineup lineup)
-    {
-        var r = new LineupRatings();
-
-        // Aglomeracje: policz graczy na CD / IM / FW
-        int cdCount = 0, imCount = 0, fwCount = 0;
-        foreach (var s in lineup.Slots.Values)
-        {
-            if (IsCentralDefenderSlot(s.SlotId)) cdCount++;
-            else if (IsInnerMidfielderSlot(s.SlotId)) imCount++;
-            else if (IsForwardSlot(s.SlotId)) fwCount++;
-        }
-        double penCD = FormationData.CentralDefenderPenalty.GetValueOrDefault(cdCount, 1.0);
-        double penIM = FormationData.InnerMidfielderPenalty.GetValueOrDefault(imCount, 1.0);
-        double penFW = FormationData.ForwardPenalty.GetValueOrDefault(fwCount, 1.0);
-
-        foreach (var s in lineup.Slots.Values)
-        {
-            if (!FormationData.PositionContributions.TryGetValue(s.Behaviour, out var c)) continue;
-            double eff = EffectiveMultiplier(s.Player);
-
-            double pen = 1.0;
-            if (IsCentralDefenderSlot(s.SlotId)) pen = penCD;
-            else if (IsInnerMidfielderSlot(s.SlotId)) pen = penIM;
-            else if (IsForwardSlot(s.SlotId)) pen = penFW;
-
-            double mid = c.MidfieldPM * s.Player.Skills.Playmaking;
-            double cd = c.CentralDefenseDef * s.Player.Skills.Defending + c.CentralDefenseGK * s.Player.Skills.Keeper;
-            double sd = c.SideDefenseDef * s.Player.Skills.Defending + c.SideDefenseGK * s.Player.Skills.Keeper;
-            double ca = c.CentralAttackSc * s.Player.Skills.Scoring + c.CentralAttackPs * s.Player.Skills.Passing;
-            double sa = c.SideAttackSc * s.Player.Skills.Scoring + c.SideAttackPs * s.Player.Skills.Passing + c.SideAttackWg * s.Player.Skills.Winger;
-
-            var side = FormationData.SlotSide.GetValueOrDefault(s.SlotId, "C");
-            double effPen = eff * pen;
-
-            r.Midfield += mid * effPen;
-            r.CentralDefense += cd * effPen;
-            r.CentralAttack += ca * effPen;
-
-            if (side == "R")
-            {
-                r.RightDefense += sd * effPen;
-                r.RightAttack += sa * effPen;
-            }
-            else if (side == "L")
-            {
-                r.LeftDefense += sd * effPen;
-                r.LeftAttack += sa * effPen;
-            }
-            else
-            {
-                r.RightDefense += sd * 0.5 * effPen;
-                r.LeftDefense += sd * 0.5 * effPen;
-                r.RightAttack += sa * 0.5 * effPen;
-                r.LeftAttack += sa * 0.5 * effPen;
-            }
-        }
-
-        r.Overall = (r.Midfield + r.CentralDefense + r.RightDefense + r.LeftDefense +
-                     r.CentralAttack + r.RightAttack + r.LeftAttack) / 7.0;
-        return r;
-    }
-
-    private void ApplyTacticAndContext(ref LineupRatings r, string tactic, AssignedLineup lineup)
-    {
-        switch (tactic)
-        {
-            case "Counter":
-                r.Midfield *= FormationData.TacticModifiers.CounterAttackMidfieldPenalty;
-                break;
-            case "AttackInMiddle":
-                r.CentralAttack *= FormationData.TacticModifiers.AIMCentralAttackBonus;
-                r.RightAttack *= FormationData.TacticModifiers.AIMSideAttackPenalty;
-                r.LeftAttack *= FormationData.TacticModifiers.AIMSideAttackPenalty;
-                break;
-            case "AttackOnWings":
-                r.CentralAttack *= FormationData.TacticModifiers.AOWCentralAttackPenalty;
-                r.RightAttack *= FormationData.TacticModifiers.AOWSideAttackBonus;
-                r.LeftAttack *= FormationData.TacticModifiers.AOWSideAttackBonus;
-                break;
-            case "Pressing":
-                r.Midfield *= FormationData.TacticModifiers.PressingMidfieldPenalty;
-                r.CentralAttack *= FormationData.TacticModifiers.PressingAttackPenalty;
-                r.RightAttack *= FormationData.TacticModifiers.PressingAttackPenalty;
-                r.LeftAttack *= FormationData.TacticModifiers.PressingAttackPenalty;
-                r.CentralDefense *= FormationData.TacticModifiers.PressingDefenseBonus;
-                r.RightDefense *= FormationData.TacticModifiers.PressingDefenseBonus;
-                r.LeftDefense *= FormationData.TacticModifiers.PressingDefenseBonus;
-                break;
-            case "PlayCreatively":
-                r.CentralAttack *= FormationData.TacticModifiers.CreativelyAttackBonus;
-                r.RightAttack *= FormationData.TacticModifiers.CreativelyAttackBonus;
-                r.LeftAttack *= FormationData.TacticModifiers.CreativelyAttackBonus;
-                r.CentralDefense *= FormationData.TacticModifiers.CreativelyDefensePenalty;
-                r.RightDefense *= FormationData.TacticModifiers.CreativelyDefensePenalty;
-                r.LeftDefense *= FormationData.TacticModifiers.CreativelyDefensePenalty;
-                break;
-            case "LongShots":
-                r.Midfield *= FormationData.TacticModifiers.LongShotsMidfieldPenalty;
-                r.CentralAttack *= FormationData.TacticModifiers.LongShotsAttackPenalty;
-                r.RightAttack *= FormationData.TacticModifiers.LongShotsAttackPenalty;
-                r.LeftAttack *= FormationData.TacticModifiers.LongShotsAttackPenalty;
-                break;
-        }
-        r.Overall = (r.Midfield + r.CentralDefense + r.RightDefense + r.LeftDefense +
-                     r.CentralAttack + r.RightAttack + r.LeftAttack) / 7.0;
-    }
-
-    // ======================= Win probability =======================
-
-    private (double pWin, double pDraw, double pLoss, double lamMe, double lamOpp)
-        PoissonWinProbability(LineupRatings me, LineupRatings opp, string tactic, AssignedLineup lineup)
-    {
-        // Model akcji wg poradnika Hattrick (Umanx):
-        // 10 akcji w meczu, rozdzielone wg pomocy: x^a / (x^a + y^a), a = 2.75
-        double midMe = Math.Max(0.01, me.Midfield);
-        double midOpp = Math.Max(0.01, opp.Midfield);
-        const double midExp = 2.75;
-        double midMePow = Math.Pow(midMe, midExp);
-        double midOppPow = Math.Pow(midOpp, midExp);
-        double myActionShare = midMePow / (midMePow + midOppPow);
-        double actionsMe = 10.0 * myActionShare;
-        double actionsOpp = 10.0 * (1.0 - myActionShare);
-
-        // Prawdopodobienstwo gola z akcji: atak^a / (atak^a + obrona^a), a = 3.5
-        // Rozklad akcji: 35% srodek, 25% prawe skrzydlo, 25% lewe skrzydlo, 15% SFG (staly fragment gry ~ srodek)
-        const double finExp = 3.5;
-        double FinProb(double att, double def)
-        {
-            double a2 = Math.Pow(Math.Max(att, 0.01), finExp);
-            double d2 = Math.Pow(Math.Max(def, 0.01), finExp);
-            return a2 / (a2 + d2);
-        }
-
-        // Moje expected goals from actions
-        double pCentralMe = FinProb(me.CentralAttack, opp.CentralDefense);
-        double pRightMe = FinProb(me.RightAttack, opp.LeftDefense);
-        double pLeftMe = FinProb(me.LeftAttack, opp.RightDefense);
-        double pGoalMe = 0.35 * pCentralMe + 0.25 * pRightMe + 0.25 * pLeftMe + 0.15 * pCentralMe;
-        double lamMe = actionsMe * pGoalMe;
-
-        // Przeciwnik expected goals from actions
-        double pCentralOpp = FinProb(opp.CentralAttack, me.CentralDefense);
-        double pRightOpp = FinProb(opp.RightAttack, me.LeftDefense);
-        double pLeftOpp = FinProb(opp.LeftAttack, me.RightDefense);
-        double pGoalOpp = 0.35 * pCentralOpp + 0.25 * pRightOpp + 0.25 * pLeftOpp + 0.15 * pCentralOpp;
-        double lamOpp = actionsOpp * pGoalOpp;
-
-        // Kontratak daje bonus do oczekiwanych goli przy niskim posiadaniu
-        if (tactic == "Counter" && myActionShare < 0.45)
-        {
-            lamMe *= 1.10;
-        }
-
-        // Long Shots: bonus jesli poziom LS co najmniej passable (srednia sc>5)
-        if (tactic == "LongShots")
-        {
-            var ls = AverageScoring(lineup);
-            if (ls > 7) lamMe *= FormationData.TacticModifiers.LongShotsGoalBonus;
-        }
-
-        lamMe = Math.Clamp(lamMe, 0.05, 8.0);
-        lamOpp = Math.Clamp(lamOpp, 0.05, 8.0);
-
-        const int GoalCap = 10;
-        double pWin = 0, pDraw = 0, pLoss = 0;
-        for (int i = 0; i <= GoalCap; i++)
-        {
-            double pi = Poisson(lamMe, i);
-            for (int j = 0; j <= GoalCap; j++)
-            {
-                double pj = Poisson(lamOpp, j);
-                double p = pi * pj;
-                if (i > j) pWin += p;
-                else if (i == j) pDraw += p;
-                else pLoss += p;
-            }
-        }
-        return (pWin, pDraw, pLoss, lamMe, lamOpp);
-    }
-
-    private static double Poisson(double lambda, int k)
-    {
-        if (lambda <= 0) return k == 0 ? 1.0 : 0.0;
-        // log-space dla stabilnosci
-        double log = -lambda + k * Math.Log(lambda) - LogFactorial(k);
-        return Math.Exp(log);
-    }
-
-    private static readonly double[] LogFactCache = BuildLogFactCache(21);
-    private static double[] BuildLogFactCache(int n)
-    {
-        var a = new double[n];
-        a[0] = 0;
-        for (int i = 1; i < n; i++) a[i] = a[i - 1] + Math.Log(i);
-        return a;
-    }
-    private static double LogFactorial(int n) =>
-        n < LogFactCache.Length ? LogFactCache[n] : LogFactCache[^1] + Math.Log(LogFactCache.Length);
 
     // ======================= Helpers =======================
 
     private double TeamStrength(AssignedLineup lineup)
     {
-        var r = ComputeRatings(lineup);
+        var r = _engine.ComputeRatings(lineup);
         return 3 * r.Midfield + r.CentralDefense + r.RightDefense + r.LeftDefense
              + r.CentralAttack + r.RightAttack + r.LeftAttack;
     }
-
-    private double AverageScoring(AssignedLineup lineup)
-    {
-        var outfield = lineup.Slots.Values.Where(s => s.SlotId != "GK").Select(s => s.Player.Skills.Scoring);
-        if (!outfield.Any()) return 0;
-        return outfield.Average();
-    }
-
-    private static bool IsCentralDefenderSlot(string slot) =>
-        slot == "CD" || slot == "RCD" || slot == "LCD";
-
-    private static bool IsInnerMidfielderSlot(string slot) =>
-        slot == "IM" || slot == "RIM" || slot == "LIM";
-
-    private static bool IsForwardSlot(string slot) =>
-        slot == "FW" || slot == "RFW" || slot == "LFW" || slot == "CFW";
 
     private static double Variance(IEnumerable<double> values)
     {
@@ -794,7 +500,8 @@ public class AdvancedLineupOptimizer
                 Position = s.Key,
                 Player = s.Value.Player,
                 Behavior = s.Value.Behaviour,
-                Rating = ComputePlayerSlotRating(s.Value.Player, s.Key, s.Value.Behaviour)
+                Rating = ComputePlayerSlotRating(s.Value.Player, s.Key, s.Value.Behaviour),
+                IsBruised = s.Value.Player.InjuryLevel == 0
             };
         }
         return lineup;
@@ -808,7 +515,7 @@ public class AdvancedLineupOptimizer
     private double ComputePlayerSlotRating(Player player, string slot, string behaviour)
     {
         if (player == null) return 0;
-        double eff = EffectiveMultiplier(player);
+        double eff = RatingEngine.EffectiveMultiplier(player);
         var skills = player.Skills;
         double main = slot switch
         {
@@ -928,6 +635,14 @@ internal class AssignedSlot
     public string SlotId { get; set; } = "";
     public Player Player { get; set; } = null!;
     public string Behaviour { get; set; } = "";
+}
+
+// Kontekst meczu przekazywany do oceny kandydatow (dom/wyjazd, ISP przeciwnika).
+internal class MatchContext
+{
+    public bool IsHomeMatch { get; set; }
+    public double OpponentIspAtt { get; set; }
+    public double OpponentIspDef { get; set; }
 }
 
 internal class AssignedLineup

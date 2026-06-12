@@ -169,6 +169,38 @@ public static class FormationData
             CentralAttackPs = 0.33,
             SideAttackPs = 0.26
         },
+        // Warianty zachowan srodkowego pomocnika (wg tabel spolecznosci HO!/Schum).
+        ["IMO"] = new PositionContribution
+        {
+            Position = "IMO",
+            MidfieldPM = 0.95,
+            CentralDefenseDef = 0.16,
+            SideDefenseDef = 0.09,
+            CentralAttackSc = 0.34,
+            CentralAttackPs = 0.49,
+            SideAttackPs = 0.18
+        },
+        ["IMD"] = new PositionContribution
+        {
+            Position = "IMD",
+            MidfieldPM = 0.93,
+            CentralDefenseDef = 0.58,
+            SideDefenseDef = 0.24,
+            CentralAttackSc = 0.13,
+            CentralAttackPs = 0.18,
+            SideAttackPs = 0.07
+        },
+        ["IMTW"] = new PositionContribution
+        {
+            Position = "IMTW",
+            MidfieldPM = 0.90,
+            CentralDefenseDef = 0.33,
+            SideDefenseDef = 0.31,
+            CentralAttackSc = 0.13,
+            CentralAttackPs = 0.18,
+            SideAttackPs = 0.31,
+            SideAttackWg = 0.59
+        },
         // Obrocy
         ["CD"] = new PositionContribution
         {
@@ -391,14 +423,16 @@ public static class FormationData
     };
 
     // Informacja, czy slot jest po prawej / lewej / w centrum.
-    // Stosowane, by winger/WB kontrybuowali tylko do swojej flanki.
+    // W Hattricku gracz prawej strony (RCD, RIM, RFW) wnosi wklad boczny
+    // do SWOJEJ flanki, a nie po polowie na obie — stad R/L takze dla nich.
+    // Sloty czysto centralne (CD, IM, FW) wnosza wklad boczny do OBU flank.
     public static readonly Dictionary<string, string> SlotSide = new()
     {
         ["GK"] = "C",
         ["RWB"] = "R", ["LWB"] = "L",
-        ["RCD"] = "C", ["LCD"] = "C", ["CD"] = "C",
+        ["RCD"] = "R", ["LCD"] = "L", ["CD"] = "C",
         ["RW"] = "R", ["LW"] = "L",
-        ["RIM"] = "C", ["LIM"] = "C", ["IM"] = "C",
+        ["RIM"] = "R", ["LIM"] = "L", ["IM"] = "C",
         ["RFW"] = "R", ["LFW"] = "L", ["CFW"] = "C", ["FW"] = "C"
     };
 
@@ -488,16 +522,17 @@ public static class FormationData
         public const int MinStaminaForPressing = 7;
     }
 
-    // Typ trenera (według poradnika Hattrick)
+    // Typ trenera (wartosci wg badan spolecznosci; nowy HT ma suwak stylu 0-10,
+    // ponizsze odpowiadaja skrajnym ustawieniom)
     public static class CoachModifiers
     {
-        // Offensive coach: +8% attack, -11% defense
-        public const double OffensiveAttackBonus = 1.08;
-        public const double OffensiveDefensePenalty = 0.89;
+        // Offensive coach: +10% attack, -10% defense
+        public const double OffensiveAttackBonus = 1.10;
+        public const double OffensiveDefensePenalty = 0.90;
 
-        // Defensive coach: +14% defense, -8% attack
-        public const double DefensiveDefenseBonus = 1.14;
-        public const double DefensiveAttackPenalty = 0.92;
+        // Defensive coach: +15% defense, -10% attack
+        public const double DefensiveDefenseBonus = 1.15;
+        public const double DefensiveAttackPenalty = 0.90;
     }
 }
 

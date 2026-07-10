@@ -523,6 +523,16 @@
     "formationsLast5": "Formacje (5 m.):",
     "mostCommon": "Najczęstsza:"
   },
+  "weather": {
+    "title": "Pogoda na mecz",
+    "rain": "deszcz",
+    "overcast": "pochmurno",
+    "partlyCloudy": "częściowe zachmurzenie",
+    "sunny": "słonecznie",
+    "unknown": "nieznana",
+    "applied": "wpływ na specjalności (techniczny/silny/szybki) uwzględniony w składzie",
+    "tooFar": "Hattrick zna prognozę tylko na dziś i jutro — bez wpływu na obliczenia"
+  },
   "league": {
     "title": "Symulacja ligi",
     "team": "Drużyna",

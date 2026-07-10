@@ -27,6 +27,8 @@ public class OptimizerRequest
     public long MatchId { get; set; }
     // Czy gramy u siebie (atut wlasnego boiska — srodek pola x1.19892).
     public bool IsHomeMatch { get; set; }
+    // Data meczu (z next-opponent) — do prognozy pogody (HT zna tylko dzis i jutro).
+    public DateTime? MatchDate { get; set; }
 }
 
 public class OptimizerResponse
@@ -40,6 +42,8 @@ public class OptimizerResponse
     public string OpponentRatingsSource { get; set; } = "";
     public long? OpponentRatingsMatchId { get; set; }
     public DateTime? OpponentRatingsMatchDate { get; set; }
+    // Pogoda uwzgledniona w obliczeniach (null, gdy nieznana / mecz bez kontekstu).
+    public Services.MatchWeather? Weather { get; set; }
 }
 
 public class FormationAlternative

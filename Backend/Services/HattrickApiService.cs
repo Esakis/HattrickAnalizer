@@ -13,6 +13,19 @@ public class NextOpponentInfo
     public DateTime? MatchDate { get; set; }
     public string MatchType { get; set; } = string.Empty;
     public bool IsHomeMatch { get; set; }
+    // Prognoza pogody w regionie gospodarza (null, gdy nie udalo sie pobrac).
+    public MatchWeather? Weather { get; set; }
+}
+
+// Pogoda regionu gospodarza meczu. HT zna tylko pogode dzisiejsza i jutrzejsza —
+// dla dalszych meczow WeatherId = -1 (unknown).
+public class MatchWeather
+{
+    public int RegionId { get; set; }
+    public string RegionName { get; set; } = string.Empty;
+    // 0=deszcz, 1=pochmurno, 2=czesciowe zachmurzenie, 3=slonce, -1=nieznana.
+    public int WeatherId { get; set; } = -1;
+    public string Source { get; set; } = "unknown"; // "current" | "tomorrow" | "unknown"
 }
 
 // Oceny przeciwnika z informacją o pochodzeniu: "lastMatch" (matchdetails ostatniego
@@ -631,7 +644,7 @@ public class HattrickApiService
             ? (away?.Element("AwayTeamName")?.Value ?? "")
             : (home?.Element("HomeTeamName")?.Value ?? "");
 
-        return new NextOpponentInfo
+        var info = new NextOpponentInfo
         {
             MatchId = long.Parse(upcoming.Element.Element("MatchID")?.Value ?? "0"),
             OpponentTeamId = opponentId,
@@ -640,6 +653,68 @@ public class HattrickApiService
             MatchType = upcoming.Element.Element("MatchType")?.Value ?? "",
             IsHomeMatch = isHome
         };
+
+        try
+        {
+            var hostTeamId = isHome ? teamId : opponentId;
+            info.Weather = await GetMatchWeatherAsync(hostTeamId, info.MatchDate);
+        }
+        catch (Exception ex)
+        {
+            // Pogoda jest dodatkiem — jej brak nie moze wywracac next-opponent.
+            _logger.LogWarning(ex, "Nie udało się pobrać pogody dla meczu {MatchId}.", info.MatchId);
+        }
+
+        return info;
+    }
+
+    /// <summary>
+    /// Prognoza pogody w regionie gospodarza: teamdetails (region) + regiondetails
+    /// (WeatherID dzis / TomorrowWeatherID jutro). Mecz pozniej niz jutro -> unknown.
+    /// </summary>
+    public async Task<MatchWeather> GetMatchWeatherAsync(int hostTeamId, DateTime? matchDate)
+    {
+        var teamDoc = await FetchChppXmlAsync(new Dictionary<string, string>
+        {
+            { "file", "teamdetails" }, { "teamId", hostTeamId.ToString() }, { "version", "3.6" }
+        }, $"teamdetails teamId={hostTeamId}");
+
+        var teamEl = teamDoc.Descendants("Team")
+            .FirstOrDefault(t => t.Element("TeamID")?.Value == hostTeamId.ToString())
+            ?? teamDoc.Descendants("Team").FirstOrDefault();
+        var regionEl = teamEl?.Element("Region");
+        var regionId = int.Parse(regionEl?.Element("RegionID")?.Value ?? "0");
+
+        var weather = new MatchWeather
+        {
+            RegionId = regionId,
+            RegionName = regionEl?.Element("RegionName")?.Value ?? ""
+        };
+        if (regionId == 0) return weather;
+
+        var regionDoc = await FetchChppXmlAsync(new Dictionary<string, string>
+        {
+            { "file", "regiondetails" }, { "regionID", regionId.ToString() }
+        }, $"regiondetails regionID={regionId}");
+
+        var region = regionDoc.Descendants("Region")
+            .FirstOrDefault(r => r.Element("WeatherID") != null);
+        if (region == null) return weather;
+
+        var today = DateTime.UtcNow.Date;
+        var matchDay = matchDate?.Date;
+        if (matchDay == today)
+        {
+            weather.WeatherId = int.Parse(region.Element("WeatherID")?.Value ?? "-1");
+            weather.Source = "current";
+        }
+        else if (matchDay == today.AddDays(1))
+        {
+            weather.WeatherId = int.Parse(region.Element("TomorrowWeatherID")?.Value ?? "-1");
+            weather.Source = "tomorrow";
+        }
+
+        return weather;
     }
 
     public async Task<TeamMatchStats> GetTeamMatchStatsAsync(int teamId)

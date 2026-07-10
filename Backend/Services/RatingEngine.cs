@@ -87,6 +87,30 @@ public sealed class RatingEngine
     public static double EffectiveMultiplier(Player p) =>
         FormFactor(p.Form) * StaminaEffect(p.Stamina);
 
+    // Kody pogody CHPP (WeatherID): 0=deszcz, 1=pochmurno, 2=czesciowe zachmurzenie, 3=slonce.
+    public const int WeatherRain = 0;
+    public const int WeatherSunny = 3;
+    public const int WeatherUnknown = -1;
+
+    /// <summary>
+    /// Wplyw pogody na specjalnosc (model HT): techniczny slonce +5% / deszcz -5%,
+    /// silny deszcz +5% / slonce -5%, szybki deszcz i slonce -5%. Inne bez wplywu.
+    /// Specialty z CHPP przychodzi jako kod liczbowy (1=Technical, 2=Quick, 3=Powerful).
+    /// </summary>
+    public static double WeatherMultiplier(Player p, int weatherId)
+    {
+        if (weatherId != WeatherRain && weatherId != WeatherSunny) return 1.0;
+        var spec = p.Specialty;
+        bool technical = spec is "1" or "Technical";
+        bool quick = spec is "2" or "Quick";
+        bool powerful = spec is "3" or "Powerful";
+
+        if (technical) return weatherId == WeatherSunny ? 1.05 : 0.95;
+        if (powerful) return weatherId == WeatherRain ? 1.05 : 0.95;
+        if (quick) return 0.95; // cierpi i w deszczu, i w sloncu
+        return 1.0;
+    }
+
     // ======================= Wklad gracza w sektory =======================
 
     internal sealed record SectorContribution(
@@ -100,9 +124,9 @@ public sealed class RatingEngine
     /// Strona slotu decyduje, dokad ida wklady boczne; sloty czysto centralne (CD/IM/FW)
     /// wnosza wklad boczny W PELNI do obu flank (model HO!), nie po polowie.
     /// </summary>
-    internal static SectorContribution ContributionFor(Player p, string slot, PositionContribution c)
+    internal static SectorContribution ContributionFor(Player p, string slot, PositionContribution c, int weatherId = WeatherUnknown)
     {
-        double eff = EffectiveMultiplier(p);
+        double eff = EffectiveMultiplier(p) * WeatherMultiplier(p, weatherId);
 
         double mid = c.MidfieldPM * EffSkill(p, p.Skills.Playmaking);
         double cd = c.CentralDefenseDef * EffSkill(p, p.Skills.Defending)
@@ -131,7 +155,7 @@ public sealed class RatingEngine
 
     // ======================= Oceny druzyny =======================
 
-    internal LineupRatings ComputeRatings(AssignedLineup lineup)
+    internal LineupRatings ComputeRatings(AssignedLineup lineup, int weatherId = WeatherUnknown)
     {
         var r = new LineupRatings();
 
@@ -158,7 +182,7 @@ public sealed class RatingEngine
             else if (IsInnerMidfielderSlot(s.SlotId)) pen = penIM;
             else if (IsForwardSlot(s.SlotId)) pen = penFW;
 
-            var contrib = ContributionFor(s.Player, s.SlotId, c);
+            var contrib = ContributionFor(s.Player, s.SlotId, c, weatherId);
             r.Midfield += contrib.Mid * pen;
             r.CentralDefense += contrib.Cd * pen;
             r.RightDefense += contrib.Rd * pen;

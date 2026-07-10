@@ -268,7 +268,8 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       preferredFormation: this.selectedMyFormation,
       language: this.translate.currentLang || 'pl',
       matchId: isNextOpponent ? nextOpp!.matchId : 0,
-      isHomeMatch: isNextOpponent ? !!nextOpp!.isHomeMatch : false
+      isHomeMatch: isNextOpponent ? !!nextOpp!.isHomeMatch : false,
+      matchDate: isNextOpponent ? nextOpp!.matchDate : undefined
     };
 
     this.hattrickApi.optimizeLineup(request).subscribe({
@@ -540,6 +541,27 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
         this.loadingOpponentScout = false;
       }
     });
+  }
+
+  getWeatherIcon(weatherId: number): string {
+    switch (weatherId) {
+      case 0: return '🌧️';
+      case 1: return '☁️';
+      case 2: return '⛅';
+      case 3: return '☀️';
+      default: return '';
+    }
+  }
+
+  getWeatherLabel(weatherId: number): string {
+    const keys: { [id: number]: string } = {
+      0: 'weather.rain',
+      1: 'weather.overcast',
+      2: 'weather.partlyCloudy',
+      3: 'weather.sunny'
+    };
+    const key = keys[weatherId];
+    return key ? this.translate.instant(key) : this.translate.instant('weather.unknown');
   }
 
   get scoutTacticSummary(): string {

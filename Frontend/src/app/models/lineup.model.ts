@@ -41,6 +41,15 @@ export interface OptimizerRequest {
   language: string;
   matchId?: number;
   isHomeMatch?: boolean;
+  matchDate?: string;
+}
+
+// Pogoda regionu gospodarza (kody CHPP: 0=deszcz, 1=pochmurno, 2=częściowe zachmurzenie, 3=słońce).
+export interface MatchWeather {
+  regionId: number;
+  regionName: string;
+  weatherId: number;
+  source: string;
 }
 
 export interface FormationAlternative {
@@ -65,6 +74,7 @@ export interface OptimizerResponse {
   opponentRatingsSource?: string;
   opponentRatingsMatchId?: number;
   opponentRatingsMatchDate?: string;
+  weather?: MatchWeather | null;
 }
 
 export interface TeamComparison {

@@ -342,6 +342,16 @@
     </div>
   </div>
 
+  <div *ngIf="result?.weather" class="weather-bar">
+    <span class="weather-icon">{{ getWeatherIcon(result!.weather!.weatherId) }}</span>
+    <span>
+      {{ 'weather.title' | translate }} ({{ result!.weather!.regionName }}):
+      <strong>{{ getWeatherLabel(result!.weather!.weatherId) }}</strong>
+      <span *ngIf="result!.weather!.weatherId >= 0"> — {{ 'weather.applied' | translate }}</span>
+      <span *ngIf="result!.weather!.weatherId < 0"> — {{ 'weather.tooFar' | translate }}</span>
+    </span>
+  </div>
+
   <div *ngIf="result" class="results-section">
     <!-- OBA SKŁADY OBOK SIEBIE -->
     <div class="lineups-side-by-side">

@@ -43,6 +43,22 @@ public class AdvancedLineupOptimizer
             OpponentIspDef = opponentRatings.IndirectSetPiecesDefRating
         };
 
+        // Pogoda regionu gospodarza — tylko dla znanego nadchodzacego meczu.
+        MatchWeather? weather = null;
+        if (request.MatchId != 0)
+        {
+            try
+            {
+                var hostTeamId = request.IsHomeMatch ? request.MyTeamId : request.OpponentTeamId;
+                weather = await _hattrickApi.GetMatchWeatherAsync(hostTeamId, request.MatchDate);
+                context.WeatherId = weather.WeatherId;
+            }
+            catch (Exception)
+            {
+                // Pogoda jest dodatkiem — optymalizacja dziala dalej bez niej.
+            }
+        }
+
         // InjuryLevel: -1 = zdrowy, 0 = siniak (moze grac), >=1 = tygodnie kontuzji (nie moze grac)
         var available = myTeam.Players.Where(p => p.InjuryLevel <= 0).ToList();
         if (available.Count < 11)
@@ -137,7 +153,8 @@ public class AdvancedLineupOptimizer
             Alternatives = alternatives,
             OpponentRatingsSource = opponentResult.Source,
             OpponentRatingsMatchId = opponentResult.SourceMatchId,
-            OpponentRatingsMatchDate = opponentResult.SourceMatchDate
+            OpponentRatingsMatchDate = opponentResult.SourceMatchDate,
+            Weather = weather
         };
     }
 
@@ -386,7 +403,7 @@ public class AdvancedLineupOptimizer
 
     private OptimizationCandidate EvaluateCandidate(FormationDefinition formation, string tactic, string attitude, string coach, AssignedLineup lineup, TeamRatings opponent, MatchContext context, double disorderRisk = 0.0)
     {
-        var ratings = _engine.ComputeRatings(lineup);
+        var ratings = _engine.ComputeRatings(lineup, context.WeatherId);
         _engine.ApplyTactic(ratings, tactic);
         _engine.ApplyAttitude(ratings, attitude);
         _engine.ApplyCoach(ratings, coach);
@@ -647,6 +664,8 @@ internal class MatchContext
     public bool IsHomeMatch { get; set; }
     public double OpponentIspAtt { get; set; }
     public double OpponentIspDef { get; set; }
+    // Kod pogody CHPP (0=deszcz..3=slonce); -1 = nieznana (bez wplywu).
+    public int WeatherId { get; set; } = RatingEngine.WeatherUnknown;
 }
 
 internal class AssignedLineup

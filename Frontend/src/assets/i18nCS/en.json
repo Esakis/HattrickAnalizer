@@ -522,6 +522,16 @@
     "formationsLast5": "Formations (5 m.):",
     "mostCommon": "Most common:"
   },
+  "weather": {
+    "title": "Match weather",
+    "rain": "rain",
+    "overcast": "overcast",
+    "partlyCloudy": "partly cloudy",
+    "sunny": "sunny",
+    "unknown": "unknown",
+    "applied": "specialty effects (technical/powerful/quick) applied to the lineup",
+    "tooFar": "Hattrick only knows today's and tomorrow's forecast — no effect on calculations"
+  },
   "league": {
     "title": "League simulation",
     "team": "Team",

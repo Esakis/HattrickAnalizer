@@ -1353,6 +1353,23 @@ details > summary {
   border-top: 1px dashed #c8e6c9;
 }
 
+// ==================== POGODA ====================
+
+.weather-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 8px 14px;
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  border-radius: 8px;
+
+  .weather-icon {
+    font-size: 1.3em;
+  }
+}
+
 // ==================== SKAUT PRZECIWNIKA ====================
 
 .scout-report {

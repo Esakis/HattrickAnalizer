@@ -27,6 +27,7 @@
   },
   "navigation": {
     "league": "League",
+    "training": "Training",
     "players": "My Players",
     "optimizer": "Optimizer",
     "oauth": "OAuth",
@@ -521,6 +522,37 @@
     "matches": "matches",
     "formationsLast5": "Formations (5 m.):",
     "mostCommon": "Most common:"
+  },
+  "training": {
+    "title": "Training",
+    "type": "Training type",
+    "intensity": "Intensity",
+    "staminaShare": "Stamina share",
+    "trainer": "Coach",
+    "lastMatch": "Last match",
+    "playersHeader": "Players (starting XI of the last match)",
+    "player": "Player",
+    "age": "Age",
+    "position": "Position",
+    "fullTraining": "Full training",
+    "skillLevel": "Trained skill",
+    "weeksToNext": "Weeks to next level (approx.)",
+    "hint": "The weeks estimate is approximate (skill level, age, intensity) — it does not reproduce Hattrick's full training model.",
+    "types": {
+      "General": "General",
+      "Stamina": "Stamina",
+      "SetPieces": "Set pieces",
+      "Defending": "Defending",
+      "Scoring": "Scoring",
+      "CrossPass": "Crossing",
+      "Shooting": "Shooting",
+      "ShortPasses": "Short passes",
+      "Playmaking": "Playmaking",
+      "Goaltending": "Goaltending",
+      "ThroughPasses": "Through passes",
+      "DefensivePositions": "Defensive positions",
+      "WingAttacks": "Wing attacks"
+    }
   },
   "weather": {
     "title": "Match weather",

@@ -11,6 +11,7 @@ import { LineupOptimizerComponent } from './components/lineup-optimizer/lineup-o
 import { OAuthSetupComponent } from './components/oauth-setup/oauth-setup.component';
 import { PlayersComponent } from './components/players/players.component';
 import { LeagueTableComponent } from './components/league-table/league-table.component';
+import { TrainingViewComponent } from './components/training-view/training-view.component';
 import { LoadStatusSidebarComponent } from './components/load-status-sidebar/load-status-sidebar.component';
 import { PlayerHistoryModalComponent } from './components/player-history-modal/player-history-modal.component';
 import { CredentialsInterceptor } from './interceptors/credentials.interceptor';
@@ -35,6 +36,7 @@ export function HttpLoaderFactory(http: HttpClient) {
     OAuthSetupComponent,
     PlayersComponent,
     LeagueTableComponent,
+    TrainingViewComponent,
     LoadStatusSidebarComponent,
     PlayerHistoryModalComponent
   ],

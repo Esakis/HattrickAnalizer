@@ -1,0 +1,64 @@
+<div class="training-container">
+  <div class="training-header">
+    <button class="btn-back" routerLink="/">{{ 'common.back' | translate }}</button>
+    <h1>🏋️ {{ 'training.title' | translate }}</h1>
+  </div>
+
+  <div *ngIf="loading" class="loading-indicator">{{ 'common.loading' | translate }}...</div>
+  <div *ngIf="error" class="error-message">{{ error }}</div>
+
+  <div *ngIf="!loading && summary">
+    <div class="training-summary-card">
+      <div class="summary-item">
+        <span class="label">{{ 'training.type' | translate }}:</span>
+        <span class="value highlight">{{ getTrainingTypeLabel() }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="label">{{ 'training.intensity' | translate }}:</span>
+        <span class="value">{{ summary.trainingLevel }}%</span>
+      </div>
+      <div class="summary-item">
+        <span class="label">{{ 'training.staminaShare' | translate }}:</span>
+        <span class="value">{{ summary.staminaTrainingPart }}%</span>
+      </div>
+      <div class="summary-item" *ngIf="summary.trainerName">
+        <span class="label">{{ 'training.trainer' | translate }}:</span>
+        <span class="value">{{ summary.trainerName }}</span>
+      </div>
+      <div class="summary-item" *ngIf="summary.lastMatchDate">
+        <span class="label">{{ 'training.lastMatch' | translate }}:</span>
+        <span class="value">{{ summary.lastMatchDate | date:'dd.MM.yyyy' }}</span>
+      </div>
+    </div>
+
+    <h3>{{ 'training.playersHeader' | translate }}</h3>
+    <div class="training-table-wrap">
+      <table class="training-table">
+        <thead>
+          <tr>
+            <th>{{ 'training.player' | translate }}</th>
+            <th>{{ 'training.age' | translate }}</th>
+            <th>{{ 'training.position' | translate }}</th>
+            <th>{{ 'training.fullTraining' | translate }}</th>
+            <th *ngIf="summary.trainedSkill">{{ 'training.skillLevel' | translate }}</th>
+            <th *ngIf="summary.trainedSkill">{{ 'training.weeksToNext' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let p of summary.players" [class.full-training]="p.fullTraining">
+            <td class="player-col">{{ p.playerName }}</td>
+            <td>{{ p.age }}</td>
+            <td>{{ p.slot }}</td>
+            <td>{{ p.fullTraining ? '✅' : '—' }}</td>
+            <td *ngIf="summary.trainedSkill">{{ p.trainedSkillValue }} ({{ getSkillLevelName(p.trainedSkillValue) }})</td>
+            <td *ngIf="summary.trainedSkill">
+              <span *ngIf="p.estimatedWeeksToNextLevel !== null">~{{ p.estimatedWeeksToNextLevel }}</span>
+              <span *ngIf="p.estimatedWeeksToNextLevel === null">—</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="training-hint">{{ 'training.hint' | translate }}</p>
+  </div>
+</div>

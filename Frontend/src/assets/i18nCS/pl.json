@@ -27,6 +27,7 @@
   },
   "navigation": {
     "league": "Liga",
+    "training": "Trening",
     "players": "Moi Zawodnicy",
     "optimizer": "Optymalizator",
     "oauth": "OAuth",
@@ -522,6 +523,37 @@
     "matches": "mecze",
     "formationsLast5": "Formacje (5 m.):",
     "mostCommon": "Najczęstsza:"
+  },
+  "training": {
+    "title": "Trening",
+    "type": "Rodzaj treningu",
+    "intensity": "Intensywność",
+    "staminaShare": "Udział kondycji",
+    "trainer": "Trener",
+    "lastMatch": "Ostatni mecz",
+    "playersHeader": "Zawodnicy (podstawowa XI ostatniego meczu)",
+    "player": "Zawodnik",
+    "age": "Wiek",
+    "position": "Pozycja",
+    "fullTraining": "Pełny trening",
+    "skillLevel": "Trenowany skill",
+    "weeksToNext": "Tygodni do skoku (ok.)",
+    "hint": "Prognoza tygodni jest orientacyjna (poziom skilla, wiek, intensywność) — nie odtwarza pełnego modelu treningu Hattricka.",
+    "types": {
+      "General": "Ogólny",
+      "Stamina": "Kondycja",
+      "SetPieces": "Stałe fragmenty",
+      "Defending": "Obrona",
+      "Scoring": "Strzelanie",
+      "CrossPass": "Dośrodkowania",
+      "Shooting": "Strzały",
+      "ShortPasses": "Krótkie podania",
+      "Playmaking": "Rozgrywanie",
+      "Goaltending": "Bronienie",
+      "ThroughPasses": "Podania prostopadłe",
+      "DefensivePositions": "Gra w obronie",
+      "WingAttacks": "Ataki skrzydłami"
+    }
   },
   "weather": {
     "title": "Pogoda na mecz",

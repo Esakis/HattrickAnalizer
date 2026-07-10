@@ -28,6 +28,20 @@ public sealed class RatingEngine
         public static double ToHtScale(double sum) => K * Math.Pow(Math.Max(0, sum), Gamma) + C;
     }
 
+    /// <summary>
+    /// Kalibrowane mnozniki sektorowe: srednie actual/predicted z 5 rozegranych meczow
+    /// (GET /api/calibration/own-matches, 2026-07-10, pelne dopasowanie 11 graczy).
+    /// Strony L/P usrednione symetrycznie — roznice miedzy nimi to szum probki.
+    /// </summary>
+    public static class SectorCorrection
+    {
+        public const double Midfield = 0.46;
+        public const double CentralDefense = 0.95;
+        public const double SideDefense = 1.35;
+        public const double CentralAttack = 0.96;
+        public const double SideAttack = 1.31;
+    }
+
     // Wklad doswiadczenia: sektor *= 1 + k * ln(1 + srednie XP). Kalibrowalne.
     private const double XpFactorDefense = 0.035;
     private const double XpFactorMidfield = 0.025;
@@ -170,13 +184,13 @@ public sealed class RatingEngine
 
         // Mapowanie na skale denominacji HT — od tego momentu oceny sa porownywalne
         // z ocenami przeciwnika z matchdetails.
-        r.Midfield = RatingScale.ToHtScale(r.Midfield);
-        r.CentralDefense = RatingScale.ToHtScale(r.CentralDefense);
-        r.RightDefense = RatingScale.ToHtScale(r.RightDefense);
-        r.LeftDefense = RatingScale.ToHtScale(r.LeftDefense);
-        r.CentralAttack = RatingScale.ToHtScale(r.CentralAttack);
-        r.RightAttack = RatingScale.ToHtScale(r.RightAttack);
-        r.LeftAttack = RatingScale.ToHtScale(r.LeftAttack);
+        r.Midfield = RatingScale.ToHtScale(r.Midfield) * SectorCorrection.Midfield;
+        r.CentralDefense = RatingScale.ToHtScale(r.CentralDefense) * SectorCorrection.CentralDefense;
+        r.RightDefense = RatingScale.ToHtScale(r.RightDefense) * SectorCorrection.SideDefense;
+        r.LeftDefense = RatingScale.ToHtScale(r.LeftDefense) * SectorCorrection.SideDefense;
+        r.CentralAttack = RatingScale.ToHtScale(r.CentralAttack) * SectorCorrection.CentralAttack;
+        r.RightAttack = RatingScale.ToHtScale(r.RightAttack) * SectorCorrection.SideAttack;
+        r.LeftAttack = RatingScale.ToHtScale(r.LeftAttack) * SectorCorrection.SideAttack;
 
         RecomputeOverall(r);
         return r;

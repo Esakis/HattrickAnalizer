@@ -1,9 +1,15 @@
 <div class="training-container">
-  <div class="training-header">
-    <button class="btn-back" routerLink="/">{{ 'common.back' | translate }}</button>
-    <h1>🏋️ {{ 'training.title' | translate }}</h1>
+  <div class="header">
+    <div class="header-content">
+      <h1>🏋️ {{ 'training.title' | translate }}</h1>
+      <p class="subtitle">{{ 'training.subtitle' | translate }}</p>
+    </div>
+    <div class="header-buttons">
+      <button class="btn-nav" routerLink="/">{{ 'navigation.backToOptimizer' | translate }}</button>
+    </div>
   </div>
 
+  <div class="training-body">
   <div *ngIf="loading" class="loading-indicator">{{ 'common.loading' | translate }}...</div>
   <div *ngIf="error" class="error-message">{{ error }}</div>
 
@@ -31,6 +37,7 @@
       </div>
     </div>
 
+    <div class="training-card">
     <h3>{{ 'training.playersHeader' | translate }}</h3>
     <div class="training-table-wrap">
       <table class="training-table">
@@ -60,5 +67,7 @@
       </table>
     </div>
     <p class="training-hint">{{ 'training.hint' | translate }}</p>
+    </div>
+  </div>
   </div>
 </div>

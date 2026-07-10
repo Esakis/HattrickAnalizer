@@ -1,49 +1,102 @@
 <div class="league-container">
-  <div class="league-header">
-    <button class="btn-back" routerLink="/">{{ 'common.back' | translate }}</button>
-    <h1>🏆 {{ 'league.title' | translate }}<span *ngIf="report"> — {{ report.leagueName }}</span></h1>
+  <div class="header">
+    <div class="header-content">
+      <h1>🏆 {{ 'league.title' | translate }}<span *ngIf="report"> — {{ report.leagueName }}</span></h1>
+      <p class="subtitle">{{ 'league.subtitle' | translate }}</p>
+    </div>
+    <div class="header-buttons">
+      <button class="btn-nav" routerLink="/">{{ 'navigation.backToOptimizer' | translate }}</button>
+    </div>
   </div>
 
-  <div *ngIf="loading" class="loading-indicator">{{ 'common.loading' | translate }}...</div>
-  <div *ngIf="error" class="error-message">{{ error }}</div>
+  <div class="league-body">
+    <div *ngIf="error" class="error-message">{{ error }}</div>
 
-  <div *ngIf="!loading && report">
-    <p class="league-meta">
-      {{ 'league.remainingMatches' | translate }}: <strong>{{ report.remainingMatches }}</strong>
-      <span *ngIf="report.remainingMatches > 0"> · {{ 'league.iterations' | translate }}: {{ report.iterations }}</span>
-    </p>
-    <p *ngIf="report.remainingMatches === 0" class="league-note">{{ 'league.seasonOver' | translate }}</p>
+    <div class="league-columns">
+      <!-- LEWA KOLUMNA: aktualna sytuacja w lidze -->
+      <div class="league-card current-table-card">
+        <h3>📋 {{ 'league.currentTable' | translate }}</h3>
+        <div *ngIf="loading" class="loading-indicator">{{ 'common.loading' | translate }}...</div>
+        <table *ngIf="!loading && report" class="league-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th class="team-col">{{ 'league.team' | translate }}</th>
+              <th>{{ 'league.matches' | translate }}</th>
+              <th>{{ 'league.goals' | translate }}</th>
+              <th>{{ 'league.points' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let t of report.teams" [class.own-team]="t.isOwnTeam">
+              <td>{{ t.currentPosition }}</td>
+              <td class="team-col">{{ t.teamName }}</td>
+              <td>{{ t.matches }}</td>
+              <td>{{ t.goalsFor }}:{{ t.goalsAgainst }}</td>
+              <td><strong>{{ t.points }}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+        <p *ngIf="report" class="league-meta">
+          {{ 'league.remainingMatches' | translate }}: <strong>{{ report.remainingMatches }}</strong>
+        </p>
+      </div>
 
-    <div class="league-table-wrap">
-      <table class="league-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th class="team-col">{{ 'league.team' | translate }}</th>
-            <th>{{ 'league.matches' | translate }}</th>
-            <th>{{ 'league.goals' | translate }}</th>
-            <th>{{ 'league.points' | translate }}</th>
-            <th>{{ 'league.expectedPoints' | translate }}</th>
-            <th>{{ 'league.expectedPosition' | translate }}</th>
-            <th *ngFor="let pos of positions" class="pos-col">{{ pos }}.</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let t of report.teams" [class.own-team]="t.isOwnTeam">
-            <td>{{ t.currentPosition }}</td>
-            <td class="team-col">{{ t.teamName }}</td>
-            <td>{{ t.matches }}</td>
-            <td>{{ t.goalsFor }}:{{ t.goalsAgainst }}</td>
-            <td><strong>{{ t.points }}</strong></td>
-            <td>{{ t.expectedPoints }}</td>
-            <td>{{ t.expectedPosition }}</td>
-            <td *ngFor="let pos of positions" class="pos-col" [ngStyle]="probabilityStyle(t.positionProbabilities[pos - 1] || 0)">
-              {{ formatProbability(t.positionProbabilities[pos - 1] || 0) }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <!-- PRAWA KOLUMNA: symulacja -->
+      <div class="league-card simulation-card">
+        <h3>🎲 {{ 'league.simulationHeader' | translate }}</h3>
+        <div class="sim-buttons">
+          <button class="btn-sim" (click)="runSimulation(true)" [disabled]="simLoading"
+                  [class.active]="simMode === 'first'">
+            {{ 'league.simFromFirst' | translate }}
+          </button>
+          <button class="btn-sim" (click)="runSimulation(false)" [disabled]="simLoading"
+                  [class.active]="simMode === 'current'">
+            {{ 'league.simFromCurrent' | translate }}
+          </button>
+        </div>
+
+        <div *ngIf="simLoading" class="loading-indicator">{{ 'common.loading' | translate }}...</div>
+        <div *ngIf="simError" class="error-message">{{ simError }}</div>
+
+        <div *ngIf="!simLoading && simReport">
+          <p class="league-meta">
+            <span *ngIf="simReport.fromFirstRound">{{ 'league.modeFirstInfo' | translate }}</span>
+            <span *ngIf="!simReport.fromFirstRound">{{ 'league.modeCurrentInfo' | translate }}</span>
+            · {{ 'league.iterations' | translate }}: {{ simReport.iterations }}
+          </p>
+          <p *ngIf="!simReport.fromFirstRound && simReport.remainingMatches === 0" class="league-note">
+            {{ 'league.seasonOver' | translate }}
+          </p>
+
+          <div class="league-table-wrap">
+            <table class="league-table sim-table">
+              <thead>
+                <tr>
+                  <th class="team-col">{{ 'league.team' | translate }}</th>
+                  <th>{{ 'league.expectedPoints' | translate }}</th>
+                  <th>{{ 'league.expectedPosition' | translate }}</th>
+                  <th *ngFor="let pos of positions" class="pos-col">{{ pos }}.</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let t of simReport.teams" [class.own-team]="t.isOwnTeam">
+                  <td class="team-col">{{ t.teamName }}</td>
+                  <td>{{ t.expectedPoints }}</td>
+                  <td>{{ t.expectedPosition }}</td>
+                  <td *ngFor="let pos of positions" class="pos-col"
+                      [ngStyle]="probabilityStyle(t.positionProbabilities[pos - 1] || 0)">
+                    {{ formatProbability(t.positionProbabilities[pos - 1] || 0) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="league-hint">{{ 'league.hint' | translate }}</p>
+        </div>
+
+        <p *ngIf="!simLoading && !simReport" class="league-note">{{ 'league.pickMode' | translate }}</p>
+      </div>
     </div>
-    <p class="league-hint">{{ 'league.hint' | translate }}</p>
   </div>
 </div>

@@ -19,5 +19,6 @@ export interface LeagueSimulationReport {
   leagueName: string;
   remainingMatches: number;
   iterations: number;
+  fromFirstRound: boolean;
   teams: LeagueTeamForecast[];
 }

@@ -38,8 +38,8 @@ export class HattrickApiService {
     return this.http.get<OpponentScoutReport>(`${this.apiUrl}/team/${teamId}/scout?count=${count}`);
   }
 
-  getLeagueSimulation(): Observable<LeagueSimulationReport> {
-    return this.http.get<LeagueSimulationReport>(`${this.apiUrl}/league/simulation`);
+  getLeagueSimulation(fromFirstRound: boolean = false): Observable<LeagueSimulationReport> {
+    return this.http.get<LeagueSimulationReport>(`${this.apiUrl}/league/simulation?fromFirstRound=${fromFirstRound}`);
   }
 
   getTrainingSummary(): Observable<TrainingSummary> {

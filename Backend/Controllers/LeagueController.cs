@@ -20,8 +20,9 @@ public class LeagueController : ControllerBase
     /// Symulacja pozostalych meczow sezonu ligi zalogowanego uzytkownika —
     /// prawdopodobienstwa pozycji koncowych (Monte Carlo na modelu Poissona).
     /// </summary>
+    // fromFirstRound=true — symulacja całego sezonu od 1. kolejki zamiast od stanu obecnego.
     [HttpGet("simulation")]
-    public async Task<IActionResult> GetSimulation()
+    public async Task<IActionResult> GetSimulation([FromQuery] bool fromFirstRound = false)
     {
         var sessionId = Request.Cookies["ht_session"] ?? "";
         var stored = _tokenStore.Get(sessionId);
@@ -30,7 +31,7 @@ public class LeagueController : ControllerBase
             return Unauthorized(new { error = "Brak autoryzacji OAuth — zaloguj się do Hattricka." });
         }
 
-        var report = await _simulation.SimulateAsync(stored.OwnTeamId);
+        var report = await _simulation.SimulateAsync(stored.OwnTeamId, fromFirstRound);
         return Ok(report);
     }
 }

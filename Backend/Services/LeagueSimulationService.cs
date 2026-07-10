@@ -18,7 +18,7 @@ public class LeagueSimulationService
     private const int ScoutMatchCount = 3;
     private const int Iterations = 5000;
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(10);
-    private static readonly ConcurrentDictionary<int, (DateTime At, LeagueSimulationReport Report)> Cache = new();
+    private static readonly ConcurrentDictionary<string, (DateTime At, LeagueSimulationReport Report)> Cache = new();
 
     private readonly HattrickApiService _api;
     private readonly OpponentScoutService _scout;
@@ -31,16 +31,19 @@ public class LeagueSimulationService
         _logger = logger;
     }
 
-    public async Task<LeagueSimulationReport> SimulateAsync(int ownTeamId)
+    /// <param name="fromFirstRound">true = symulacja calego sezonu od 1. kolejki (wyniki
+    /// rozegranych meczow ignorowane, punkty od zera); false = od stanu obecnego.</param>
+    public async Task<LeagueSimulationReport> SimulateAsync(int ownTeamId, bool fromFirstRound = false)
     {
         var leagueUnitId = await GetLeagueUnitIdAsync(ownTeamId);
-        if (Cache.TryGetValue(leagueUnitId, out var cached) && DateTime.UtcNow - cached.At < CacheTtl)
+        var cacheKey = $"{leagueUnitId}:{fromFirstRound}";
+        if (Cache.TryGetValue(cacheKey, out var cached) && DateTime.UtcNow - cached.At < CacheTtl)
         {
             return cached.Report;
         }
 
-        var report = await BuildReportAsync(ownTeamId, leagueUnitId);
-        Cache[leagueUnitId] = (DateTime.UtcNow, report);
+        var report = await BuildReportAsync(ownTeamId, leagueUnitId, fromFirstRound);
+        Cache[cacheKey] = (DateTime.UtcNow, report);
         return report;
     }
 
@@ -63,7 +66,7 @@ public class LeagueSimulationService
         return unitId;
     }
 
-    private async Task<LeagueSimulationReport> BuildReportAsync(int ownTeamId, int leagueUnitId)
+    private async Task<LeagueSimulationReport> BuildReportAsync(int ownTeamId, int leagueUnitId, bool fromFirstRound)
     {
         // Tabela ligi.
         var standingsDoc = await _api.FetchChppXmlAsync(new Dictionary<string, string>
@@ -75,7 +78,8 @@ public class LeagueSimulationService
         {
             LeagueLevelUnitId = leagueUnitId,
             LeagueName = standingsDoc.Descendants("LeagueLevelUnitName").FirstOrDefault()?.Value ?? "",
-            Iterations = Iterations
+            Iterations = Iterations,
+            FromFirstRound = fromFirstRound
         };
 
         var teams = new List<LeagueTeamForecast>();
@@ -115,10 +119,13 @@ public class LeagueSimulationService
             var awayId = int.Parse(m.Element("AwayTeam")?.Element("AwayTeamID")?.Value ?? "0");
             if (!teamIndex.TryGetValue(homeId, out var hi) || !teamIndex.TryGetValue(awayId, out var ai)) continue;
 
-            bool played = m.Element("HomeGoals") != null && m.Element("AwayGoals") != null;
-            if (played) continue;
-            var date = ParseDate(m.Element("MatchDate")?.Value);
-            if (date != null && date < DateTime.UtcNow.AddHours(-3)) continue; // mecz trwa / brak wyniku w cache HT
+            if (!fromFirstRound)
+            {
+                bool played = m.Element("HomeGoals") != null && m.Element("AwayGoals") != null;
+                if (played) continue;
+                var date = ParseDate(m.Element("MatchDate")?.Value);
+                if (date != null && date < DateTime.UtcNow.AddHours(-3)) continue; // mecz trwa / brak wyniku w cache HT
+            }
 
             remaining.Add((hi, ai));
         }
@@ -130,11 +137,13 @@ public class LeagueSimulationService
         {
             try
             {
-                var scout = await _scout.GetScoutReportAsync(teams[i].TeamId, ScoutMatchCount, includeLineups: false);
+                // Tylko mecze ligowe — towarzyskie (rezerwy) zanizaja szacunek sily.
+                var scout = await _scout.GetScoutReportAsync(teams[i].TeamId, ScoutMatchCount, includeLineups: false, leagueOnly: true);
                 if (scout.MatchesAnalyzed > 0)
                 {
                     ratings[i] = scout.WeightedRatings;
                     teams[i].RatingsSource = "scout";
+                    teams[i].TypicalTactic = scout.MostCommonTactic;
                 }
             }
             catch (ChppApiException ex)
@@ -148,7 +157,9 @@ public class LeagueSimulationService
 
         // Prawdopodobienstwa lambd per mecz liczone raz, potem Monte Carlo.
         var lambdas = remaining
-            .Select(f => ComputeLambdas(ratings[f.HomeIdx], ratings[f.AwayIdx]))
+            .Select(f => ComputeLambdas(
+                ratings[f.HomeIdx], ratings[f.AwayIdx],
+                teams[f.HomeIdx].TypicalTactic, teams[f.AwayIdx].TypicalTactic))
             .ToList();
 
         RunMonteCarlo(teams, remaining, lambdas, report);
@@ -166,7 +177,9 @@ public class LeagueSimulationService
         var positionCounts = new int[n, n]; // [team, pozycja-1]
         var pointsSum = new double[n];
         // Staly seed: wynik stabilny miedzy wywolaniami dla tego samego stanu ligi.
-        var rng = new Random(report.LeagueLevelUnitId * 397 + remaining.Count);
+        var rng = new Random(report.LeagueLevelUnitId * 397 + remaining.Count * 2 + (report.FromFirstRound ? 1 : 0));
+        // Od 1. kolejki: punkty i bramki liczone od zera, wyniki rozegranych meczow ignorowane.
+        bool fromZero = report.FromFirstRound;
 
         var simPoints = new int[n];
         var simGf = new int[n];
@@ -177,9 +190,9 @@ public class LeagueSimulationService
         {
             for (int i = 0; i < n; i++)
             {
-                simPoints[i] = teams[i].Points;
-                simGf[i] = teams[i].GoalsFor;
-                simGa[i] = teams[i].GoalsAgainst;
+                simPoints[i] = fromZero ? 0 : teams[i].Points;
+                simGf[i] = fromZero ? 0 : teams[i].GoalsFor;
+                simGa[i] = fromZero ? 0 : teams[i].GoalsAgainst;
                 order[i] = i;
             }
 
@@ -231,9 +244,12 @@ public class LeagueSimulationService
     /// <summary>
     /// Oczekiwane bramki obu druzyn tym samym modelem co RatingEngine.PredictOutcome
     /// (10 akcji dzielonych srodkiem pola ^2.75, finalizacja ^3.5, rozklad sektorow
-    /// 35/25/25/15), bez czesci zaleznych od skladu (kontra, pressing, strzaly z dystansu).
+    /// 35/25/25/15). Taktyki modyfikujace OCENY (AIM/AOW/kreatywnie/strzaly) sa juz
+    /// zawarte w realnych ocenach z matchdetails; osobno modelujemy tylko kontre
+    /// (dodatkowe szanse przy mniejszosci posiadania) i pressing (tlumi obie strony).
     /// </summary>
-    internal static (double Home, double Away) ComputeLambdas(TeamRatings home, TeamRatings away)
+    internal static (double Home, double Away) ComputeLambdas(
+        TeamRatings home, TeamRatings away, string homeTactic = "Normal", string awayTactic = "Normal")
     {
         double midHome = Math.Max(0.01, home.MidfieldRating * FormationData.TacticModifiers.HomeAdvantage);
         double midAway = Math.Max(0.01, away.MidfieldRating);
@@ -260,9 +276,26 @@ public class LeagueSimulationService
             0.25 * FinProb(away.LeftAttackRating, home.RightDefenseRating) +
             0.15 * FinProb(awayIspAtt, homeIspDef);
 
+        double lamHome = actionsHome * pGoalHome;
+        double lamAway = actionsAway * pGoalAway;
+
+        // Kontra: dodatkowe szanse z przechwytow przy mniejszosci posiadania.
+        // Konwersja ~0.2 (srodek przedzialu RatingEngine 0.05-0.35 — brak skilli obroncow).
+        const double CounterConversion = 0.2;
+        if (homeTactic == "Counter" && homeShare < 0.5) lamHome += actionsAway * CounterConversion * pGoalHome;
+        if (awayTactic == "Counter" && homeShare > 0.5) lamAway += actionsHome * CounterConversion * pGoalAway;
+
+        // Pressing: tlumi szanse OBU druzyn (srodek przedzialu RatingEngine 0.10-0.30).
+        const double PressingSuppression = 0.2;
+        if (homeTactic == "Pressing" || awayTactic == "Pressing")
+        {
+            lamHome *= 1 - PressingSuppression;
+            lamAway *= 1 - PressingSuppression;
+        }
+
         return (
-            Math.Clamp(actionsHome * pGoalHome, 0.05, 8.0),
-            Math.Clamp(actionsAway * pGoalAway, 0.05, 8.0)
+            Math.Clamp(lamHome, 0.05, 8.0),
+            Math.Clamp(lamAway, 0.05, 8.0)
         );
     }
 
@@ -309,6 +342,8 @@ public class LeagueSimulationReport
     public string LeagueName { get; set; } = string.Empty;
     public int RemainingMatches { get; set; }
     public int Iterations { get; set; }
+    // true = symulacja calego sezonu od 1. kolejki (bez uwzgledniania rozegranych wynikow).
+    public bool FromFirstRound { get; set; }
     public List<LeagueTeamForecast> Teams { get; set; } = new();
 }
 
@@ -328,5 +363,7 @@ public class LeagueTeamForecast
     // Indeks 0 = pozycja 1. Suma = 1 dla kazdej druzyny.
     public double[] PositionProbabilities { get; set; } = Array.Empty<double>();
     public string RatingsSource { get; set; } = "default";
+    // Najczestsza taktyka z ligowych meczow (skaut) — uzyta w modelu meczu.
+    public string TypicalTactic { get; set; } = "Normal";
     public TeamRatings? Ratings { get; set; }
 }

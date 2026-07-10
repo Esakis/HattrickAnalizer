@@ -1,5 +1,5 @@
 // Styl spójny z resztą aplikacji (optymalizator): zielone gradienty, białe karty.
-.league-container {
+.scout-container {
   width: 100%;
   margin: 0;
   padding: 0;
@@ -57,27 +57,17 @@
   }
 }
 
-.league-body {
+.scout-body {
   padding: 0 20px 20px;
 }
 
-.league-columns {
-  display: grid;
-  grid-template-columns: minmax(320px, 1fr) 2fr;
-  gap: 15px;
-  align-items: start;
-
-  @media (max-width: 1100px) {
-    grid-template-columns: 1fr;
-  }
-}
-
-.league-card {
+.scout-card {
   background: white;
   padding: 15px 20px;
   border-radius: 10px;
   box-shadow: 0 4px 15px rgba(46, 125, 50, 0.15);
   border: 2px solid #a5d6a7;
+  margin-bottom: 15px;
 
   h3 {
     color: #1b5e20;
@@ -87,55 +77,129 @@
     padding-bottom: 8px;
     border-bottom: 2px solid #e8f5e9;
   }
+
+  .ratings-header {
+    margin-top: 16px;
+  }
 }
 
-.sim-buttons {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
+.scout-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  align-items: start;
 
-  .btn-sim {
-    padding: 8px 16px;
-    border: 2px solid #2e7d32;
-    border-radius: 6px;
-    background: white;
-    color: #2e7d32;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
+  @media (max-width: 1000px) {
+    grid-template-columns: 1fr;
+  }
+}
 
-    &:hover:not(:disabled) {
-      background: #e8f5e9;
+.scout-controls {
+  .control-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+
+    label {
+      font-weight: 600;
+      color: #1b5e20;
     }
 
-    &.active {
+    .team-input {
+      width: 130px;
+      padding: 8px 10px;
+      border: 2px solid #c8e6c9;
+      border-radius: 6px;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+    }
+
+    .btn-primary {
       background: #2e7d32;
       color: white;
+      border: 2px solid #2e7d32;
+
+      &:hover:not(:disabled) {
+        background: #1b5e20;
+      }
     }
 
-    &:disabled {
-      opacity: 0.6;
-      cursor: default;
+    .btn-secondary {
+      background: white;
+      color: #2e7d32;
+      border: 2px solid #2e7d32;
+
+      &:hover:not(:disabled) {
+        background: #e8f5e9;
+      }
     }
   }
 }
 
-.league-meta {
-  color: #555;
-  font-size: 0.9em;
+.stat-item {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 0;
+
+  .stat-label {
+    color: #666;
+  }
+
+  .stat-value {
+    font-weight: 600;
+  }
+
+  .stat-highlight {
+    color: #2e7d32;
+  }
 }
 
-.league-note {
-  color: #8d6e63;
-  font-style: italic;
+.ratings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+
+  .rating-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px;
+    background: #f1f8e9;
+    border-radius: 6px;
+    border: 1px solid #c8e6c9;
+
+    .rating-label {
+      font-size: 0.8em;
+      color: #666;
+    }
+
+    .rating-value {
+      font-size: 1.3em;
+      font-weight: 700;
+      color: #1b5e20;
+    }
+  }
 }
 
-.league-table-wrap {
+.scout-table-wrap {
   overflow-x: auto;
 }
 
-.league-table {
+.scout-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9em;
@@ -157,22 +221,6 @@
     text-align: left;
     min-width: 140px;
   }
-
-  .pos-col {
-    min-width: 42px;
-    font-size: 0.85em;
-  }
-
-  .own-team {
-    font-weight: 700;
-    background: #fffde7;
-  }
-}
-
-.league-hint {
-  margin-top: 10px;
-  color: #777;
-  font-size: 0.85em;
 }
 
 .loading-indicator {

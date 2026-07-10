@@ -31,16 +31,18 @@ public class OpponentScoutService
 
     // includeLineups=false pomija matchlineup (bez przewidywanej XI) — o polowe mniej
     // zapytan CHPP; uzywane przy skanowaniu calej ligi przez symulator tabeli.
-    public async Task<OpponentScoutReport> GetScoutReportAsync(int teamId, int count = DefaultMatchCount, bool includeLineups = true)
+    // leagueOnly=true ogranicza do meczow ligowych (typ 1) — towarzyskie graja czesto
+    // rezerwami i zanizaja oceny, co psuje szacunek sily do symulacji sezonu.
+    public async Task<OpponentScoutReport> GetScoutReportAsync(int teamId, int count = DefaultMatchCount, bool includeLineups = true, bool leagueOnly = false)
     {
         count = Math.Clamp(count, 2, 10);
-        var cacheKey = $"{teamId}:{count}:{includeLineups}";
+        var cacheKey = $"{teamId}:{count}:{includeLineups}:{leagueOnly}";
         if (Cache.TryGetValue(cacheKey, out var cached) && DateTime.UtcNow - cached.At < CacheTtl)
         {
             return cached.Report;
         }
 
-        var report = await BuildReportAsync(teamId, count, includeLineups);
+        var report = await BuildReportAsync(teamId, count, includeLineups, leagueOnly);
         Cache[cacheKey] = (DateTime.UtcNow, report);
         return report;
     }
@@ -78,7 +80,7 @@ public class OpponentScoutService
         return await _api.GetOpponentRatingsAsync(teamId);
     }
 
-    private async Task<OpponentScoutReport> BuildReportAsync(int teamId, int count, bool includeLineups = true)
+    private async Task<OpponentScoutReport> BuildReportAsync(int teamId, int count, bool includeLineups = true, bool leagueOnly = false)
     {
         var matchesDoc = await _api.FetchChppXmlAsync(new Dictionary<string, string>
         {
@@ -90,8 +92,8 @@ public class OpponentScoutService
             {
                 var status = m.Element("Status")?.Value ?? "";
                 var matchType = int.Parse(m.Element("MatchType")?.Value ?? "0");
-                return status.Equals("FINISHED", StringComparison.OrdinalIgnoreCase)
-                    && matchType >= 1 && matchType <= 12;
+                bool typeOk = leagueOnly ? matchType == 1 : matchType >= 1 && matchType <= 12;
+                return status.Equals("FINISHED", StringComparison.OrdinalIgnoreCase) && typeOk;
             })
             .OrderByDescending(m => ParseDate(m.Element("MatchDate")?.Value) ?? DateTime.MinValue)
             .Take(count)

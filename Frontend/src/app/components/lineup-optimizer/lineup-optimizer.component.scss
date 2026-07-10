@@ -1353,6 +1353,53 @@ details > summary {
   border-top: 1px dashed #c8e6c9;
 }
 
+// ==================== SKAUT PRZECIWNIKA ====================
+
+.scout-report {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #c8e6c9;
+
+  h4 {
+    margin: 0 0 8px;
+  }
+
+  .scout-matches {
+    margin-top: 8px;
+    overflow-x: auto;
+  }
+
+  .scout-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85em;
+
+    th, td {
+      padding: 4px 8px;
+      text-align: left;
+      border-bottom: 1px solid #e0e0e0;
+      white-space: nowrap;
+    }
+
+    th {
+      font-weight: 600;
+      color: #555;
+    }
+  }
+
+  .scout-starters {
+    margin-top: 8px;
+  }
+
+  .scout-starter-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-top: 4px;
+    font-size: 0.85em;
+  }
+}
+
 // ==================== TRENER I SZTAB ====================
 
 .staff-section {

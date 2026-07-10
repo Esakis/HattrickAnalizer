@@ -521,5 +521,19 @@
     "matches": "mecze",
     "formationsLast5": "Formacje (5 m.):",
     "mostCommon": "Najczęstsza:"
+  },
+  "scout": {
+    "title": "Skaut przeciwnika",
+    "matchesAnalyzed": "przeanalizowane mecze",
+    "mostCommonTactic": "Taktyki",
+    "weightedRatings": "Średnie oceny (ważone)",
+    "defense": "obrona",
+    "attack": "atak",
+    "date": "Data",
+    "opponent": "Przeciwnik",
+    "result": "Wynik",
+    "formation": "Formacja",
+    "tactic": "Taktyka",
+    "likelyStarters": "Przewidywana XI"
   }
 }

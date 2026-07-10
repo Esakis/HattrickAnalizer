@@ -204,7 +204,7 @@ public class CalibrationService
     private static DateTime? ParseDate(string? value) =>
         DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt) ? dt : null;
 
-    private static string MapTacticCode(int code) => code switch
+    internal static string MapTacticCode(int code) => code switch
     {
         1 => "Pressing",
         2 => "Counter",
@@ -215,7 +215,7 @@ public class CalibrationService
         _ => "Normal"
     };
 
-    private static string MapRoleIdToSlot(int roleId) => roleId switch
+    internal static string MapRoleIdToSlot(int roleId) => roleId switch
     {
         100 => "GK",
         101 => "RWB", 102 => "RCD", 103 => "CD", 104 => "LCD", 105 => "LWB",

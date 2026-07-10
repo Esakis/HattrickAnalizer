@@ -6,6 +6,7 @@ import { OptimizerRequest, OptimizerResponse, LineupPosition, Lineup } from '../
 import { TranslateService } from '@ngx-translate/core';
 import { DataCacheService } from '../../services/data-cache.service';
 import { Player } from '../../models/player.model';
+import { OpponentScoutReport } from '../../models/opponent-scout.model';
 
 @Component({
   selector: 'app-lineup-optimizer',
@@ -40,6 +41,10 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   opponentTeamStats: any = null;
   loadingMyTeamStats: boolean = false;
   loadingOpponentTeamStats: boolean = false;
+
+  // Raport skauta przeciwnika
+  opponentScout: OpponentScoutReport | null = null;
+  loadingOpponentScout: boolean = false;
   
   myTeamName: string = '';
   opponentTeamName: string = '';
@@ -114,6 +119,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
         if (!this.opponentTeamId) this.opponentTeamId = opp.opponentTeamId;
         this.loadOpponentTeam();
         this.loadOpponentTeamStats();
+        this.loadOpponentScout();
       }
     });
   }
@@ -168,6 +174,9 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
 
     const cachedOppStats = this.cache.opponentTeamStats$.value;
     if (cachedOppStats) this.opponentTeamStats = cachedOppStats;
+
+    const cachedScout = this.cache.opponentScout$.value;
+    if (cachedScout) this.opponentScout = cachedScout;
 
     const cachedExp = this.cache.formationExperience$.value;
     if (cachedExp) {
@@ -497,13 +506,48 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
         this.opponentTeamName = '';
         this.opponentTeamStats = null;
         this.opponentOptimalLineup = null;
+        this.opponentScout = null;
         this.cache.opponentPlayers$.next(null);
         this.cache.opponentTeamStats$.next(null);
         this.cache.opponentOptimalLineup$.next(null);
+        this.cache.opponentScout$.next(null);
       }
       this.loadOpponentTeam();
       this.loadOpponentTeamStats();
+      this.loadOpponentScout();
     }
+  }
+
+  loadOpponentScout(): void {
+    if (!this.opponentTeamId) return;
+
+    const cached = this.cache.opponentScout$.value;
+    if (cached?.teamId === this.opponentTeamId) {
+      this.opponentScout = cached;
+      return;
+    }
+
+    this.loadingOpponentScout = true;
+    this.hattrickApi.getOpponentScout(this.opponentTeamId).subscribe({
+      next: (report) => {
+        this.opponentScout = report;
+        this.loadingOpponentScout = false;
+        this.cache.opponentScout$.next(report);
+      },
+      error: (err) => {
+        console.error('Error loading opponent scout:', err);
+        this.opponentScout = null;
+        this.loadingOpponentScout = false;
+      }
+    });
+  }
+
+  get scoutTacticSummary(): string {
+    if (!this.opponentScout) return '';
+    return Object.entries(this.opponentScout.tacticCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([tactic, count]) => `${this.getTacticLabel(tactic)} (${count})`)
+      .join(', ');
   }
 
   get myTeamAverageAge(): string {

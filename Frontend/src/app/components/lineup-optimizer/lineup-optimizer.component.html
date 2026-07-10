@@ -269,6 +269,56 @@
           {{ 'optimizer.enterTeamId' | translate }}
         </div>
 
+        <!-- Raport skauta przeciwnika -->
+        <div *ngIf="loadingOpponentScout" class="loading-indicator">
+          {{ 'common.loading' | translate }} {{ 'scout.title' | translate }}...
+        </div>
+        <div *ngIf="!loadingOpponentScout && opponentScout && opponentScout.matchesAnalyzed > 0" class="scout-report">
+          <h4>🔎 {{ 'scout.title' | translate }} ({{ 'scout.matchesAnalyzed' | translate }}: {{ opponentScout.matchesAnalyzed }})</h4>
+          <div class="stat-item">
+            <span class="stat-label">{{ 'scout.mostCommonTactic' | translate }}:</span>
+            <span class="stat-value stat-highlight">{{ scoutTacticSummary }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">{{ 'scout.weightedRatings' | translate }}:</span>
+            <span class="stat-value">
+              {{ 'optimizer.comparison.midfield' | translate }} {{ opponentScout.weightedRatings.midfieldRating }},
+              {{ 'scout.defense' | translate }} {{ opponentScout.weightedRatings.leftDefenseRating }}/{{ opponentScout.weightedRatings.centralDefenseRating }}/{{ opponentScout.weightedRatings.rightDefenseRating }},
+              {{ 'scout.attack' | translate }} {{ opponentScout.weightedRatings.leftAttackRating }}/{{ opponentScout.weightedRatings.centralAttackRating }}/{{ opponentScout.weightedRatings.rightAttackRating }}
+            </span>
+          </div>
+          <div class="scout-matches">
+            <table class="scout-table">
+              <thead>
+                <tr>
+                  <th>{{ 'scout.date' | translate }}</th>
+                  <th>{{ 'scout.opponent' | translate }}</th>
+                  <th>{{ 'scout.result' | translate }}</th>
+                  <th>{{ 'scout.formation' | translate }}</th>
+                  <th>{{ 'scout.tactic' | translate }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let m of opponentScout.matches">
+                  <td>{{ m.matchDate | date:'dd.MM' }}</td>
+                  <td>{{ m.opponent }} {{ m.isHomeMatch ? '(D)' : '(W)' }}</td>
+                  <td>{{ m.goalsFor }}-{{ m.goalsAgainst }}</td>
+                  <td>{{ m.formation }}</td>
+                  <td>{{ getTacticLabel(m.tactic) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="scout-starters" *ngIf="opponentScout.likelyStarters.length > 0">
+            <span class="stat-label">{{ 'scout.likelyStarters' | translate }}:</span>
+            <div class="scout-starter-list">
+              <span *ngFor="let s of opponentScout.likelyStarters" class="scout-starter">
+                <strong>{{ getPositionLabel(s.slot) }}</strong> {{ s.playerName }} ({{ s.appearances }}/{{ opponentScout.matchesAnalyzed }})
+              </span>
+            </div>
+          </div>
+        </div>
+
         <!-- Wybór formacji i taktyki przeciwnika -->
         <div class="opponent-formation-select" *ngIf="opponentTeamPlayers.length > 0">
           <div class="form-group-inline">

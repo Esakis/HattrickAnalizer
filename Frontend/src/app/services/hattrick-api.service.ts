@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { Team } from '../models/team.model';
 import { Player } from '../models/player.model';
 import { OptimizerRequest, OptimizerResponse } from '../models/lineup.model';
+import { OpponentScoutReport } from '../models/opponent-scout.model';
 import { AuthInfo, NextOpponent } from './data-cache.service';
 import { environment } from '../../environments/environment';
 
@@ -29,6 +30,10 @@ export class HattrickApiService {
 
   getFormationExperience(teamId: number): Observable<{ [formation: string]: number }> {
     return this.http.get<{ [formation: string]: number }>(`${this.apiUrl}/team/${teamId}/formation-experience`);
+  }
+
+  getOpponentScout(teamId: number, count: number = 5): Observable<OpponentScoutReport> {
+    return this.http.get<OpponentScoutReport>(`${this.apiUrl}/team/${teamId}/scout?count=${count}`);
   }
 
   getNextOpponent(): Observable<NextOpponent> {

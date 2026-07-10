@@ -11,6 +11,7 @@ namespace HattrickAnalizer.Services;
 public class AdvancedLineupOptimizer
 {
     private readonly HattrickApiService _hattrickApi;
+    private readonly OpponentScoutService _scout;
 
     // Wlasciwe taktyki Hattricka (MatchTacticType)
     private static readonly string[] AllTactics =
@@ -22,15 +23,18 @@ public class AdvancedLineupOptimizer
 
     private readonly RatingEngine _engine = new();
 
-    public AdvancedLineupOptimizer(HattrickApiService hattrickApi)
+    public AdvancedLineupOptimizer(HattrickApiService hattrickApi, OpponentScoutService scout)
     {
         _hattrickApi = hattrickApi;
+        _scout = scout;
     }
 
     public async Task<OptimizerResponse> OptimizeLineupAsync(OptimizerRequest request)
     {
         var myTeam = await _hattrickApi.GetTeamDetailsAsync(request.MyTeamId);
-        var opponentResult = await _hattrickApi.GetOpponentRatingsAsync(request.OpponentTeamId);
+        // Oceny przeciwnika ze skauta (srednia wazona z ostatnich meczow) zamiast
+        // pojedynczego ostatniego meczu — mniejsza wariancja pojedynczego wystawienia.
+        var opponentResult = await _scout.GetWeightedRatingsAsync(request.OpponentTeamId);
         var opponentRatings = opponentResult.Ratings;
         var context = new MatchContext
         {

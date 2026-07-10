@@ -3,6 +3,7 @@ import { BehaviorSubject } from 'rxjs';
 import { Team } from '../models/team.model';
 import { Lineup, OptimizerResponse } from '../models/lineup.model';
 import { Player } from '../models/player.model';
+import { OpponentScoutReport } from '../models/opponent-scout.model';
 
 export interface NextOpponent {
   matchId: number;
@@ -59,6 +60,7 @@ export class DataCacheService {
   readonly opponentPlayers$ = new BehaviorSubject<Player[] | null>(null);
   readonly myTeamStats$ = new BehaviorSubject<any>(null);
   readonly opponentTeamStats$ = new BehaviorSubject<any>(null);
+  readonly opponentScout$ = new BehaviorSubject<OpponentScoutReport | null>(null);
   readonly formationExperience$ = new BehaviorSubject<{ [k: string]: number } | null>(null);
   readonly optimizerResult$ = new BehaviorSubject<OptimizerResponse | null>(null);
   readonly opponentOptimalLineup$ = new BehaviorSubject<Lineup | null>(null);

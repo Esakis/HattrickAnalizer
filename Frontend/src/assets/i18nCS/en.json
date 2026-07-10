@@ -520,5 +520,19 @@
     "matches": "matches",
     "formationsLast5": "Formations (5 m.):",
     "mostCommon": "Most common:"
+  },
+  "scout": {
+    "title": "Opponent scout",
+    "matchesAnalyzed": "matches analyzed",
+    "mostCommonTactic": "Tactics",
+    "weightedRatings": "Average ratings (weighted)",
+    "defense": "defense",
+    "attack": "attack",
+    "date": "Date",
+    "opponent": "Opponent",
+    "result": "Result",
+    "formation": "Formation",
+    "tactic": "Tactic",
+    "likelyStarters": "Predicted XI"
   }
 }

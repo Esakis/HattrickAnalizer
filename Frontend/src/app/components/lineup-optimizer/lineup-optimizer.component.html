@@ -361,6 +361,13 @@
       <!-- MÓJ OPTYMALNY SKŁAD -->
       <div class="lineup-section my-lineup-section">
         <h2> {{ 'optimizer.optimalLineup' | translate }}</h2>
+        <div class="send-orders" *ngIf="canSendOrders">
+          <button class="btn-send-orders" (click)="sendLineupToHattrick()" [disabled]="sendingOrders">
+            {{ sendingOrders ? ('matchOrders.sending' | translate) : ('matchOrders.send' | translate) }}
+          </button>
+          <span *ngIf="ordersSuccess" class="orders-success">✅ {{ 'matchOrders.success' | translate }}</span>
+          <span *ngIf="ordersError" class="orders-error">{{ ordersError }}</span>
+        </div>
         <div *ngIf="result.optimalLineup.formation" class="formation-info">
           <span class="formation-label">{{ 'optimizer.formation' | translate }}:</span>
           <span class="formation-value">{{ result.optimalLineup.formation }}</span>

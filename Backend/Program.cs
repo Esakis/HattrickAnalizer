@@ -16,6 +16,7 @@ builder.Services.AddScoped<CalibrationService>();
 builder.Services.AddScoped<OpponentScoutService>();
 builder.Services.AddScoped<LeagueSimulationService>();
 builder.Services.AddScoped<TrainingService>();
+builder.Services.AddScoped<MatchOrdersService>();
 builder.Services.AddSingleton<OAuthService>();
 builder.Services.AddSingleton<TokenStore>();
 builder.Services.AddSingleton<PlayerHistoryService>();

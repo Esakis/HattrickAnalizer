@@ -20,7 +20,9 @@ public class OAuthService
         _httpClient = httpClient;
     }
 
-    public async Task<(string Token, string TokenSecret, string AuthUrl)> GetRequestTokenAsync(string callbackUrl = "oob")
+    // scope np. "set_matchorder" — musi byc zatwierdzony dla klucza CHPP przez Hattrick.
+    // Przekazywany TYLKO w URL autoryzacji (nie wchodzi do podpisu OAuth).
+    public async Task<(string Token, string TokenSecret, string AuthUrl)> GetRequestTokenAsync(string callbackUrl = "oob", string scope = "")
     {
         var consumerKey = _configuration["HattrickApi:ConsumerKey"];
         var consumerSecret = _configuration["HattrickApi:ConsumerSecret"];
@@ -58,6 +60,10 @@ public class OAuthService
             throw new Exception($"Niepoprawna odpowiedź OAuth (request token) — brak tokenów: {responseContent}");
         }
         var authUrl = $"{AuthorizeUrl}?oauth_token={token}";
+        if (!string.IsNullOrWhiteSpace(scope))
+        {
+            authUrl += $"&scope={Uri.EscapeDataString(scope)}";
+        }
 
         return (token, tokenSecret, authUrl);
     }
@@ -112,13 +118,16 @@ public class OAuthService
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
     private const int CacheMaxEntries = 500;
 
+    // useCache=false dla operacji zapisu (np. matchorders) — odpowiedz nie moze byc
+    // ani zwrocona z cache, ani do niego zapisana.
     public async Task<string> MakeAuthenticatedRequestAsync(
         string accessToken,
         string accessTokenSecret,
-        Dictionary<string, string> queryParams)
+        Dictionary<string, string> queryParams,
+        bool useCache = true)
     {
         var cacheKey = accessToken + "|" + string.Join("&", queryParams.OrderBy(p => p.Key).Select(p => $"{p.Key}={p.Value}"));
-        if (_responseCache.TryGetValue(cacheKey, out var cached) && DateTime.UtcNow - cached.FetchedAt < CacheTtl)
+        if (useCache && _responseCache.TryGetValue(cacheKey, out var cached) && DateTime.UtcNow - cached.FetchedAt < CacheTtl)
         {
             return cached.Xml;
         }
@@ -160,16 +169,19 @@ public class OAuthService
             throw new Exception($"Failed to access protected resource: {responseContent}");
         }
 
-        if (_responseCache.Count >= CacheMaxEntries)
+        if (useCache)
         {
-            // Prosta ewikcja: usun przeterminowane, a gdy nadal pelno — wyczysc.
-            foreach (var kv in _responseCache)
+            if (_responseCache.Count >= CacheMaxEntries)
             {
-                if (DateTime.UtcNow - kv.Value.FetchedAt >= CacheTtl) _responseCache.TryRemove(kv.Key, out _);
+                // Prosta ewikcja: usun przeterminowane, a gdy nadal pelno — wyczysc.
+                foreach (var kv in _responseCache)
+                {
+                    if (DateTime.UtcNow - kv.Value.FetchedAt >= CacheTtl) _responseCache.TryRemove(kv.Key, out _);
+                }
+                if (_responseCache.Count >= CacheMaxEntries) _responseCache.Clear();
             }
-            if (_responseCache.Count >= CacheMaxEntries) _responseCache.Clear();
+            _responseCache[cacheKey] = (DateTime.UtcNow, responseContent);
         }
-        _responseCache[cacheKey] = (DateTime.UtcNow, responseContent);
 
         return responseContent;
     }

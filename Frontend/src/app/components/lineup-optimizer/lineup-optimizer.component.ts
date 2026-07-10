@@ -543,6 +543,57 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     });
   }
 
+  // Wysyłanie składu do Hattricka (wymaga tokenu ze scope set_matchorder)
+  sendingOrders: boolean = false;
+  ordersSuccess: boolean = false;
+  ordersError: string | null = null;
+
+  get canSendOrders(): boolean {
+    const nextOpp = this.cache.nextOpponent$.value;
+    return !!this.result?.optimalLineup?.positions
+      && !!nextOpp?.matchId
+      && nextOpp.opponentTeamId === this.opponentTeamId;
+  }
+
+  sendLineupToHattrick(): void {
+    const nextOpp = this.cache.nextOpponent$.value;
+    if (!this.canSendOrders || !nextOpp) return;
+
+    const positions: { [slot: string]: { playerId: number; behaviour: string } } = {};
+    const players: Player[] = [];
+    for (const [slot, pos] of Object.entries(this.result!.optimalLineup.positions)) {
+      if (!pos.player) continue;
+      positions[slot] = { playerId: pos.player.playerId, behaviour: pos.behavior };
+      players.push(pos.player);
+    }
+    if (players.length < 9) return;
+
+    // Kapitan: najbardziej doświadczony; wykonawca SFG: najlepsze stałe fragmenty.
+    const captain = players.reduce((a, b) => ((a.experience ?? 0) >= (b.experience ?? 0) ? a : b));
+    const spTaker = players.reduce((a, b) => ((a.skills?.setPieces ?? 0) >= (b.skills?.setPieces ?? 0) ? a : b));
+
+    this.sendingOrders = true;
+    this.ordersSuccess = false;
+    this.ordersError = null;
+    this.hattrickApi.sendMatchOrders({
+      matchId: nextOpp.matchId,
+      positions,
+      tactic: this.result!.optimalLineup.tacticType,
+      attitude: this.teamAttitude,
+      captainId: captain.playerId,
+      setPiecesTakerId: spTaker.playerId
+    }).subscribe({
+      next: () => {
+        this.sendingOrders = false;
+        this.ordersSuccess = true;
+      },
+      error: (err) => {
+        this.sendingOrders = false;
+        this.ordersError = err?.error?.error ?? err?.message ?? 'error';
+      }
+    });
+  }
+
   getWeatherIcon(weatherId: number): string {
     switch (weatherId) {
       case 0: return '🌧️';

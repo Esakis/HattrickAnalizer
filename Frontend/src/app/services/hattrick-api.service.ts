@@ -54,8 +54,13 @@ export class HattrickApiService {
     return this.http.post<OptimizerResponse>(`${this.apiUrl}/optimizer/optimize`, request);
   }
 
-  startOAuthFlow(): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/oauth/start`);
+  startOAuthFlow(scope: string = ''): Observable<any> {
+    const query = scope ? `?scope=${encodeURIComponent(scope)}` : '';
+    return this.http.get<any>(`${this.apiUrl}/oauth/start${query}`);
+  }
+
+  sendMatchOrders(request: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/matchorders`, request);
   }
 
   completeOAuthFlow(sessionId: string, verifier: string): Observable<any> {

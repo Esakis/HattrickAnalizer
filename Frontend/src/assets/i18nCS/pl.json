@@ -204,7 +204,8 @@
       "title": "Krok 1: Rozpocznij autoryzację",
       "description": "Kliknij poniższy przycisk, aby rozpocząć proces autoryzacji z Hattrick API.",
       "button": "Rozpocznij autoryzację OAuth",
-      "initializing": "Inicjalizacja..."
+      "initializing": "Inicjalizacja...",
+      "matchOrdersScope": "Poproś też o uprawnienie do wysyłania składu (set_matchorder) — wymagane przez przycisk „Wyślij skład do Hattricka”"
     },
     "step2": {
       "title": "Krok 2: Autoryzuj aplikację",
@@ -523,6 +524,11 @@
     "matches": "mecze",
     "formationsLast5": "Formacje (5 m.):",
     "mostCommon": "Najczęstsza:"
+  },
+  "matchOrders": {
+    "send": "📤 Wyślij skład do Hattricka",
+    "sending": "Wysyłanie...",
+    "success": "Skład wysłany do Hattricka!"
   },
   "training": {
     "title": "Trening",

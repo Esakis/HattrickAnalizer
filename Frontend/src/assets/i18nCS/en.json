@@ -204,7 +204,8 @@
       "title": "Step 1: Start Authorization",
       "description": "Click the button below to start the authorization process with Hattrick API.",
       "button": "Start OAuth Authorization",
-      "initializing": "Initializing..."
+      "initializing": "Initializing...",
+      "matchOrdersScope": "Also request the set match orders permission (set_matchorder) — required by the \"Send lineup to Hattrick\" button"
     },
     "step2": {
       "title": "Step 2: Authorize Application",
@@ -522,6 +523,11 @@
     "matches": "matches",
     "formationsLast5": "Formations (5 m.):",
     "mostCommon": "Most common:"
+  },
+  "matchOrders": {
+    "send": "📤 Send lineup to Hattrick",
+    "sending": "Sending...",
+    "success": "Lineup sent to Hattrick!"
   },
   "training": {
     "title": "Training",

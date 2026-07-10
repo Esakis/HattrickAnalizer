@@ -16,6 +16,8 @@ export class OAuthSetupComponent {
   loading: boolean = false;
   error: string | null = null;
   success: boolean = false;
+  // Uprawnienie set_matchorder — pozwala wysyłać ustawienie meczowe do Hattricka.
+  withMatchOrders: boolean = false;
 
   constructor(private hattrickApi: HattrickApiService, private translate: TranslateService) {}
 
@@ -24,7 +26,9 @@ export class OAuthSetupComponent {
     this.error = null;
 
     try {
-      const response = await firstValueFrom(this.hattrickApi.startOAuthFlow());
+      const response = await firstValueFrom(
+        this.hattrickApi.startOAuthFlow(this.withMatchOrders ? 'set_matchorder' : '')
+      );
       this.sessionId = response.sessionId;
       this.authorizationUrl = response.authorizationUrl;
       this.step = 2;

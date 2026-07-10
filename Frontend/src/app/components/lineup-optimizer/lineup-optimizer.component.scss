@@ -1353,6 +1353,44 @@ details > summary {
   border-top: 1px dashed #c8e6c9;
 }
 
+// ==================== WYSYŁANIE SKŁADU ====================
+
+.send-orders {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 6px 0 10px;
+
+  .btn-send-orders {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 6px;
+    background: #1565c0;
+    color: white;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: #0d47a1;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
+
+  .orders-success {
+    color: #2e7d32;
+    font-weight: 600;
+  }
+
+  .orders-error {
+    color: #c62828;
+    font-size: 0.85em;
+  }
+}
+
 // ==================== POGODA ====================
 
 .weather-bar {

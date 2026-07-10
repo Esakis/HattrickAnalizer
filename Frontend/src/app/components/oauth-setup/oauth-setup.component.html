@@ -29,7 +29,11 @@
     <div *ngIf="step === 1" class="step-1">
       <h2>{{ 'oauth.step1.title' | translate }}</h2>
       <p>{{ 'oauth.step1.description' | translate }}</p>
-      <button 
+      <label class="scope-checkbox">
+        <input type="checkbox" [(ngModel)]="withMatchOrders">
+        {{ 'oauth.step1.matchOrdersScope' | translate }}
+      </label>
+      <button
         (click)="startAuthorization()" 
         [disabled]="loading"
         class="btn-primary">

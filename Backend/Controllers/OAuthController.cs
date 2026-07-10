@@ -41,13 +41,14 @@ public class OAuthController : ControllerBase
         return sessionId;
     }
 
+    // scope np. "set_matchorder" — wymagany do wysyłania składu; pusty = tylko odczyt.
     [HttpGet("start")]
-    public async Task<IActionResult> StartAuthorization()
+    public async Task<IActionResult> StartAuthorization([FromQuery] string? scope = null)
     {
         try
         {
             var sessionId = GetOrCreateSessionId();
-            var (token, tokenSecret, authUrl) = await _oauthService.GetRequestTokenAsync();
+            var (token, tokenSecret, authUrl) = await _oauthService.GetRequestTokenAsync("oob", scope ?? "");
 
             _tokenStore.SavePending(sessionId, new PendingAuth
             {

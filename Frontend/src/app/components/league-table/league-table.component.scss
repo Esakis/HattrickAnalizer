@@ -1,0 +1,98 @@
+.league-container {
+  padding: 20px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.league-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+
+  h1 {
+    margin: 0;
+    font-size: 1.5em;
+  }
+
+  .btn-back {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 6px;
+    background: #e0e0e0;
+    cursor: pointer;
+
+    &:hover {
+      background: #d5d5d5;
+    }
+  }
+}
+
+.league-meta {
+  color: #555;
+}
+
+.league-note {
+  color: #8d6e63;
+  font-style: italic;
+}
+
+.league-table-wrap {
+  overflow-x: auto;
+}
+
+.league-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+
+  th, td {
+    padding: 8px 10px;
+    text-align: center;
+    border-bottom: 1px solid #eee;
+    white-space: nowrap;
+  }
+
+  th {
+    background: #2e7d32;
+    color: white;
+    font-weight: 600;
+  }
+
+  .team-col {
+    text-align: left;
+    min-width: 160px;
+  }
+
+  .pos-col {
+    min-width: 42px;
+    font-size: 0.85em;
+  }
+
+  .own-team {
+    font-weight: 700;
+    background: #fffde7;
+  }
+}
+
+.league-hint {
+  margin-top: 10px;
+  color: #777;
+  font-size: 0.85em;
+}
+
+.loading-indicator {
+  padding: 20px;
+  color: #555;
+}
+
+.error-message {
+  padding: 12px;
+  background: #ffebee;
+  color: #c62828;
+  border-radius: 6px;
+}

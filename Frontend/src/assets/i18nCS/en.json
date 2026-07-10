@@ -26,6 +26,7 @@
     "more": "more"
   },
   "navigation": {
+    "league": "League",
     "players": "My Players",
     "optimizer": "Optimizer",
     "oauth": "OAuth",
@@ -520,6 +521,19 @@
     "matches": "matches",
     "formationsLast5": "Formations (5 m.):",
     "mostCommon": "Most common:"
+  },
+  "league": {
+    "title": "League simulation",
+    "team": "Team",
+    "matches": "M",
+    "goals": "Goals",
+    "points": "Pts",
+    "expectedPoints": "Exp. pts",
+    "expectedPosition": "Exp. pos.",
+    "remainingMatches": "Remaining matches",
+    "iterations": "simulation iterations",
+    "seasonOver": "Season finished — the table is final. Simulation will resume with the new schedule.",
+    "hint": "Columns 1.–8. show the probability of finishing at that position (Monte Carlo on each team's recent match ratings)."
   },
   "scout": {
     "title": "Opponent scout",

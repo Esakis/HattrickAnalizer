@@ -29,16 +29,18 @@ public class OpponentScoutService
         _logger = logger;
     }
 
-    public async Task<OpponentScoutReport> GetScoutReportAsync(int teamId, int count = DefaultMatchCount)
+    // includeLineups=false pomija matchlineup (bez przewidywanej XI) — o polowe mniej
+    // zapytan CHPP; uzywane przy skanowaniu calej ligi przez symulator tabeli.
+    public async Task<OpponentScoutReport> GetScoutReportAsync(int teamId, int count = DefaultMatchCount, bool includeLineups = true)
     {
         count = Math.Clamp(count, 2, 10);
-        var cacheKey = $"{teamId}:{count}";
+        var cacheKey = $"{teamId}:{count}:{includeLineups}";
         if (Cache.TryGetValue(cacheKey, out var cached) && DateTime.UtcNow - cached.At < CacheTtl)
         {
             return cached.Report;
         }
 
-        var report = await BuildReportAsync(teamId, count);
+        var report = await BuildReportAsync(teamId, count, includeLineups);
         Cache[cacheKey] = (DateTime.UtcNow, report);
         return report;
     }
@@ -76,7 +78,7 @@ public class OpponentScoutService
         return await _api.GetOpponentRatingsAsync(teamId);
     }
 
-    private async Task<OpponentScoutReport> BuildReportAsync(int teamId, int count)
+    private async Task<OpponentScoutReport> BuildReportAsync(int teamId, int count, bool includeLineups = true)
     {
         var matchesDoc = await _api.FetchChppXmlAsync(new Dictionary<string, string>
         {
@@ -106,7 +108,7 @@ public class OpponentScoutService
 
             try
             {
-                var entry = await ScoutMatchAsync(teamId, matchId, match, slotAppearances);
+                var entry = await ScoutMatchAsync(teamId, matchId, match, slotAppearances, includeLineups);
                 if (entry != null) report.Matches.Add(entry);
             }
             catch (Exception ex)
@@ -142,7 +144,8 @@ public class OpponentScoutService
 
     private async Task<ScoutMatchSummary?> ScoutMatchAsync(
         int teamId, string matchId, System.Xml.Linq.XElement matchElement,
-        Dictionary<string, Dictionary<int, ScoutStarterAggregate>> slotAppearances)
+        Dictionary<string, Dictionary<int, ScoutStarterAggregate>> slotAppearances,
+        bool includeLineups)
     {
         var detailsDoc = await _api.FetchChppXmlAsync(new Dictionary<string, string>
         {
@@ -189,6 +192,8 @@ public class OpponentScoutService
             Tactic = CalibrationService.MapTacticCode(ParseIntOrZero(myElement, "TacticType")),
             Ratings = ratings
         };
+
+        if (!includeLineups) return entry;
 
         // Podstawowa jedenastka z matchlineup (role 100-113).
         var lineupDoc = await _api.FetchChppXmlAsync(new Dictionary<string, string>

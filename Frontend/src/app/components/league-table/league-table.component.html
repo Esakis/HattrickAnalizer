@@ -1,0 +1,49 @@
+<div class="league-container">
+  <div class="league-header">
+    <button class="btn-back" routerLink="/">{{ 'common.back' | translate }}</button>
+    <h1>🏆 {{ 'league.title' | translate }}<span *ngIf="report"> — {{ report.leagueName }}</span></h1>
+  </div>
+
+  <div *ngIf="loading" class="loading-indicator">{{ 'common.loading' | translate }}...</div>
+  <div *ngIf="error" class="error-message">{{ error }}</div>
+
+  <div *ngIf="!loading && report">
+    <p class="league-meta">
+      {{ 'league.remainingMatches' | translate }}: <strong>{{ report.remainingMatches }}</strong>
+      <span *ngIf="report.remainingMatches > 0"> · {{ 'league.iterations' | translate }}: {{ report.iterations }}</span>
+    </p>
+    <p *ngIf="report.remainingMatches === 0" class="league-note">{{ 'league.seasonOver' | translate }}</p>
+
+    <div class="league-table-wrap">
+      <table class="league-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th class="team-col">{{ 'league.team' | translate }}</th>
+            <th>{{ 'league.matches' | translate }}</th>
+            <th>{{ 'league.goals' | translate }}</th>
+            <th>{{ 'league.points' | translate }}</th>
+            <th>{{ 'league.expectedPoints' | translate }}</th>
+            <th>{{ 'league.expectedPosition' | translate }}</th>
+            <th *ngFor="let pos of positions" class="pos-col">{{ pos }}.</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let t of report.teams" [class.own-team]="t.isOwnTeam">
+            <td>{{ t.currentPosition }}</td>
+            <td class="team-col">{{ t.teamName }}</td>
+            <td>{{ t.matches }}</td>
+            <td>{{ t.goalsFor }}:{{ t.goalsAgainst }}</td>
+            <td><strong>{{ t.points }}</strong></td>
+            <td>{{ t.expectedPoints }}</td>
+            <td>{{ t.expectedPosition }}</td>
+            <td *ngFor="let pos of positions" class="pos-col" [ngStyle]="probabilityStyle(t.positionProbabilities[pos - 1] || 0)">
+              {{ formatProbability(t.positionProbabilities[pos - 1] || 0) }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="league-hint">{{ 'league.hint' | translate }}</p>
+  </div>
+</div>

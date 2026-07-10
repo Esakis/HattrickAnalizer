@@ -5,6 +5,7 @@ import { Team } from '../models/team.model';
 import { Player } from '../models/player.model';
 import { OptimizerRequest, OptimizerResponse } from '../models/lineup.model';
 import { OpponentScoutReport } from '../models/opponent-scout.model';
+import { LeagueSimulationReport } from '../models/league-simulation.model';
 import { AuthInfo, NextOpponent } from './data-cache.service';
 import { environment } from '../../environments/environment';
 
@@ -34,6 +35,10 @@ export class HattrickApiService {
 
   getOpponentScout(teamId: number, count: number = 5): Observable<OpponentScoutReport> {
     return this.http.get<OpponentScoutReport>(`${this.apiUrl}/team/${teamId}/scout?count=${count}`);
+  }
+
+  getLeagueSimulation(): Observable<LeagueSimulationReport> {
+    return this.http.get<LeagueSimulationReport>(`${this.apiUrl}/league/simulation`);
   }
 
   getNextOpponent(): Observable<NextOpponent> {

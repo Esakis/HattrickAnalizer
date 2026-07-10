@@ -9,13 +9,58 @@
   padding: 0.6rem 1.2rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
+  gap: 1rem;
 }
 
+.team-switcher {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+
+  .team-switcher-label {
+    color: #bdc3c7;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-right: 0.2rem;
+  }
+
+  .team-btn {
+    padding: 0.4rem 0.8rem;
+    border: 2px solid #66bb6a;
+    background-color: transparent;
+    color: #ecf0f1;
+    font-weight: 600;
+    font-size: 0.8rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+
+    &:hover:not(:disabled) {
+      background-color: #66bb6a;
+      transform: translateY(-2px);
+    }
+
+    &.active {
+      background-color: #66bb6a;
+      color: #fff;
+      box-shadow: 0 2px 4px rgba(102, 187, 106, 0.4);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
+}
+
+// Gdy nie ma przełącznika drużyn, języki lądują po prawej.
 .language-switcher {
   display: flex;
   gap: 0.4rem;
+  margin-left: auto;
 }
 
 .lang-btn {

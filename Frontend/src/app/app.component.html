@@ -1,5 +1,17 @@
 <div class="app-container">
   <header class="app-header">
+    <div class="team-switcher" *ngIf="accountTeams.length > 1">
+      <span class="team-switcher-label">{{ 'teamSwitcher.label' | translate }}</span>
+      <button
+        *ngFor="let t of accountTeams"
+        class="team-btn"
+        [class.active]="t.teamId === currentTeamId"
+        [disabled]="switchingTeam"
+        [title]="t.leagueName"
+        (click)="switchTeam(t.teamId)">
+        {{ t.teamName }}
+      </button>
+    </div>
     <div class="language-switcher">
       <button
         class="lang-btn"

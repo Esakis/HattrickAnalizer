@@ -8,6 +8,14 @@ import { OpponentScoutReport } from '../models/opponent-scout.model';
 import { LeagueSimulationReport } from '../models/league-simulation.model';
 import { TrainingSummary } from '../models/training.model';
 import { AuthInfo, NextOpponent } from './data-cache.service';
+
+// Drużyny konta Hattrick (można prowadzić kilka klubów, np. męski i kobiecy).
+export interface AccountTeam {
+  teamId: number;
+  teamName: string;
+  leagueName: string;
+  isPrimaryClub: boolean;
+}
 import { environment } from '../../environments/environment';
 
 @Injectable({
@@ -52,6 +60,14 @@ export class HattrickApiService {
 
   optimizeLineup(request: OptimizerRequest): Observable<OptimizerResponse> {
     return this.http.post<OptimizerResponse>(`${this.apiUrl}/optimizer/optimize`, request);
+  }
+
+  getMyTeams(): Observable<{ currentTeamId: number; teams: AccountTeam[] }> {
+    return this.http.get<{ currentTeamId: number; teams: AccountTeam[] }>(`${this.apiUrl}/oauth/my-teams`);
+  }
+
+  selectTeam(teamId: number): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/oauth/select-team`, { teamId });
   }
 
   startOAuthFlow(scope: string = ''): Observable<any> {

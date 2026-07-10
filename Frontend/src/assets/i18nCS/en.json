@@ -525,6 +525,9 @@
     "formationsLast5": "Formations (5 m.):",
     "mostCommon": "Most common:"
   },
+  "teamSwitcher": {
+    "label": "Team:"
+  },
   "matchOrders": {
     "send": "📤 Send lineup to Hattrick",
     "sending": "Sending...",

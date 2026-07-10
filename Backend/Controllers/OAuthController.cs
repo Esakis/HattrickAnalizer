@@ -138,6 +138,79 @@ public class OAuthController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Wszystkie druzyny konta (Hattrick pozwala prowadzic kilka klubow, np. meski i kobiecy).
+    /// teamdetails bez teamId zwraca wszystkie zespoly uzytkownika.
+    /// </summary>
+    [HttpGet("my-teams")]
+    public async Task<IActionResult> GetMyTeams()
+    {
+        var sessionId = Request.Cookies["ht_session"] ?? "";
+        var stored = _tokenStore.Get(sessionId);
+        if (stored == null || string.IsNullOrEmpty(stored.AccessToken))
+        {
+            return Unauthorized(new { error = "Brak autoryzacji OAuth — zaloguj się do Hattricka." });
+        }
+
+        var teams = await FetchAccountTeamsAsync(stored.AccessToken, stored.AccessTokenSecret);
+        return Ok(new { currentTeamId = stored.OwnTeamId, teams });
+    }
+
+    /// <summary>
+    /// Przelacza aktywna druzyne sesji (musi nalezec do konta). Wszystkie endpointy
+    /// oparte o OwnTeamId (next-opponent, liga, trening) dzialaja od razu w nowym kontekscie.
+    /// </summary>
+    [HttpPost("select-team")]
+    public async Task<IActionResult> SelectTeam([FromBody] SelectTeamRequest request)
+    {
+        var sessionId = Request.Cookies["ht_session"] ?? "";
+        var stored = _tokenStore.Get(sessionId);
+        if (stored == null || string.IsNullOrEmpty(stored.AccessToken))
+        {
+            return Unauthorized(new { error = "Brak autoryzacji OAuth — zaloguj się do Hattricka." });
+        }
+
+        var teams = await FetchAccountTeamsAsync(stored.AccessToken, stored.AccessTokenSecret);
+        var selected = teams.FirstOrDefault(t => t.TeamId == request.TeamId);
+        if (selected == null)
+        {
+            return BadRequest(new { error = $"Drużyna {request.TeamId} nie należy do tego konta." });
+        }
+
+        stored.OwnTeamId = selected.TeamId;
+        stored.OwnTeamName = selected.TeamName;
+        _tokenStore.Save(sessionId, stored);
+
+        return Ok(new { ownTeamId = selected.TeamId, ownTeamName = selected.TeamName });
+    }
+
+    private async Task<List<AccountTeam>> FetchAccountTeamsAsync(string accessToken, string accessTokenSecret)
+    {
+        var queryParams = new Dictionary<string, string>
+        {
+            { "file", "teamdetails" },
+            { "version", "3.6" }
+        };
+        var xml = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
+        var doc = XDocument.Parse(xml);
+
+        var teams = new List<AccountTeam>();
+        foreach (var teamEl in doc.Descendants("Team"))
+        {
+            var id = int.Parse(teamEl.Element("TeamID")?.Value ?? "0");
+            if (id == 0) continue;
+            teams.Add(new AccountTeam
+            {
+                TeamId = id,
+                TeamName = teamEl.Element("TeamName")?.Value ?? "",
+                LeagueName = teamEl.Element("LeagueLevelUnit")?.Element("LeagueLevelUnitName")?.Value ?? "",
+                IsPrimaryClub = string.Equals(teamEl.Element("IsPrimaryClub")?.Value, "True", StringComparison.OrdinalIgnoreCase)
+                                || teamEl.Element("IsPrimaryClub")?.Value == "1"
+            });
+        }
+        return teams;
+    }
+
     [HttpPost("logout")]
     public IActionResult Logout()
     {
@@ -174,4 +247,17 @@ public class CompleteAuthRequest
 {
     public string SessionId { get; set; } = string.Empty;
     public string Verifier { get; set; } = string.Empty;
+}
+
+public class SelectTeamRequest
+{
+    public int TeamId { get; set; }
+}
+
+public class AccountTeam
+{
+    public int TeamId { get; set; }
+    public string TeamName { get; set; } = string.Empty;
+    public string LeagueName { get; set; } = string.Empty;
+    public bool IsPrimaryClub { get; set; }
 }

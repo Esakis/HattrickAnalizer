@@ -526,6 +526,9 @@
     "formationsLast5": "Formacje (5 m.):",
     "mostCommon": "Najczęstsza:"
   },
+  "teamSwitcher": {
+    "label": "Drużyna:"
+  },
   "matchOrders": {
     "send": "📤 Wyślij skład do Hattricka",
     "sending": "Wysyłanie...",

@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { TranslationService } from './services/translation.service';
-import { HattrickApiService } from './services/hattrick-api.service';
+import { HattrickApiService, AccountTeam } from './services/hattrick-api.service';
 import { LoadStatusService } from './services/load-status.service';
 import { DataCacheService } from './services/data-cache.service';
 import { TranslateService } from '@ngx-translate/core';
@@ -16,6 +16,11 @@ export class AppComponent implements OnInit {
   title = 'Frontend';
   showAuthBanner = false;
   showMockBanner = false;
+
+  // Drużyny konta (np. męska i kobieca) — przełącznik w nagłówku.
+  accountTeams: AccountTeam[] = [];
+  currentTeamId: number = 0;
+  switchingTeam = false;
 
   constructor(
     public translationService: TranslationService,
@@ -47,6 +52,32 @@ export class AppComponent implements OnInit {
     this.router.navigateByUrl('/oauth-setup');
   }
 
+  loadAccountTeams(): void {
+    this.api.getMyTeams().subscribe({
+      next: (res) => {
+        this.accountTeams = res.teams;
+        this.currentTeamId = res.currentTeamId;
+      },
+      error: (err) => console.error('Error loading account teams:', err)
+    });
+  }
+
+  switchTeam(teamId: number): void {
+    if (teamId === this.currentTeamId || this.switchingTeam) return;
+    this.switchingTeam = true;
+    this.api.selectTeam(teamId).subscribe({
+      next: () => {
+        // Cały stan aplikacji (cache, komponenty) jest budowany wokół jednej drużyny —
+        // pełne przeładowanie to najprostszy sposób na czysty kontekst nowej drużyny.
+        window.location.reload();
+      },
+      error: (err) => {
+        console.error('Error switching team:', err);
+        this.switchingTeam = false;
+      }
+    });
+  }
+
   async runStartupLoad(): Promise<void> {
     this.loadStatus.set('auth', 'loading');
     let auth;
@@ -68,6 +99,7 @@ export class AppComponent implements OnInit {
 
     this.loadStatus.set('auth', 'success', auth.ownTeamName);
     this.showAuthBanner = false;
+    this.loadAccountTeams();
 
     const teamId = auth.ownTeamId!;
 

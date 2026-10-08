@@ -1,1 +1,79 @@
-/* You can add global styles to this file, and also import other style files */
+// Style globalne: paleta, reset i wspólne elementy stron (nagłówek strony).
+:root {
+  --ht-green-900: #1b5e20;
+  --ht-green-800: #2e7d32;
+  --ht-green-600: #43a047;
+  --ht-green-400: #66bb6a;
+  --ht-green-200: #a5d6a7;
+  --ht-green-100: #c8e6c9;
+  --ht-green-50: #e8f5e9;
+
+  --ht-bg: #f2f5f1;
+  --ht-surface: #ffffff;
+  --ht-border: #dfe7dc;
+  --ht-text: #1f2a1f;
+  --ht-text-muted: #5f6f5f;
+
+  --ht-radius: 10px;
+  --ht-shadow: 0 1px 3px rgba(27, 94, 32, 0.08), 0 4px 14px rgba(27, 94, 32, 0.06);
+  --ht-font: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--ht-font);
+  color: var(--ht-text);
+  background: var(--ht-bg);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ht-green-400);
+  outline-offset: 2px;
+}
+
+// Nagłówek strony (tytuł + podtytuł) — wspólny dla wszystkich zakładek.
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 14px 20px;
+  margin-bottom: 15px;
+  background: var(--ht-surface);
+  border-radius: var(--ht-radius);
+  border-left: 5px solid var(--ht-green-800);
+  box-shadow: var(--ht-shadow);
+
+  h1 {
+    margin: 0;
+    font-size: 1.45em;
+    font-weight: 700;
+    color: var(--ht-green-900);
+  }
+
+  .subtitle {
+    margin: 4px 0 0;
+    font-size: 0.88em;
+    color: var(--ht-text-muted);
+  }
+}

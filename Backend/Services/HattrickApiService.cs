@@ -36,6 +36,8 @@ public class OpponentRatingsResult
     public string Source { get; set; } = "default";
     public long? SourceMatchId { get; set; }
     public DateTime? SourceMatchDate { get; set; }
+    public int SampleCount { get; set; }
+    public List<string> Warnings { get; set; } = new();
 }
 
 public class HattrickApiService
@@ -100,12 +102,16 @@ public class HattrickApiService
         var team = new Team
         {
             TeamId = teamId,
-            TeamName = $"Team {teamId}"
+            TeamName = $"Team {teamId}",
+            Provenance = new DataProvenance { Source = "CHPP team details", RetrievedAt = DateTimeOffset.UtcNow }
         };
 
         if (_useMockData)
         {
             team.Players = GenerateMockPlayers();
+            team.TeamSpiritLevel = 5;
+            team.ConfidenceLevel = 5;
+            team.Provenance = new DataProvenance { Source = "deterministic mock", RetrievedAt = DateTimeOffset.UtcNow };
             return team;
         }
 
@@ -125,6 +131,11 @@ public class HattrickApiService
             if (teamElement != null)
             {
                 team.TeamName = teamElement.Element("TeamName")?.Value ?? team.TeamName;
+                team.TeamSpiritLevel = TryParseOptionalInt(teamElement, "TeamSpirit");
+                team.ConfidenceLevel = TryParseOptionalInt(teamElement, "Confidence");
+                team.Provenance = new DataProvenance { Source = "CHPP teamdetails", RetrievedAt = DateTimeOffset.UtcNow };
+                if (!team.TeamSpiritLevel.HasValue) team.Provenance.Warnings.Add("Current TeamSpirit was not exposed in teamdetails.");
+                if (!team.ConfidenceLevel.HasValue) team.Provenance.Warnings.Add("Current Confidence was not exposed in teamdetails.");
             }
         }
         catch (ChppApiException ex)
@@ -134,6 +145,24 @@ public class HattrickApiService
         }
 
         team.Players = await GetTeamPlayersAsync(teamId);
+        try
+        {
+            // CHPP training is the documented source for current Morale and SelfConfidence.
+            var training = await FetchChppXmlAsync(new Dictionary<string, string>
+            {
+                ["file"] = "training", ["teamId"] = teamId.ToString(), ["version"] = "2.2"
+            }, $"training context teamId={teamId}");
+            var trainingTeam = training.Descendants("Team").FirstOrDefault();
+            team.TeamSpiritLevel = trainingTeam is null ? null : TryParseOptionalInt(trainingTeam, "Morale");
+            team.ConfidenceLevel = trainingTeam is null ? null : TryParseOptionalInt(trainingTeam, "SelfConfidence");
+            if (!team.TeamSpiritLevel.HasValue) team.Provenance.Warnings.Add("CHPP training did not expose Morale; team spirit is unknown.");
+            if (!team.ConfidenceLevel.HasValue) team.Provenance.Warnings.Add("CHPP training did not expose SelfConfidence; confidence is unknown.");
+        }
+        catch (ChppApiException ex)
+        {
+            team.Provenance.Warnings.Add("CHPP training context unavailable; team spirit and confidence remain unknown.");
+            _logger.LogWarning(ex, "Could not fetch current training context for team {TeamId}", teamId);
+        }
         return team;
     }
 
@@ -185,32 +214,8 @@ public class HattrickApiService
                 }
 
                 // Uzupełnij dane z API players (imiona, skille, forma) jeśli dostępne
-                foreach (var mp in matchPlayers)
-                {
-                    if (playersFromApi.TryGetValue(mp.PlayerId, out var apiPlayer))
-                    {
-                        // Weź dane personalne z API, a statystyki z lineup
-                        mp.Skills = apiPlayer.Skills;
-                        mp.Form = apiPlayer.Form;
-                        mp.Stamina = apiPlayer.Stamina;
-                        mp.Experience = apiPlayer.Experience;
-                        mp.Loyalty = apiPlayer.Loyalty;
-                        mp.Leadership = apiPlayer.Leadership;
-                        mp.Specialty = apiPlayer.Specialty;
-                        mp.InjuryLevel = apiPlayer.InjuryLevel;
-                        mp.ShirtNumber = apiPlayer.ShirtNumber;
-                        mp.TSI = apiPlayer.TSI;
-                        mp.Age = apiPlayer.Age;
-
-                        if (mp.MatchStats != null && apiPlayer.MatchStats != null)
-                        {
-                            mp.MatchStats.Goals = apiPlayer.MatchStats.Goals;
-                            mp.MatchStats.YellowCards = apiPlayer.MatchStats.YellowCards;
-                            mp.MatchStats.AverageForm = apiPlayer.Form;
-                        }
-                    }
-                }
-
+                playersFromApi = MergeCurrentPlayersWithMatchStats(playersFromApi.Values.ToList(), matchPlayers)
+                    .ToDictionary(p => p.PlayerId);
                 // Dodaj graczy z aktualnego składu, którzy nie grali w ostatnich meczach (np. nowi, kontuzjowani)
                 if (playersFromApi.Count > 0)
                 {
@@ -224,7 +229,7 @@ public class HattrickApiService
                     }
                 }
 
-                return matchPlayers;
+                return playersFromApi.Count > 0 ? playersFromApi.Values.ToList() : matchPlayers;
             }
         }
         catch (Exception ex)
@@ -241,6 +246,28 @@ public class HattrickApiService
         throw new ChppApiException(
             $"Nie udało się pobrać zawodników drużyny {teamId} z CHPP.",
             playersApiError);
+    }
+
+    /// <summary>Pure merge seam: current player identity/attributes win; match data only adds stats.</summary>
+    public static List<Player> MergeCurrentPlayersWithMatchStats(
+        IReadOnlyCollection<Player> currentPlayers, IReadOnlyCollection<Player> historicalPlayers)
+    {
+        var history = historicalPlayers.ToDictionary(p => p.PlayerId);
+        var result = currentPlayers.ToList();
+        foreach (var current in result)
+        {
+            if (!history.TryGetValue(current.PlayerId, out var historical) || historical.MatchStats == null) continue;
+            historical.MatchStats.AverageForm = current.Form;
+            if (current.MatchStats != null)
+            {
+                historical.MatchStats.Goals = current.MatchStats.Goals;
+                historical.MatchStats.Assists = current.MatchStats.Assists;
+                historical.MatchStats.YellowCards = current.MatchStats.YellowCards;
+                historical.MatchStats.RedCards = current.MatchStats.RedCards;
+            }
+            current.MatchStats = historical.MatchStats;
+        }
+        return result;
     }
 
     private async Task<List<Player>> GetTeamPlayersFromMatchesAsync(int teamId, string accessToken, string accessTokenSecret)
@@ -390,10 +417,21 @@ public class HattrickApiService
                     PlayerId = pid,
                     FirstName = playerEl.Element("FirstName")?.Value ?? "",
                     LastName = playerEl.Element("LastName")?.Value ?? "",
-                    Age = int.Parse(playerEl.Element("Age")?.Value ?? "17"),
-                    Form = int.Parse(playerEl.Element("PlayerForm")?.Value ?? "5"),
-                    Stamina = int.Parse(playerEl.Element("StaminaSkill")?.Value ?? "5"),
-                    Skills = new PlayerSkills()
+                    Age = ParseChppInt(playerEl, "Age"),
+                    Form = ParseChppInt(playerEl, "PlayerForm"),
+                    Stamina = ParseChppInt(playerEl, "StaminaSkill"),
+                    StaminaAvailable = TryParseChppInt(playerEl, "StaminaSkill", out var stamina) && stamina is >= 0 and <= 20,
+                    Skills = new PlayerSkills
+                    {
+                        KeeperAvailable = false, DefendingAvailable = false, PlaymakingAvailable = false,
+                        WingerAvailable = false, PassingAvailable = false, ScoringAvailable = false,
+                        SetPiecesAvailable = false
+                    },
+                    Provenance = new DataProvenance
+                    {
+                        Source = "CHPP matchlineup", RetrievedAt = DateTimeOffset.UtcNow,
+                        Warnings = new() { "Matchlineup does not contain private player skills or reliable current player details." }
+                    }
                 };
                 playerDict[pid] = player;
                 appearances[pid] = new PlayerAppearanceAggregate();
@@ -402,7 +440,12 @@ public class HattrickApiService
 
             var agg = appearances[pid];
             // Lineup element has no PlayedMinutes - if player is in Lineup, they played
-            var minutes = int.Parse(playerEl.Element("PlayedMinutes")?.Value ?? "90");
+            if (!TryParseChppInt(playerEl, "PlayedMinutes", out var minutes))
+            {
+                if (playerDict.TryGetValue(pid, out var player))
+                    player.Provenance.Warnings.Add("CHPP omitted PlayedMinutes; this appearance was not included in match statistics.");
+                continue;
+            }
             if (minutes <= 0) continue;
 
             // Use RatingStars (start-of-match) as primary - this matches what users see in match reports
@@ -732,7 +775,14 @@ public class HattrickApiService
             TeamId = teamId,
             TeamName = $"Team {teamId}",
             MatchHistory = matches,
-            Statistics = new TeamStatisticsSummary()
+            Statistics = new TeamStatisticsSummary(),
+            Provenance = new DataProvenance
+            {
+                Source = "CHPP matches and matchdetails",
+                RetrievedAt = DateTimeOffset.UtcNow,
+                SampleCount = matches.Count,
+                Warnings = matches.Count == 0 ? new() { "No match observations available." } : new()
+            }
         };
 
         teamStats.CalculateStatistics();
@@ -745,7 +795,7 @@ public class HattrickApiService
     {
         if (_useMockData)
         {
-            return new OpponentRatingsResult { Ratings = GenerateMockRatings(teamId), Source = "mock" };
+            return new OpponentRatingsResult { Ratings = GenerateMockRatings(teamId), Source = "mock", Warnings = new() { "Mock ratings are synthetic." } };
         }
 
         var (accessToken, accessTokenSecret) = RequireTokens();
@@ -763,8 +813,8 @@ public class HattrickApiService
             .Where(m =>
             {
                 var status = m.Element("Status")?.Value ?? "";
-                var matchType = int.Parse(m.Element("MatchType")?.Value ?? "0");
-                return status.Equals("FINISHED", StringComparison.OrdinalIgnoreCase)
+                var matchTypeKnown = int.TryParse(m.Element("MatchType")?.Value, out var matchType);
+                return matchTypeKnown && status.Equals("FINISHED", StringComparison.OrdinalIgnoreCase)
                     && matchType >= 1 && matchType <= 12;
             })
             .OrderByDescending(m => ParseDate(m.Element("MatchDate")?.Value) ?? DateTime.MinValue)
@@ -774,7 +824,11 @@ public class HattrickApiService
         {
             // Świeża drużyna bez rozegranych meczów — neutralne wartości, jawnie oznaczone.
             _logger.LogWarning("Brak rozegranych meczów przeciwnika {TeamId} — używam wartości domyślnych.", teamId);
-            return new OpponentRatingsResult { Ratings = GetDefaultOpponentRatings(), Source = "default" };
+            return new OpponentRatingsResult
+            {
+                Ratings = GetDefaultOpponentRatings(), Source = "default",
+                Warnings = new() { "No played opponent ratings were available; neutral values are a synthetic fallback." }
+            };
         }
 
         var matchId = lastPlayed.Element("MatchID")?.Value ?? "0";
@@ -786,12 +840,17 @@ public class HattrickApiService
         };
         var response = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
         var doc = ParseChppXml(response, $"matchdetails matchId={matchId}");
+        var warnings = new List<string>();
+        var validRatings = TryParseTeamRatings(doc, teamId, warnings, out var ratings);
+        if (!validRatings) ratings = GetDefaultOpponentRatings();
         return new OpponentRatingsResult
         {
-            Ratings = ParseTeamRatings(doc, teamId),
-            Source = "lastMatch",
-            SourceMatchId = long.Parse(matchId),
-            SourceMatchDate = ParseDate(lastPlayed.Element("MatchDate")?.Value)
+            Ratings = ratings,
+            Source = validRatings ? "lastMatch" : "default",
+            SourceMatchId = long.TryParse(matchId, out var parsedMatchId) ? parsedMatchId : null,
+            SourceMatchDate = ParseDate(lastPlayed.Element("MatchDate")?.Value),
+            SampleCount = validRatings ? 1 : 0,
+            Warnings = warnings
         };
     }
 
@@ -839,58 +898,78 @@ public class HattrickApiService
 
     internal Player ParsePlayer(XElement element)
     {
-        var playerId = int.Parse(element.Element("PlayerID")?.Value ?? "0");
+        var playerId = ParseChppInt(element, "PlayerID");
         
         // Pobierz podstawowe dane zawodnika
+        var cardsAvailable = TryParseChppInt(element, "Cards", out var cards) && cards is >= 0 and <= 3;
+        var explicitSuspension = TryParseChppBool(element, "IsSuspended", out var suspendedFlag)
+            || TryParseChppBool(element, "Suspended", out suspendedFlag);
+        var injuryAvailable = TryParseChppInt(element, "InjuryLevel", out var injuryLevel) && injuryLevel >= -1;
         var player = new Player
         {
-            PlayerId = playerId,
+            PlayerId = TryParseChppInt(element, "PlayerID", out var parsedPlayerId) ? parsedPlayerId : 0,
             FirstName = element.Element("FirstName")?.Value ?? "",
             LastName = element.Element("LastName")?.Value ?? "",
-            Age = int.Parse(element.Element("Age")?.Value ?? "17"),
-            TSI = int.Parse(element.Element("TSI")?.Value ?? "1000"),
-            Form = int.Parse(element.Element("PlayerForm")?.Value ?? "5"),
-            Stamina = int.Parse(element.Element("StaminaSkill")?.Value ?? "5"),
-            Experience = int.Parse(element.Element("Experience")?.Value ?? "3"),
-            ShirtNumber = int.Parse(element.Element("PlayerNumber")?.Value ?? "0"),
-            InjuryLevel = int.Parse(element.Element("InjuryLevel")?.Value ?? "0"),
+            Age = ParseChppInt(element, "Age"),
+            TSI = ParseChppInt(element, "TSI"),
+            Form = ParseChppInt(element, "PlayerForm"),
+            Stamina = ParseChppInt(element, "StaminaSkill"),
+            StaminaAvailable = TryParseChppInt(element, "StaminaSkill", out var parsedStamina) && parsedStamina >= 0,
+            Experience = ParseChppInt(element, "Experience"),
+            ShirtNumber = ParseChppInt(element, "PlayerNumber"),
+            InjuryLevel = injuryAvailable ? injuryLevel : 0,
+            InjuryStatusKnown = injuryAvailable,
+            IsSuspended = explicitSuspension ? suspendedFlag : cardsAvailable && cards >= 3,
+            SuspensionStatusKnown = explicitSuspension || cardsAvailable,
             Specialty = element.Element("Specialty")?.Value ?? "",
-            Loyalty = int.Parse(element.Element("Loyalty")?.Value ?? "0"),
+            Loyalty = ParseChppInt(element, "Loyalty"),
             MotherClubBonus = string.Equals(element.Element("MotherClubBonus")?.Value, "True", StringComparison.OrdinalIgnoreCase)
                               || element.Element("MotherClubBonus")?.Value == "1",
-            Leadership = int.Parse(element.Element("Leadership")?.Value ?? "0"),
+            Leadership = ParseChppInt(element, "Leadership"),
             Skills = new PlayerSkills
             {
-                Keeper = int.Parse(element.Element("KeeperSkill")?.Value ?? "0"),
-                Defending = int.Parse(element.Element("DefenderSkill")?.Value ?? "0"),
-                Playmaking = int.Parse(element.Element("PlaymakerSkill")?.Value ?? "0"),
-                Winger = int.Parse(element.Element("WingerSkill")?.Value ?? "0"),
-                Passing = int.Parse(element.Element("PassingSkill")?.Value ?? "0"),
-                Scoring = int.Parse(element.Element("ScorerSkill")?.Value ?? "0"),
-                SetPieces = int.Parse(element.Element("SetPiecesSkill")?.Value ?? "0")
-            }
+                Keeper = ParseSkill(element, "KeeperSkill", out var keeperKnown),
+                KeeperAvailable = keeperKnown,
+                Defending = ParseSkill(element, "DefenderSkill", out var defendingKnown),
+                DefendingAvailable = defendingKnown,
+                Playmaking = ParseSkill(element, "PlaymakerSkill", out var playmakingKnown),
+                PlaymakingAvailable = playmakingKnown,
+                Winger = ParseSkill(element, "WingerSkill", out var wingerKnown),
+                WingerAvailable = wingerKnown,
+                Passing = ParseSkill(element, "PassingSkill", out var passingKnown),
+                PassingAvailable = passingKnown,
+                Scoring = ParseSkill(element, "ScorerSkill", out var scoringKnown),
+                ScoringAvailable = scoringKnown,
+                SetPieces = ParseSkill(element, "SetPiecesSkill", out var setPiecesKnown),
+                SetPiecesAvailable = setPiecesKnown
+            },
+            Provenance = new DataProvenance { Source = "CHPP players", RetrievedAt = DateTimeOffset.UtcNow }
         };
+
+        if (!player.SkillsAvailable) player.Provenance.Warnings.Add("One or more private skills (including stamina) are absent or malformed; optimization is blocked for this player.");
+        if (!player.InjuryStatusKnown) player.Provenance.Warnings.Add("Injury status is absent or malformed.");
+        if (!player.SuspensionStatusKnown) player.Provenance.Warnings.Add("Suspension status is absent or malformed.");
 
         // Podstawowe statystyki - career + bieżący sezon. Per-mecz dane są później
         // uzupełniane przez EnrichPlayersWithMatchStatsAsync (z matchlineup).
-        var careerGoals = int.Parse(element.Element("CareerGoals")?.Value ?? "0");
-        var leagueGoals = int.Parse(element.Element("LeagueGoals")?.Value ?? "0");
-        var cupGoals = int.Parse(element.Element("CupGoals")?.Value ?? "0");
-        var friendlyGoals = int.Parse(element.Element("FriendliesGoals")?.Value ?? "0");
+        var careerGoals = ParseChppInt(element, "CareerGoals");
+        var leagueGoals = ParseChppInt(element, "LeagueGoals");
+        var cupGoals = ParseChppInt(element, "CupGoals");
+        var friendlyGoals = ParseChppInt(element, "FriendliesGoals");
         var seasonGoals = leagueGoals + cupGoals + friendlyGoals;
         var totalGoals = careerGoals > 0 ? careerGoals : seasonGoals;
 
         var lastMatchElement = element.Element("LastMatch");
         var lastMatchRating = lastMatchElement != null
-            ? double.Parse(lastMatchElement.Element("Rating")?.Value ?? "0", CultureInfo.InvariantCulture)
-            : 0;
+            && double.TryParse(lastMatchElement.Element("Rating")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedRating)
+            ? parsedRating : 0;
 
         player.MatchStats = new PlayerMatchStats
         {
             TotalMatches = 0,
             Goals = totalGoals,
             Assists = 0, // API Hattrick nie udostępnia asyst
-            YellowCards = int.Parse(element.Element("Cards")?.Value ?? "0"),
+            YellowCards = cardsAvailable ? cards : 0,
             RedCards = 0,
             AverageRating = lastMatchRating,
             AverageForm = player.Form,
@@ -902,8 +981,35 @@ public class HattrickApiService
         return player;
     }
 
-    private static TeamRatings ParseTeamRatings(XDocument doc, int teamId)
+    private static bool TryParseChppInt(XElement element, string name, out int value) =>
+        int.TryParse(element.Element(name)?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+
+    private static bool TryParseChppBool(XElement element, string name, out bool value)
     {
+        var raw = element.Element(name)?.Value;
+        if (bool.TryParse(raw, out value)) return true;
+        if (raw == "1") { value = true; return true; }
+        if (raw == "0") { value = false; return true; }
+        value = false;
+        return false;
+    }
+
+    private static int ParseChppInt(XElement element, string name) =>
+        TryParseChppInt(element, name, out var value) ? value : 0;
+
+    private static int? TryParseOptionalInt(XElement element, string name) =>
+        TryParseChppInt(element, name, out var value) ? value : null;
+
+
+    private static int ParseSkill(XElement element, string name, out bool available)
+    {
+        available = TryParseChppInt(element, name, out var value) && value is >= 0 and <= 20;
+        return available ? value : 0;
+    }
+
+    private static bool TryParseTeamRatings(XDocument doc, int teamId, List<string> warnings, out TeamRatings ratings)
+    {
+        ratings = new TeamRatings();
         // matchdetails: oceny sektorowe są w <HomeTeam>/<AwayTeam> jako Rating* —
         // nie ma elementu <Team> ani pól w stylu "MidfieldRating".
         var homeTeam = doc.Descendants("HomeTeam").FirstOrDefault();
@@ -919,23 +1025,36 @@ public class HattrickApiService
             throw new ChppApiException($"Drużyna {teamId} nie występuje w matchdetails (home={homeTeamId}, away={awayTeamId}).");
         }
 
-        return new TeamRatings
+        var names = new[] { "RatingMidfield", "RatingRightDef", "RatingMidDef", "RatingLeftDef", "RatingRightAtt", "RatingMidAtt", "RatingLeftAtt" };
+        var values = new double[names.Length];
+        for (var i = 0; i < names.Length; i++)
         {
-            MidfieldRating = int.Parse(teamElement.Element("RatingMidfield")?.Value ?? "0"),
-            RightDefenseRating = int.Parse(teamElement.Element("RatingRightDef")?.Value ?? "0"),
-            CentralDefenseRating = int.Parse(teamElement.Element("RatingMidDef")?.Value ?? "0"),
-            LeftDefenseRating = int.Parse(teamElement.Element("RatingLeftDef")?.Value ?? "0"),
-            RightAttackRating = int.Parse(teamElement.Element("RatingRightAtt")?.Value ?? "0"),
-            CentralAttackRating = int.Parse(teamElement.Element("RatingMidAtt")?.Value ?? "0"),
-            LeftAttackRating = int.Parse(teamElement.Element("RatingLeftAtt")?.Value ?? "0"),
-            IndirectSetPiecesAttRating = int.Parse(teamElement.Element("RatingIndirectSetPiecesAtt")?.Value ?? "0"),
-            IndirectSetPiecesDefRating = int.Parse(teamElement.Element("RatingIndirectSetPiecesDef")?.Value ?? "0")
+            if (!double.TryParse(teamElement.Element(names[i])?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out values[i])
+                || !double.IsFinite(values[i]) || values[i] < 0)
+            {
+                warnings.Add($"Opponent rating {names[i]} was missing or invalid; synthetic neutral ratings were used.");
+                return false;
+            }
+        }
+        var attackKnown = double.TryParse(teamElement.Element("RatingIndirectSetPiecesAtt")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var attack)
+            && double.IsFinite(attack) && attack >= 0;
+        var defenseKnown = double.TryParse(teamElement.Element("RatingIndirectSetPiecesDef")?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var defense)
+            && double.IsFinite(defense) && defense >= 0;
+        if (!attackKnown || !defenseKnown)
+            warnings.Add("Indirect set-piece ratings were missing or invalid; the model's 0=unavailable sentinel is used.");
+        ratings = new TeamRatings
+        {
+            MidfieldRating = values[0], RightDefenseRating = values[1], CentralDefenseRating = values[2],
+            LeftDefenseRating = values[3], RightAttackRating = values[4], CentralAttackRating = values[5],
+            LeftAttackRating = values[6], IndirectSetPiecesAttRating = attackKnown ? attack : 0,
+            IndirectSetPiecesDefRating = defenseKnown ? defense : 0
         };
+        return true;
     }
 
     private List<Player> GenerateMockPlayers()
     {
-        var random = new Random();
+        var random = new Random(1337);
         var players = new List<Player>();
 
         for (int i = 1; i <= 18; i++)
@@ -943,6 +1062,7 @@ public class HattrickApiService
             var totalMatches = random.Next(10, 150);
             var goals = i >= 9 && i <= 13 ? random.Next(5, 50) : random.Next(0, 15);
             var assists = random.Next(0, 30);
+            var cards = random.Next(0, 4);
             
             players.Add(new Player
             {
@@ -953,25 +1073,36 @@ public class HattrickApiService
                 TSI = random.Next(1000, 100000),
                 Form = random.Next(1, 9),
                 Stamina = random.Next(1, 9),
+                StaminaAvailable = true,
                 Experience = random.Next(1, 9),
                 ShirtNumber = i,
-                InjuryLevel = random.Next(0, 10) > 8 ? random.Next(1, 4) : 0,
+                InjuryLevel = random.Next(0, 10) > 8 ? random.Next(1, 4) : -1,
+                InjuryStatusKnown = true,
+                IsSuspended = cards == 3,
+                SuspensionStatusKnown = true,
                 Skills = new PlayerSkills
                 {
                     Keeper = i == 1 ? random.Next(5, 15) : 0,
+                    KeeperAvailable = true,
                     Defending = i <= 6 ? random.Next(4, 14) : random.Next(1, 8),
+                    DefendingAvailable = true,
                     Playmaking = random.Next(2, 12),
+                    PlaymakingAvailable = true,
                     Winger = (i >= 3 && i <= 5) || (i >= 9 && i <= 11) ? random.Next(4, 13) : random.Next(1, 7),
+                    WingerAvailable = true,
                     Passing = random.Next(2, 11),
+                    PassingAvailable = true,
                     Scoring = i >= 9 && i <= 13 ? random.Next(5, 15) : random.Next(1, 8),
-                    SetPieces = random.Next(1, 10)
+                    ScoringAvailable = true,
+                    SetPieces = random.Next(1, 10),
+                    SetPiecesAvailable = true
                 },
                 MatchStats = new PlayerMatchStats
                 {
                     TotalMatches = totalMatches,
                     Goals = goals,
                     Assists = assists,
-                    YellowCards = random.Next(0, 15),
+                    YellowCards = cards,
                     RedCards = random.Next(0, 3),
                     AverageRating = Math.Round(random.NextDouble() * 3 + 5, 1),
                     AverageForm = random.Next(1, 9),

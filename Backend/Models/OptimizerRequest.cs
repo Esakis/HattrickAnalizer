@@ -13,6 +13,12 @@ public class OptimizerRequest
     public string CoachType { get; set; } = "Neutral";
     // Poziom asystenta ds. taktyki (0-5)
     public int AssistantManagerLevel { get; set; } = 0;
+    // Explicit model inputs; levels are bounded to 0..10. Null uses a neutral approximation.
+    public int? TeamSpiritLevel { get; set; }
+    public int? ConfidenceLevel { get; set; }
+    public string Objective { get; set; } = "Win";
+    // Optional explicit opponent scenario. Ratings must be supplied by the caller; skills are never inferred.
+    public OpponentScenario? OpponentScenario { get; set; }
     // Doswiadczenie formacji: nazwa formacji (np. "4-4-2") -> poziom 3..10
     // 3=kiepskie, 4=slabe, 5=niewystarczajace, 6=znosne, 7=solidne, 8=doskonale, 9=fantastyczne, 10=olsniewajace
     public Dictionary<string, int> FormationExperience { get; set; } = new();
@@ -44,6 +50,19 @@ public class OptimizerResponse
     public DateTime? OpponentRatingsMatchDate { get; set; }
     // Pogoda uwzgledniona w obliczeniach (null, gdy nieznana / mecz bez kontekstu).
     public Services.MatchWeather? Weather { get; set; }
+    public OptimizerRequest InputSnapshot { get; set; } = new();
+    public DateTimeOffset GeneratedAt { get; set; }
+    public DataProvenance OwnTeamProvenance { get; set; } = new();
+    public DataProvenance OpponentProvenance { get; set; } = new();
+    public string ModelVersion { get; set; } = "core-1";
+    public string ModelConfidence { get; set; } = "unvalidated-low";
+    public List<string> ModelWarnings { get; set; } = new();
+}
+
+public class OpponentScenario
+{
+    public string Tactic { get; set; } = "Normal";
+    public TeamRatings? Ratings { get; set; }
 }
 
 public class FormationAlternative
@@ -51,11 +70,13 @@ public class FormationAlternative
     public string Formation { get; set; } = "";
     public string Tactic { get; set; } = "";
     public string Attitude { get; set; } = "Normal";
+    public Lineup Lineup { get; set; } = new();
     public double WinProbability { get; set; }
     public double DrawProbability { get; set; }
     public double LossProbability { get; set; }
     public double ExpectedGoalsFor { get; set; }
     public double ExpectedGoalsAgainst { get; set; }
+    public double ExpectedPoints { get; set; }
     public double DisorderRisk { get; set; }
     public LineupRatings Ratings { get; set; } = new();
 }

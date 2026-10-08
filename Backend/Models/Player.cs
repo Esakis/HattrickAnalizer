@@ -10,6 +10,7 @@ public class Player
     public PlayerSkills Skills { get; set; } = new();
     public int Form { get; set; }
     public int Stamina { get; set; }
+    public bool StaminaAvailable { get; set; }
     public int Experience { get; set; }
     public int Loyalty { get; set; }
     // Bonus klubu macierzystego: gracz wychowany w klubie dostaje +1.5 poziomu
@@ -18,8 +19,17 @@ public class Player
     public int Leadership { get; set; }
     public string Specialty { get; set; } = string.Empty;
     public int InjuryLevel { get; set; }
+    public bool InjuryStatusKnown { get; set; }
     public int ShirtNumber { get; set; }
     public PlayerMatchStats? MatchStats { get; set; }
+    public DataProvenance Provenance { get; set; } = new();
+    public bool IsSuspended { get; set; }
+    public bool SuspensionStatusKnown { get; set; }
+    public bool SkillsAvailable => Skills.HasAllSkills && StaminaAvailable;
+    public bool CanOptimize => SkillsAvailable && InjuryStatusKnown && InjuryLevel <= 0
+        && SuspensionStatusKnown && !IsSuspended;
+    public bool CanOptimizeForMatch(bool? isSuspendedForMatch) =>
+        CanOptimize && isSuspendedForMatch.HasValue && !isSuspendedForMatch.Value;
 }
 
 public class PlayerMatchStats
@@ -40,10 +50,28 @@ public class PlayerMatchStats
 public class PlayerSkills
 {
     public int Keeper { get; set; }
+    public bool KeeperAvailable { get; set; }
     public int Defending { get; set; }
+    public bool DefendingAvailable { get; set; }
     public int Playmaking { get; set; }
+    public bool PlaymakingAvailable { get; set; }
     public int Winger { get; set; }
+    public bool WingerAvailable { get; set; }
     public int Passing { get; set; }
+    public bool PassingAvailable { get; set; }
     public int Scoring { get; set; }
+    public bool ScoringAvailable { get; set; }
     public int SetPieces { get; set; }
+    public bool SetPiecesAvailable { get; set; }
+
+    public bool HasAllSkills => KeeperAvailable && DefendingAvailable && PlaymakingAvailable
+        && WingerAvailable && PassingAvailable && ScoringAvailable && SetPiecesAvailable;
+}
+
+public class DataProvenance
+{
+    public string Source { get; set; } = "unknown";
+    public DateTimeOffset? RetrievedAt { get; set; }
+    public List<string> Warnings { get; set; } = new();
+    public int SampleCount { get; set; }
 }

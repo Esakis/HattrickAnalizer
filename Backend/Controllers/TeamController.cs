@@ -59,9 +59,9 @@ public class TeamController : ControllerBase
     // Raport skauta: agregacja ostatnich meczów dowolnej drużyny (formacja, taktyka,
     // ważone oceny, przewidywana XI). Publiczne dane CHPP, cache po stronie serwisu.
     [HttpGet("{teamId}/scout")]
-    public async Task<IActionResult> GetScoutReport(int teamId, [FromQuery] int count = 5)
+    public async Task<IActionResult> GetScoutReport(int teamId, [FromQuery] int count = 5, [FromQuery] bool leagueOnly = false)
     {
-        var report = await _scout.GetScoutReportAsync(teamId, count);
+        var report = await _scout.GetScoutReportAsync(teamId, count, leagueOnly: leagueOnly);
         return Ok(report);
     }
 

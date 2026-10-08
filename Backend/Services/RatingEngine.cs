@@ -7,12 +7,12 @@ namespace HattrickAnalizer.Services;
 /// Wejscie: 11 graczy z zachowaniami + kontekst (taktyka, postawa, trener, dom).
 /// Wyjscie: 7 ocen sektorowych w skali denominacji HT + prawdopodobienstwa W/R/P.
 ///
-/// Stale oznaczone "kalibrowalne" nalezy dopasowac harnessem kalibracyjnym
-/// (/api/calibration/own-matches) na ocenach z matchdetails wlasnych meczow.
+/// The current constants are low-confidence approximations, not values validated
+/// against persisted own-match snapshots.
 /// </summary>
 public sealed class RatingEngine
 {
-    // ======================= Skale i stale kalibrowalne =======================
+    // ======================= Rating scale and approximate constants =======================
 
     /// <summary>
     /// Mapowanie wewnetrznej sumy wkladow na skale denominacji HT (matchdetails):
@@ -29,9 +29,9 @@ public sealed class RatingEngine
     }
 
     /// <summary>
-    /// Kalibrowane mnozniki sektorowe: srednie actual/predicted z 5 rozegranych meczow
-    /// (GET /api/calibration/own-matches, 2026-07-10, pelne dopasowanie 11 graczy).
-    /// Strony L/P usrednione symetrycznie — roznice miedzy nimi to szum probki.
+    /// Legacy unvalidated sector prior; no reproducible five-match fit or persisted
+    /// match snapshots are available for these values.
+    /// Left/right symmetry is a model assumption, not a measured sampling result.
     /// </summary>
     public static class SectorCorrection
     {
@@ -42,7 +42,7 @@ public sealed class RatingEngine
         public const double SideAttack = 1.31;
     }
 
-    // Wklad doswiadczenia: sektor *= 1 + k * ln(1 + srednie XP). Kalibrowalne.
+    // Approximate experience contribution: sector *= 1 + k * ln(1 + average XP).
     private const double XpFactorDefense = 0.035;
     private const double XpFactorMidfield = 0.025;
     private const double XpFactorAttack = 0.030;
@@ -220,44 +220,52 @@ public sealed class RatingEngine
         return r;
     }
 
+    /// <summary>
+    /// Pure contextual rating path for a complete assigned XI. The returned ratings include
+    /// player skills/roles, weather, team attitude, coach, disorder, spirit and confidence.
+    /// Home advantage is optional because MatchPredictionModel normally applies it once while
+    /// evaluating a match; callers passing true must mark that side's bonus as already present.
+    /// Tactics that change routes, possession or events are applied by MatchPredictionModel.
+    /// </summary>
+    public LineupRatings ComputeContextualRatings(Lineup lineup, int weatherId, string attitude, string coach,
+        double disorderRisk, int? teamSpiritLevel, int? confidenceLevel, bool applyHomeAdvantage = false)
+    {
+        ArgumentNullException.ThrowIfNull(lineup);
+        if (string.IsNullOrWhiteSpace(lineup.Formation) ||
+            !FormationData.Formations.TryGetValue(lineup.Formation, out var formation) ||
+            lineup.Positions.Count != 11 || lineup.Positions.Values.Any(p => p.Player is null) ||
+            lineup.Positions.Values.Select(p => p.Player!.PlayerId).Distinct().Count() != 11)
+            throw new ArgumentException("A complete lineup with eleven distinct players and a known formation is required.", nameof(lineup));
+        if (teamSpiritLevel is < 0 or > 10 || confidenceLevel is < 0 or > 10)
+            throw new ArgumentOutOfRangeException(nameof(teamSpiritLevel));
+
+        var assigned = new AssignedLineup
+        {
+            Formation = formation,
+            Slots = lineup.Positions.ToDictionary(kv => kv.Key, kv => new AssignedSlot
+            {
+                SlotId = kv.Key, Player = kv.Value.Player!, Behaviour = kv.Value.Behavior
+            }, StringComparer.Ordinal)
+        };
+        var ratings = ComputeRatings(assigned, weatherId);
+        ApplyAttitude(ratings, attitude);
+        ApplyCoach(ratings, coach);
+        ApplyDisorder(ratings, disorderRisk);
+        ratings.Midfield *= 1 + 0.015 * ((teamSpiritLevel ?? 5) - 5);
+        var confidenceMultiplier = 1 + 0.01 * ((confidenceLevel ?? 5) - 5);
+        ratings.CentralAttack *= confidenceMultiplier;
+        ratings.RightAttack *= confidenceMultiplier;
+        ratings.LeftAttack *= confidenceMultiplier;
+        if (applyHomeAdvantage) ApplyHomeAdvantage(ratings, true);
+        RecomputeOverall(ratings);
+        return ratings;
+    }
+
     // ======================= Modyfikatory kontekstu =======================
 
     public void ApplyTactic(LineupRatings r, string tactic)
     {
-        switch (tactic)
-        {
-            case "Counter":
-                r.Midfield *= FormationData.TacticModifiers.CounterAttackMidfieldPenalty;
-                break;
-            case "AttackInMiddle":
-                r.CentralAttack *= FormationData.TacticModifiers.AIMCentralAttackBonus;
-                r.RightAttack *= FormationData.TacticModifiers.AIMSideAttackPenalty;
-                r.LeftAttack *= FormationData.TacticModifiers.AIMSideAttackPenalty;
-                break;
-            case "AttackOnWings":
-                r.CentralAttack *= FormationData.TacticModifiers.AOWCentralAttackPenalty;
-                r.RightAttack *= FormationData.TacticModifiers.AOWSideAttackBonus;
-                r.LeftAttack *= FormationData.TacticModifiers.AOWSideAttackBonus;
-                break;
-            case "Pressing":
-                // Pressing NIE zmienia ocen — tlumi szanse obu druzyn (model meczu).
-                break;
-            case "PlayCreatively":
-                r.CentralAttack *= FormationData.TacticModifiers.CreativelyAttackBonus;
-                r.RightAttack *= FormationData.TacticModifiers.CreativelyAttackBonus;
-                r.LeftAttack *= FormationData.TacticModifiers.CreativelyAttackBonus;
-                r.CentralDefense *= FormationData.TacticModifiers.CreativelyDefensePenalty;
-                r.RightDefense *= FormationData.TacticModifiers.CreativelyDefensePenalty;
-                r.LeftDefense *= FormationData.TacticModifiers.CreativelyDefensePenalty;
-                break;
-            case "LongShots":
-                r.Midfield *= FormationData.TacticModifiers.LongShotsMidfieldPenalty;
-                r.CentralAttack *= FormationData.TacticModifiers.LongShotsAttackPenalty;
-                r.RightAttack *= FormationData.TacticModifiers.LongShotsAttackPenalty;
-                r.LeftAttack *= FormationData.TacticModifiers.LongShotsAttackPenalty;
-                break;
-        }
-        RecomputeOverall(r);
+        MatchPredictionModel.ApplyTacticRatingEffects(r, tactic, apply: true);
     }
 
     public void ApplyAttitude(LineupRatings r, string attitude)
@@ -360,7 +368,7 @@ public sealed class RatingEngine
 
     internal sealed record MatchPrediction(
         double WinProbability, double DrawProbability, double LossProbability,
-        double ExpectedGoalsFor, double ExpectedGoalsAgainst);
+        double ExpectedGoalsFor, double ExpectedGoalsAgainst, LineupRatings MyRatings, LineupRatings OpponentRatings);
 
     /// <summary>
     /// Przewidywanie wyniku. Oceny `me` i `opp` musza byc w tej samej skali (HT).
@@ -368,110 +376,18 @@ public sealed class RatingEngine
     /// dodatkowe szanse przy mniejszosci posiadania, strzaly z dystansu konwertuja
     /// czesc normalnych szans, SFG (15% akcji) liczone z ocen ISP.
     /// </summary>
-    internal MatchPrediction PredictOutcome(
-        LineupRatings me, LineupRatings opp, string tactic, AssignedLineup lineup,
-        double myIspAtt, double myIspDef, double oppIspAtt, double oppIspDef)
+    internal MatchPrediction PredictOutcome(MatchTacticalSide home, MatchTacticalSide away, bool meIsHome)
     {
-        double midMe = Math.Max(0.01, me.Midfield);
-        double midOpp = Math.Max(0.01, opp.Midfield);
-        const double midExp = 2.75;
-        double midMePow = Math.Pow(midMe, midExp);
-        double midOppPow = Math.Pow(midOpp, midExp);
-        double myActionShare = midMePow / (midMePow + midOppPow);
-        double actionsMe = 10.0 * myActionShare;
-        double actionsOpp = 10.0 * (1.0 - myActionShare);
-
-        const double finExp = 3.5;
-        static double FinProb(double att, double def)
-        {
-            double a2 = Math.Pow(Math.Max(att, 0.01), finExp);
-            double d2 = Math.Pow(Math.Max(def, 0.01), finExp);
-            return a2 / (a2 + d2);
-        }
-
-        // Brak danych ISP przeciwnika -> przybliz z jego obrony/ataku centralnego.
-        if (oppIspDef <= 0) oppIspDef = 0.9 * opp.CentralDefense;
-        if (oppIspAtt <= 0) oppIspAtt = 0.8 * opp.CentralAttack;
-        if (myIspDef <= 0) myIspDef = 0.9 * me.CentralDefense;
-        if (myIspAtt <= 0) myIspAtt = 0.8 * me.CentralAttack;
-
-        // Rozklad akcji: 35% srodek, 25% prawa, 25% lewa, 15% SFG.
-        double pCentralMe = FinProb(me.CentralAttack, opp.CentralDefense);
-        double pRightMe = FinProb(me.RightAttack, opp.LeftDefense);
-        double pLeftMe = FinProb(me.LeftAttack, opp.RightDefense);
-        double pSfgMe = FinProb(myIspAtt, oppIspDef);
-        double pGoalMe = 0.35 * pCentralMe + 0.25 * pRightMe + 0.25 * pLeftMe + 0.15 * pSfgMe;
-
-        double pCentralOpp = FinProb(opp.CentralAttack, me.CentralDefense);
-        double pRightOpp = FinProb(opp.RightAttack, me.LeftDefense);
-        double pLeftOpp = FinProb(opp.LeftAttack, me.RightDefense);
-        double pSfgOpp = FinProb(oppIspAtt, myIspDef);
-        double pGoalOpp = 0.35 * pCentralOpp + 0.25 * pRightOpp + 0.25 * pLeftOpp + 0.15 * pSfgOpp;
-
-        // Strzaly z dystansu: czesc normalnych szans (30%) zamienia sie w proby LS,
-        // ktorych skutecznosc zalezy od poziomu LS druzyny.
-        if (tactic == "LongShots")
-        {
-            var outfield = lineup.Slots.Values.Where(s => s.SlotId != "GK").Select(s => s.Player).ToList();
-            double avgSc = outfield.Count > 0 ? outfield.Average(p => EffSkill(p, p.Skills.Scoring)) : 0;
-            double avgSp = outfield.Count > 0 ? outfield.Average(p => EffSkill(p, p.Skills.SetPieces)) : 0;
-            double lsLevel = FormationData.TacticModifiers.CalculateLongShotsLevel(avgSc, avgSp);
-            double pLs = Math.Clamp(lsLevel / 25.0, 0.05, 0.45);
-            pGoalMe = 0.7 * pGoalMe + 0.3 * pLs;
-        }
-
-        double lamMe = actionsMe * pGoalMe;
-        double lamOpp = actionsOpp * pGoalOpp;
-
-        // Kontra: dodatkowe szanse z przechwytow, tylko przy mniejszosci posiadania.
-        // Poziom kontry = (2*podania + obrona) obroncow / 3.
-        if (tactic == "Counter" && myActionShare < 0.5)
-        {
-            var defenders = lineup.Slots.Values
-                .Where(s => IsDefenderSlot(s.SlotId))
-                .Select(s => s.Player)
-                .ToList();
-            if (defenders.Count > 0)
-            {
-                double counterLevel = defenders.Average(p =>
-                    (2 * EffSkill(p, p.Skills.Passing) + EffSkill(p, p.Skills.Defending)) / 3.0);
-                double conversion = Math.Clamp(counterLevel / 35.0, 0.05, 0.35);
-                lamMe += actionsOpp * conversion * pGoalMe;
-            }
-        }
-
-        // Pressing: tlumi szanse OBU druzyn; sila zalezy od obrony i kondycji.
-        if (tactic == "Pressing")
-        {
-            var outfield = lineup.Slots.Values.Where(s => s.SlotId != "GK").Select(s => s.Player).ToList();
-            double pressLevel = outfield.Count > 0
-                ? outfield.Average(p => EffSkill(p, p.Skills.Defending) * StaminaEffect(p.Stamina))
-                : 0;
-            double suppression = Math.Clamp(0.08 + pressLevel * 0.012, 0.10, 0.30);
-            lamMe *= 1 - suppression;
-            lamOpp *= 1 - suppression;
-        }
-
-        lamMe = Math.Clamp(lamMe, 0.05, 8.0);
-        lamOpp = Math.Clamp(lamOpp, 0.05, 8.0);
-
-        const int GoalCap = 10;
-        double pWin = 0, pDraw = 0, pLoss = 0;
-        for (int i = 0; i <= GoalCap; i++)
-        {
-            double pi = Poisson(lamMe, i);
-            for (int j = 0; j <= GoalCap; j++)
-            {
-                double pj = Poisson(lamOpp, j);
-                double p = pi * pj;
-                if (i > j) pWin += p;
-                else if (i == j) pDraw += p;
-                else pLoss += p;
-            }
-        }
-        return new MatchPrediction(pWin, pDraw, pLoss, lamMe, lamOpp);
+        var result = MatchPredictionModel.PredictMatch(home, away);
+        var me = meIsHome ? result.HomeRatings : result.AwayRatings;
+        var opp = meIsHome ? result.AwayRatings : result.HomeRatings;
+        var probability = result.Probabilities;
+        return meIsHome
+            ? new MatchPrediction(probability.WinProbability, probability.DrawProbability, probability.LossProbability,
+                probability.ExpectedGoalsFor, probability.ExpectedGoalsAgainst, me, opp)
+            : new MatchPrediction(probability.LossProbability, probability.DrawProbability, probability.WinProbability,
+                probability.ExpectedGoalsAgainst, probability.ExpectedGoalsFor, me, opp);
     }
-
     // ======================= Pomocnicze =======================
 
     internal static bool IsCentralDefenderSlot(string slot) =>
@@ -486,21 +402,4 @@ public sealed class RatingEngine
     internal static bool IsDefenderSlot(string slot) =>
         slot is "CD" or "RCD" or "LCD" or "RWB" or "LWB";
 
-    private static double Poisson(double lambda, int k)
-    {
-        if (lambda <= 0) return k == 0 ? 1.0 : 0.0;
-        double log = -lambda + k * Math.Log(lambda) - LogFactorial(k);
-        return Math.Exp(log);
-    }
-
-    private static readonly double[] LogFactCache = BuildLogFactCache(21);
-    private static double[] BuildLogFactCache(int n)
-    {
-        var a = new double[n];
-        a[0] = 0;
-        for (int i = 1; i < n; i++) a[i] = a[i - 1] + Math.Log(i);
-        return a;
-    }
-    private static double LogFactorial(int n) =>
-        n < LogFactCache.Length ? LogFactCache[n] : LogFactCache[^1] + Math.Log(LogFactCache.Length);
 }

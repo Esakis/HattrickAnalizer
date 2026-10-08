@@ -10,8 +10,8 @@ namespace HattrickAnalizer.Services;
 /// ligi uzytkownika, ocenia sile kazdej druzyny skautem (wazone oceny z ostatnich meczow)
 /// i symuluje pozostale mecze sezonu Monte Carlo tym samym modelem Poissona co optymalizator.
 ///
-/// Uproszczenia: taktyka Normal dla wszystkich, atut gospodarza tylko na srodku pola,
-/// tie-break punkty -> roznica bramek -> bramki strzelone (bez regul head-to-head HT).
+/// League fixtures use observed scout sector ratings with no extra home or historic-tactic
+/// multiplier, then sample goals through the shared Poisson core. Table tie-breaks omit H2H.
 /// </summary>
 public class LeagueSimulationService
 {
@@ -79,7 +79,15 @@ public class LeagueSimulationService
             LeagueLevelUnitId = leagueUnitId,
             LeagueName = standingsDoc.Descendants("LeagueLevelUnitName").FirstOrDefault()?.Value ?? "",
             Iterations = Iterations,
-            FromFirstRound = fromFirstRound
+            FromFirstRound = fromFirstRound,
+            ModelVersion = MatchPredictionModel.Version,
+            ModelConfidence = "unvalidated-low",
+            ModelWarnings = new List<string>
+            {
+                "Observed scout sectors aggregate an unknown historical tactic mix; no single historic tactic can be safely inverted, so tactical midfield eligibility and sector effects are approximate.",
+                "Scout removes historic home midfield bonus; the upcoming home advantage is applied once by the shared model.",
+                "Opponent individual tactic skills are unavailable: AIM/AOW use range midpoints; counter, pressing, and long shots use conservative proxies; Long Shots lack goalkeeper/set-piece matching and Play Creatively specialist events are not modeled."
+            }
         };
 
         var teams = new List<LeagueTeamForecast>();
@@ -199,8 +207,8 @@ public class LeagueSimulationService
             for (int f = 0; f < remaining.Count; f++)
             {
                 var (hi, ai) = remaining[f];
-                int gh = SamplePoisson(rng, lambdas[f].Home);
-                int ga = SamplePoisson(rng, lambdas[f].Away);
+                int gh = MatchPredictionModel.SamplePoisson(rng, lambdas[f].Home);
+                int ga = MatchPredictionModel.SamplePoisson(rng, lambdas[f].Away);
                 simGf[hi] += gh; simGa[hi] += ga;
                 simGf[ai] += ga; simGa[ai] += gh;
                 if (gh > ga) simPoints[hi] += 3;
@@ -242,85 +250,40 @@ public class LeagueSimulationService
     }
 
     /// <summary>
-    /// Oczekiwane bramki obu druzyn tym samym modelem co RatingEngine.PredictOutcome
-    /// (10 akcji dzielonych srodkiem pola ^2.75, finalizacja ^3.5, rozklad sektorow
-    /// 35/25/25/15). Taktyki modyfikujace OCENY (AIM/AOW/kreatywnie/strzaly) sa juz
-    /// zawarte w realnych ocenach z matchdetails; osobno modelujemy tylko kontre
-    /// (dodatkowe szanse przy mniejszosci posiadania) i pressing (tlumi obie strony).
+    /// Shared tactical xG model for observed team sector ratings. Historic tactic composition
+    /// is unknown, so it does not invert one dominant tactic; the current route uses the supplied
+    /// typical tactic and the upcoming home bonus is applied once.
     /// </summary>
     internal static (double Home, double Away) ComputeLambdas(
         TeamRatings home, TeamRatings away, string homeTactic = "Normal", string awayTactic = "Normal")
     {
-        double midHome = Math.Max(0.01, home.MidfieldRating * FormationData.TacticModifiers.HomeAdvantage);
-        double midAway = Math.Max(0.01, away.MidfieldRating);
-        const double midExp = 2.75;
-        double hPow = Math.Pow(midHome, midExp);
-        double aPow = Math.Pow(midAway, midExp);
-        double homeShare = hPow / (hPow + aPow);
-        double actionsHome = 10.0 * homeShare;
-        double actionsAway = 10.0 * (1.0 - homeShare);
-
-        double homeIspAtt = home.IndirectSetPiecesAttRating > 0 ? home.IndirectSetPiecesAttRating : 0.8 * home.CentralAttackRating;
-        double homeIspDef = home.IndirectSetPiecesDefRating > 0 ? home.IndirectSetPiecesDefRating : 0.9 * home.CentralDefenseRating;
-        double awayIspAtt = away.IndirectSetPiecesAttRating > 0 ? away.IndirectSetPiecesAttRating : 0.8 * away.CentralAttackRating;
-        double awayIspDef = away.IndirectSetPiecesDefRating > 0 ? away.IndirectSetPiecesDefRating : 0.9 * away.CentralDefenseRating;
-
-        double pGoalHome =
-            0.35 * FinProb(home.CentralAttackRating, away.CentralDefenseRating) +
-            0.25 * FinProb(home.RightAttackRating, away.LeftDefenseRating) +
-            0.25 * FinProb(home.LeftAttackRating, away.RightDefenseRating) +
-            0.15 * FinProb(homeIspAtt, awayIspDef);
-        double pGoalAway =
-            0.35 * FinProb(away.CentralAttackRating, home.CentralDefenseRating) +
-            0.25 * FinProb(away.RightAttackRating, home.LeftDefenseRating) +
-            0.25 * FinProb(away.LeftAttackRating, home.RightDefenseRating) +
-            0.15 * FinProb(awayIspAtt, homeIspDef);
-
-        double lamHome = actionsHome * pGoalHome;
-        double lamAway = actionsAway * pGoalAway;
-
-        // Kontra: dodatkowe szanse z przechwytow przy mniejszosci posiadania.
-        // Konwersja ~0.2 (srodek przedzialu RatingEngine 0.05-0.35 — brak skilli obroncow).
-        const double CounterConversion = 0.2;
-        if (homeTactic == "Counter" && homeShare < 0.5) lamHome += actionsAway * CounterConversion * pGoalHome;
-        if (awayTactic == "Counter" && homeShare > 0.5) lamAway += actionsHome * CounterConversion * pGoalAway;
-
-        // Pressing: tlumi szanse OBU druzyn (srodek przedzialu RatingEngine 0.10-0.30).
-        const double PressingSuppression = 0.2;
-        if (homeTactic == "Pressing" || awayTactic == "Pressing")
+        static LineupRatings Convert(TeamRatings r) => new()
         {
-            lamHome *= 1 - PressingSuppression;
-            lamAway *= 1 - PressingSuppression;
-        }
-
-        return (
-            Math.Clamp(lamHome, 0.05, 8.0),
-            Math.Clamp(lamAway, 0.05, 8.0)
-        );
+            Midfield = r.MidfieldRating,
+            RightDefense = r.RightDefenseRating,
+            CentralDefense = r.CentralDefenseRating,
+            LeftDefense = r.LeftDefenseRating,
+            RightAttack = r.RightAttackRating,
+            CentralAttack = r.CentralAttackRating,
+            LeftAttack = r.LeftAttackRating
+        };
+        var prediction = MatchPredictionModel.PredictMatch(
+            new MatchTacticalSide
+            {
+                Ratings = Convert(home), Tactic = homeTactic, IsHome = true,
+                RatingsIncludeHistoricalTacticEffects = true, ApplyCurrentTacticRatingEffects = false,
+                IndirectSetPieceAttack = home.IndirectSetPiecesAttRating,
+                IndirectSetPieceDefense = home.IndirectSetPiecesDefRating
+            },
+            new MatchTacticalSide
+            {
+                Ratings = Convert(away), Tactic = awayTactic,
+                RatingsIncludeHistoricalTacticEffects = true, ApplyCurrentTacticRatingEffects = false,
+                IndirectSetPieceAttack = away.IndirectSetPiecesAttRating,
+                IndirectSetPieceDefense = away.IndirectSetPiecesDefRating
+            });
+        return (prediction.Probabilities.ExpectedGoalsFor, prediction.Probabilities.ExpectedGoalsAgainst);
     }
-
-    private static double FinProb(double att, double def)
-    {
-        const double finExp = 3.5;
-        double a = Math.Pow(Math.Max(att, 0.01), finExp);
-        double d = Math.Pow(Math.Max(def, 0.01), finExp);
-        return a / (a + d);
-    }
-
-    private static int SamplePoisson(Random rng, double lambda)
-    {
-        // Algorytm Knutha — lambdy sa male (<= 8), wiec wystarczajaco szybki.
-        double l = Math.Exp(-lambda);
-        int k = 0;
-        double p = 1.0;
-        do
-        {
-            k++;
-            p *= rng.NextDouble();
-        } while (p > l);
-        return k - 1;
-    }
-
     private static TeamRatings NeutralRatings() => new()
     {
         MidfieldRating = 30,
@@ -344,6 +307,9 @@ public class LeagueSimulationReport
     public int Iterations { get; set; }
     // true = symulacja calego sezonu od 1. kolejki (bez uwzgledniania rozegranych wynikow).
     public bool FromFirstRound { get; set; }
+    public string ModelVersion { get; set; } = MatchPredictionModel.Version;
+    public string ModelConfidence { get; set; } = "unvalidated-low";
+    public List<string> ModelWarnings { get; set; } = new();
     public List<LeagueTeamForecast> Teams { get; set; } = new();
 }
 

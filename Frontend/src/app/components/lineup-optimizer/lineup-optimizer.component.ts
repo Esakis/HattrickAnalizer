@@ -1,12 +1,12 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { Subject } from 'rxjs';
+import { Subject, Subscription } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { HattrickApiService } from '../../services/hattrick-api.service';
-import { OptimizerRequest, OptimizerResponse, LineupPosition, Lineup } from '../../models/lineup.model';
+import { OptimizerRequest, OptimizerResponse, LineupPosition, Lineup, LineupRatings } from '../../models/lineup.model';
 import { TranslateService } from '@ngx-translate/core';
 import { DataCacheService } from '../../services/data-cache.service';
 import { Player } from '../../models/player.model';
-import { OpponentScoutReport } from '../../models/opponent-scout.model';
+import { OpponentScoutReport, ScoutLikelyStarter } from '../../models/opponent-scout.model';
 
 @Component({
   selector: 'app-lineup-optimizer',
@@ -15,6 +15,11 @@ import { OpponentScoutReport } from '../../models/opponent-scout.model';
 })
 export class LineupOptimizerComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
+  private optimizeSubscription?: Subscription;
+  private optimizeSequence = 0;
+  private formationExperienceRequestSequence = 0;
+  private readonly manuallySetFormationExperience = new Set<string>();
+  private lastNextOpponentContext = '';
   myTeamId: number = 0;
   opponentTeamId: number = 0;
   preferredTactic: string = 'Auto';
@@ -24,6 +29,13 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   availableFormations: string[] = ['5-5-0','5-4-1','5-3-2','5-2-3','4-5-1','4-4-2','4-3-3','3-5-2','3-4-3','2-5-3'];
   formationExperience: { [k: string]: number } = {};
   selectedAlternative: number = 0;
+  objective: OptimizerRequest['objective'] = 'Win';
+  teamSpiritLevel: number | null = null;
+  confidenceLevel: number | null = null;
+  resultStale = false;
+  resultStaleReason: string | null = null;
+  resultGeneratedAt: string | null = null;
+  private resultTeamContext = '';
 
   result: OptimizerResponse | null = null;
   loading: boolean = false;
@@ -102,19 +114,49 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.initializeTranslations();
-    this.translate.onLangChange.pipe(takeUntil(this.destroy$)).subscribe(() => this.initializeTranslations());
+    this.translate.onLangChange.pipe(takeUntil(this.destroy$)).subscribe(() => {
+      this.initializeTranslations();
+      this.onOptimizerInputChange();
+    });
     this.translate.onTranslationChange.pipe(takeUntil(this.destroy$)).subscribe(() => this.initializeTranslations());
 
     this.restoreFromCache();
+    this.cache.optimizerResult$.next(null);
 
     this.cache.auth$.pipe(takeUntil(this.destroy$)).subscribe(auth => {
       if (auth.authorized && auth.ownTeamId) {
-        if (!this.myTeamId) this.myTeamId = auth.ownTeamId;
+        if (this.myTeamId !== auth.ownTeamId) {
+          this.invalidateTeamContext();
+          this.myTeamId = auth.ownTeamId;
+          this.myTeamPlayers = [];
+          this.clearFormationExperience();
+          this.lastLoadedMyTeamId = null;
+          this.myTeamStats = null;
+          this.cache.myTeamStats$.next(null);
+          this.cache.formationExperience$.next(null);
+        }
         this.loadMyTeam();
         this.loadMyTeamStats();
       }
     });
     this.cache.nextOpponent$.pipe(takeUntil(this.destroy$)).subscribe(opp => {
+      const opponentContext = JSON.stringify(opp ?? null);
+      if (this.lastNextOpponentContext && opponentContext !== this.lastNextOpponentContext) this.invalidateTeamContext();
+      this.lastNextOpponentContext = opponentContext;
+      const cachedOpponentId = this.cache.opponentTeam$.value?.teamId;
+      if (opp?.opponentTeamId && this.opponentTeamId !== opp.opponentTeamId
+        && (!this.opponentTeamId || this.opponentTeamId === this.lastLoadedOpponentId || this.opponentTeamId === cachedOpponentId)) {
+        this.opponentTeamId = opp.opponentTeamId;
+        this.lastLoadedOpponentId = null;
+        this.opponentTeamPlayers = [];
+        this.opponentScout = null;
+        this.opponentTeamStats = null;
+        this.cache.opponentPlayers$.next(null);
+        this.cache.opponentScout$.next(null);
+        this.cache.opponentTeamStats$.next(null);
+        this.cache.opponentOptimalLineup$.next(null);
+      }
+      if (this.opponentTeamId && opp?.opponentTeamId !== this.opponentTeamId) this.invalidateTeamContext();
       if (opp?.opponentTeamId) {
         if (!this.opponentTeamId) this.opponentTeamId = opp.opponentTeamId;
         this.loadOpponentTeam();
@@ -138,7 +180,8 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     this.coachType = ui.coachType;
     this.assistantManagerLevel = ui.assistantManagerLevel;
     this.teamAttitude = ui.teamAttitude;
-    this.preferredTactic = ui.preferredTactic;
+    this.objective = ui.objective ?? 'Win';
+    this.preferredTactic = this.selectedMyTactic;
     this.selectedAlternative = ui.selectedAlternative;
     this.playerSortColumn = ui.playerSortColumn;
     this.playerSortDirection = ui.playerSortDirection;
@@ -180,16 +223,13 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
 
     const cachedExp = this.cache.formationExperience$.value;
     if (cachedExp) {
-      for (const f of this.availableFormations) {
-        if (cachedExp[f] !== undefined) this.formationExperience[f] = cachedExp[f];
-      }
-    }
+      this.formationExperience = this.sanitizeFormationExperience(cachedExp);
+      this.cache.formationExperience$.next({ ...this.formationExperience });
+    } else this.formationExperience = {};
 
-    const cachedResult = this.cache.optimizerResult$.value;
-    if (cachedResult) this.result = cachedResult;
+    // Optimizer results are snapshots; do not restore an unkeyed response across team contexts.
 
-    const cachedOppLineup = this.cache.opponentOptimalLineup$.value;
-    if (cachedOppLineup) this.opponentOptimalLineup = cachedOppLineup;
+    this.opponentOptimalLineup = null;
   }
 
   private persistUiState(): void {
@@ -201,7 +241,8 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       coachType: this.coachType,
       assistantManagerLevel: this.assistantManagerLevel,
       teamAttitude: this.teamAttitude,
-      preferredTactic: this.preferredTactic,
+      preferredTactic: this.selectedMyTactic,
+      objective: this.objective,
       selectedAlternative: this.selectedAlternative,
       playerSortColumn: this.playerSortColumn,
       playerSortDirection: this.playerSortDirection
@@ -239,9 +280,50 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       { value: 4, label: this.translate.instant('formationExperience.4') },
       { value: 3, label: this.translate.instant('formationExperience.3') }
     ];
-    for (const f of this.availableFormations) {
-      if (!(f in this.formationExperience)) this.formationExperience[f] = 6;
+  }
+
+  getFormationExperience(formation: string): number | null {
+    return this.formationExperience[formation] ?? null;
+  }
+
+  setFormationExperience(formation: string, value: number | null): void {
+    this.manuallySetFormationExperience.add(formation);
+    if (!this.isValidFormationExperience(value)) delete this.formationExperience[formation];
+    else this.formationExperience[formation] = value;
+    this.cache.formationExperience$.next({ ...this.formationExperience });
+    this.onOptimizerInputChange();
+  }
+
+  private isValidFormationExperience(value: unknown): value is number {
+    return typeof value === 'number' && Number.isInteger(value) && value >= 3 && value <= 10;
+  }
+
+  private sanitizeFormationExperience(experience: unknown): { [formation: string]: number } {
+    const sanitized: { [formation: string]: number } = {};
+    if (!experience || typeof experience !== 'object') return sanitized;
+    const values = experience as Record<string, unknown>;
+    for (const formation of this.availableFormations) {
+      const value = values[formation];
+      if (this.isValidFormationExperience(value)) sanitized[formation] = value;
     }
+    return sanitized;
+  }
+
+  private clearFormationExperience(): void {
+    this.formationExperienceRequestSequence++;
+    this.manuallySetFormationExperience.clear();
+    this.formationExperience = {};
+    this.cache.formationExperience$.next(null);
+  }
+
+  onObjectiveChange(): void {
+    this.persistUiState();
+    this.onOptimizerInputChange();
+  }
+
+  get displayedFormationExperienceMissing(): boolean {
+    const formation = this.displayedLineup.formation;
+    return !!formation && this.result?.inputSnapshot?.formationExperience?.[formation] === undefined;
   }
 
   optimizeLineup(): void {
@@ -250,46 +332,226 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       return;
     }
 
+    this.optimizeSubscription?.unsubscribe();
+    const requestId = ++this.optimizeSequence;
     this.loading = true;
     this.error = null;
+    this.resultStale = true;
+    this.cache.optimizerResult$.next(null);
 
-    const nextOpp = this.cache.nextOpponent$.value;
-    const isNextOpponent = nextOpp?.opponentTeamId === this.opponentTeamId;
+    const request = this.createRequestSnapshot();
 
-    const request: OptimizerRequest = {
-      myTeamId: this.myTeamId,
-      opponentTeamId: this.opponentTeamId,
-      preferredTactic: this.preferredTactic,
-      teamAttitude: this.teamAttitude,
-      focusAreas: [],
-      coachType: this.coachType,
-      assistantManagerLevel: this.assistantManagerLevel,
-      formationExperience: this.formationExperience,
-      preferredFormation: this.selectedMyFormation,
-      language: this.translate.currentLang || 'pl',
-      matchId: isNextOpponent ? nextOpp!.matchId : 0,
-      isHomeMatch: isNextOpponent ? !!nextOpp!.isHomeMatch : false,
-      matchDate: isNextOpponent ? nextOpp!.matchDate : undefined
-    };
-
-    this.hattrickApi.optimizeLineup(request).subscribe({
+    this.optimizeSubscription = this.hattrickApi.optimizeLineup(request).pipe(takeUntil(this.destroy$)).subscribe({
       next: (response) => {
+        if (requestId !== this.optimizeSequence || !this.sameContext(request, this.createRequestSnapshot())) return;
         this.result = response;
         this.selectedAlternative = 0;
         this.loading = false;
+        this.resultStale = false;
+        this.resultStaleReason = null;
+        this.resultGeneratedAt = response.generatedAt ?? new Date().toISOString();
+        this.resultTeamContext = this.currentTeamContext();
         this.cache.optimizerResult$.next(response);
         this.persistUiState();
       },
       error: (err) => {
+        if (requestId !== this.optimizeSequence) return;
         this.error = this.translate.instant('optimizer.errorOptimizing') + err.message;
         this.loading = false;
       }
     });
   }
 
+  get displayedLineup(): Lineup {
+    return this.result?.alternatives?.[this.selectedAlternative]?.lineup ?? this.result?.optimalLineup ?? {
+      positions: {}, tacticType: '', tacticSkill: '',
+      predictedRatings: { midfield: 0, rightDefense: 0, centralDefense: 0, leftDefense: 0, rightAttack: 0, centralAttack: 0, leftAttack: 0, overall: 0 }
+    };
+  }
+
+  get displayedRatings(): LineupRatings | null {
+    return this.result?.alternatives?.[this.selectedAlternative]?.ratings ?? this.result?.comparison?.myTeamRatings ?? null;
+  }
+
+  get activeAlternative(): OptimizerResponse['alternatives'][number] | null {
+    return this.result?.alternatives?.[this.selectedAlternative] ?? null;
+  }
+
+  get displayedStrengths(): string[] {
+    if (this.selectedAlternative === 0) return (this.result?.comparison.strengths ?? []).map(s => this.localizeText(s));
+    const my = this.displayedRatings;
+    const opponent = this.result?.comparison.opponentRatings;
+    if (!my || !opponent) return [];
+    const strengths: string[] = [];
+    if (my.midfield > opponent.midfield) strengths.push(this.translate.instant('optimizer.comparison.matchupLabels.midfield'));
+    for (const matchup of this.attackDefenseMatchups) {
+      if (my[matchup.myKey] > opponent[matchup.opponentKey]) {
+        strengths.push(this.translate.instant('optimizer.comparison.matchupLabels.attack', {
+          lane: this.translate.instant(matchup.lane), opponentLane: this.translate.instant(matchup.opponentLane)
+        }));
+      }
+    }
+    for (const matchup of this.defenseAttackMatchups) {
+      if (my[matchup.myKey] > opponent[matchup.opponentKey]) {
+        strengths.push(this.translate.instant('optimizer.comparison.matchupLabels.defense', {
+          lane: this.translate.instant(matchup.lane), opponentLane: this.translate.instant(matchup.opponentLane)
+        }));
+      }
+    }
+    return strengths;
+  }
+
+  get displayedWeaknesses(): string[] {
+    if (this.selectedAlternative === 0) return (this.result?.comparison.weaknesses ?? []).map(s => this.localizeText(s));
+    const my = this.displayedRatings;
+    const opponent = this.result?.comparison.opponentRatings;
+    if (!my || !opponent) return [];
+    const weaknesses: string[] = [];
+    if (my.midfield < opponent.midfield) weaknesses.push(this.translate.instant('optimizer.comparison.matchupLabels.midfield'));
+    for (const matchup of this.attackDefenseMatchups) {
+      if (my[matchup.myKey] < opponent[matchup.opponentKey]) {
+        weaknesses.push(this.translate.instant('optimizer.comparison.matchupLabels.attack', {
+          lane: this.translate.instant(matchup.lane), opponentLane: this.translate.instant(matchup.opponentLane)
+        }));
+      }
+    }
+    for (const matchup of this.defenseAttackMatchups) {
+      if (my[matchup.myKey] < opponent[matchup.opponentKey]) {
+        weaknesses.push(this.translate.instant('optimizer.comparison.matchupLabels.defense', {
+          lane: this.translate.instant(matchup.lane), opponentLane: this.translate.instant(matchup.opponentLane)
+        }));
+      }
+    }
+    return weaknesses;
+  }
+
+  get selectedAlternativeReasons(): string[] {
+    const alt = this.activeAlternative;
+    if (!alt) return [];
+    return [this.translate.instant('optimizer.alternatives.selectedSummary', {
+      expectedPoints: alt.expectedPoints.toFixed(2), win: (alt.winProbability * 100).toFixed(1), draw: (alt.drawProbability * 100).toFixed(1)
+    })];
+  }
+
+  get modelWarnings(): string[] {
+    if (!this.result) return [];
+    const warnings = [...(this.result.modelWarnings ?? this.result.warnings ?? []),
+      ...(this.result.ownTeamProvenance?.warnings ?? []), ...(this.result.opponentProvenance?.warnings ?? [])];
+    const translations: Array<[string, string]> = [
+      ['Approximation details:', 'approximationDetails'],
+      ['Spirit adjusts midfield', 'contextApproximation'],
+      ['Formation experience below', 'formationApproximation'],
+      ['The model is unvalidated', 'unvalidated'],
+      ['Team spirit was not available', 'noSpirit'],
+      ['Confidence was not available', 'noConfidence'],
+      ['Opponent ratings came from a default', 'defaultOpponent'],
+      ['Opponent tactic is recorded in the snapshot', 'opponentTacticNotModeled'],
+      ['Opponent ratings aggregate historical tactics', 'historicalTacticApproximation'],
+      ['Long Shots evaluates', 'longShotsApproximation'],
+      ['Opponent sector ratings are an estimate', 'hiddenOpponentSkills'],
+      ['Matchline does not contain private player skills', 'matchlineNoSkills'],
+      ['No match observations available', 'noOpponentObservations'],
+      ['Mock ratings are synthetic', 'syntheticRatings'],
+      ['No played opponent ratings were available', 'defaultOpponent']
+    ];
+    return [...new Set(warnings)].map(w => {
+      const entry = translations.find(([prefix]) => w.startsWith(prefix));
+      return entry ? this.translate.instant(`optimizer.warnings.${entry[1]}`)
+        : this.translate.currentLang === 'pl' ? this.translate.instant('optimizer.warnings.additional') : w;
+    });
+  }
+
+  getConfidenceLabel(value?: string): string {
+    const map: Record<string, string> = {
+      'unvalidated-low': 'optimizer.confidenceLevels.unvalidatedLow',
+      low: 'optimizer.confidenceLevels.low',
+      'low-moderate': 'optimizer.confidenceLevels.lowModerate',
+      moderate: 'optimizer.confidenceLevels.moderate',
+      high: 'optimizer.confidenceLevels.high'
+    };
+    const key = value ? map[value.toLowerCase()] : undefined;
+    return key ? this.translate.instant(key) : (value ?? '—');
+  }
+
+  getOpponentSourceLabel(value?: string): string {
+    const map: Record<string, string> = {
+      lastmatch: 'optimizer.sources.lastMatch',
+      default: 'optimizer.sources.default',
+      mock: 'optimizer.sources.mock',
+      weightedscout: 'optimizer.sources.weightedScout',
+      scout: 'optimizer.sources.weightedScout'
+    };
+    const key = value ? map[value.toLowerCase()] : undefined;
+    return key ? this.translate.instant(key) : (value ?? '—');
+  }
+
+  getObjectiveLabel(value?: string): string {
+    const key = value === 'Win' ? 'optimizer.objective.win' : value === 'Draw' ? 'optimizer.objective.draw' : 'optimizer.objective.expectedPoints';
+    return this.translate.instant(key);
+  }
+
+  private createRequestSnapshot(): OptimizerRequest {
+    const nextOpp = this.cache.nextOpponent$.value;
+    const isNextOpponent = nextOpp?.opponentTeamId === this.opponentTeamId;
+    return {
+      myTeamId: Number(this.myTeamId), opponentTeamId: Number(this.opponentTeamId),
+      preferredTactic: this.selectedMyTactic, teamAttitude: this.teamAttitude, focusAreas: [],
+      coachType: this.coachType, assistantManagerLevel: this.assistantManagerLevel,
+      teamSpiritLevel: this.teamSpiritLevel, confidenceLevel: this.confidenceLevel, objective: this.objective,
+      formationExperience: this.sanitizeFormationExperience(this.formationExperience), preferredFormation: this.selectedMyFormation,
+      language: this.translate.currentLang || 'pl', matchId: isNextOpponent ? nextOpp!.matchId : 0,
+      isHomeMatch: isNextOpponent ? !!nextOpp!.isHomeMatch : false,
+      matchDate: isNextOpponent ? nextOpp!.matchDate : undefined
+    };
+  }
+
+  private sameContext(a: OptimizerRequest, b: OptimizerRequest): boolean {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+
+  onOptimizerInputChange(): void {
+    if (!this.result && !this.loading) return;
+    this.resultStale = true;
+    this.resultStaleReason = this.translate.instant('optimizer.staleResult');
+    this.optimizeSequence++;
+    this.optimizeSubscription?.unsubscribe();
+    this.cache.optimizerResult$.next(null);
+    this.loading = false;
+    this.sendingOrders = false;
+    this.ordersSuccess = false;
+  }
+
+  private currentTeamContext(): string {
+    const own = this.myTeamPlayers.map(p => p.playerId).sort((a, b) => a - b).join(',');
+    const scout = this.opponentScout?.likelyStarters.map(s => `${s.playerId}:${s.slot}:${s.appearances}`).sort().join(',') ?? '';
+    const next = this.cache.nextOpponent$.value;
+    return `${this.myTeamId}|${this.opponentTeamId}|${own}|${scout}|${next?.matchId ?? 0}|${next?.isHomeMatch ?? false}`;
+  }
+
+  private invalidateTeamContext(): void {
+    this.onOptimizerInputChange();
+    this.result = null;
+    this.cache.optimizerResult$.next(null);
+  }
+
   getPositionKeys(): string[] {
-    if (!this.result?.optimalLineup?.positions) return [];
-    return Object.keys(this.result.optimalLineup.positions);
+    if (!this.displayedLineup?.positions) return [];
+    return Object.keys(this.displayedLineup.positions);
+  }
+
+  getDisplayedPosition(position: string): LineupPosition | null {
+    return this.displayedLineup.positions[position] ?? null;
+  }
+
+  getDisplayedPositionRows(): string[][] {
+    const positions = this.getPositionKeys();
+    const gk = positions.filter(p => p === 'GK');
+    const defenders = positions.filter(p => ['RWB', 'RCD', 'CD', 'LCD', 'LWB', 'CDO', 'CDTW', 'WBD', 'WBN', 'WBO', 'WBTM'].includes(p));
+    const midfielders = positions.filter(p => ['RW', 'RIM', 'IM', 'LIM', 'LW', 'WO', 'WD', 'WTM'].includes(p));
+    const forwards = positions.filter(p => ['RFW', 'FW', 'LFW', 'FTW', 'DF'].includes(p));
+    const known = new Set([...gk, ...defenders, ...midfielders, ...forwards]);
+    midfielders.push(...positions.filter(p => !known.has(p)));
+    return [gk, defenders, midfielders, forwards];
   }
 
   getTacticLabel(value: string): string {
@@ -387,6 +649,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
 
   loadMyTeam(): void {
     if (!this.myTeamId) return;
+    const teamId = Number(this.myTeamId);
     
     // Nie pobieraj ponownie jeśli dane są już załadowane dla tego samego ID
     if (this.myTeamPlayers.length > 0 && this.lastLoadedMyTeamId === this.myTeamId) {
@@ -394,19 +657,22 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     }
     
     this.loadingMyTeam = true;
-    this.hattrickApi.getTeam(this.myTeamId).subscribe({
+    this.hattrickApi.getTeam(teamId).subscribe({
       next: (team) => {
+        if (teamId !== Number(this.myTeamId)) return;
         this.myTeamPlayers = team.players;
         this.myTeamName = team.teamName;
         this.lastLoadedMyTeamId = this.myTeamId;
         this.loadingMyTeam = false;
         this.cache.ownTeam$.next(team);
+        this.onOptimizerInputChange();
         // Generuj statystyki dla graczy
         this.generatePlayerStats();
         // Pobierz doświadczenie formacji
         this.loadFormationExperience();
       },
       error: () => {
+        if (teamId !== Number(this.myTeamId)) return;
         this.loadingMyTeam = false;
       }
     });
@@ -414,28 +680,33 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
 
   loadFormationExperience(): void {
     if (!this.myTeamId) return;
+    const teamId = Number(this.myTeamId);
+    const requestSequence = ++this.formationExperienceRequestSequence;
 
-    if (this.cache.formationExperience$.value) {
-      const cached = this.cache.formationExperience$.value;
-      for (const formation of this.availableFormations) {
-        if (cached[formation] !== undefined) {
-          this.formationExperience[formation] = cached[formation];
-        }
-      }
+    if (this.cache.formationExperience$.value !== null) {
+      this.formationExperience = this.sanitizeFormationExperience(this.cache.formationExperience$.value);
+      this.cache.formationExperience$.next({ ...this.formationExperience });
       return;
     }
 
-    this.hattrickApi.getFormationExperience(this.myTeamId).subscribe({
+    this.hattrickApi.getFormationExperience(teamId).subscribe({
       next: (experience) => {
-        // Aktualizuj doświadczenie formacji z danych API
+        if (teamId !== Number(this.myTeamId) || requestSequence !== this.formationExperienceRequestSequence) return;
+        const currentExperience = { ...this.formationExperience };
+        const validExperience = this.sanitizeFormationExperience(experience);
         for (const formation of this.availableFormations) {
-          if (experience[formation] !== undefined) {
-            this.formationExperience[formation] = experience[formation];
+          if (this.manuallySetFormationExperience.has(formation)) {
+            const current = currentExperience[formation];
+            if (this.isValidFormationExperience(current)) validExperience[formation] = current;
+            else delete validExperience[formation];
           }
         }
+        this.formationExperience = validExperience;
         this.cache.formationExperience$.next({ ...this.formationExperience });
+        this.onOptimizerInputChange();
       },
       error: (err) => {
+        if (teamId !== Number(this.myTeamId) || requestSequence !== this.formationExperienceRequestSequence) return;
         console.error('Error loading formation experience:', err);
         // W przypadku błędu zachowaj domyślne wartości
       }
@@ -444,6 +715,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
 
   loadOpponentTeam(): void {
     if (!this.opponentTeamId) return;
+    const teamId = Number(this.opponentTeamId);
     
     // Nie pobieraj ponownie jeśli dane są już załadowane dla tego samego ID
     if (this.opponentTeamPlayers.length > 0 && this.lastLoadedOpponentId === this.opponentTeamId) {
@@ -457,8 +729,9 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     if (cachedOpp?.teamId === this.opponentTeamId) {
       this.opponentTeamName = cachedOpp.teamName;
     } else {
-      this.hattrickApi.getTeam(this.opponentTeamId).subscribe({
+      this.hattrickApi.getTeam(teamId).subscribe({
         next: (team) => {
+          if (teamId !== Number(this.opponentTeamId)) return;
           this.opponentTeamName = team.teamName;
           this.cache.opponentTeam$.next(team);
         },
@@ -467,8 +740,9 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     }
 
     // Następnie pobierz graczy z wzbogaconymi statystykami
-    this.hattrickApi.getPlayers(this.opponentTeamId).subscribe({
+    this.hattrickApi.getPlayers(teamId).subscribe({
       next: (players) => {
+        if (teamId !== Number(this.opponentTeamId)) return;
         this.opponentTeamPlayers = players;
         this.lastLoadedOpponentId = this.opponentTeamId;
         this.loadingOpponentTeam = false;
@@ -479,20 +753,24 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
         this.buildOpponentOptimalLineup();
       },
       error: () => {
+        if (teamId !== Number(this.opponentTeamId)) return;
         this.loadingOpponentTeam = false;
       }
     });
   }
 
   onMyTeamIdChange(): void {
+    this.onOptimizerInputChange();
+    this.result = null;
+    this.cache.optimizerResult$.next(null);
     if (this.myTeamId) {
       // Wyczyść dane jeśli ID się zmieniło
       if (this.lastLoadedMyTeamId !== this.myTeamId) {
         this.myTeamPlayers = [];
         this.myTeamName = '';
+        this.clearFormationExperience();
         this.myTeamStats = null;
         this.cache.myTeamStats$.next(null);
-        this.cache.formationExperience$.next(null);
       }
       this.loadMyTeam();
       this.loadMyTeamStats();
@@ -500,6 +778,9 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   }
 
   onOpponentTeamIdChange(): void {
+    this.onOptimizerInputChange();
+    this.result = null;
+    this.cache.optimizerResult$.next(null);
     if (this.opponentTeamId) {
       // Wyczyść dane jeśli ID się zmieniło
       if (this.lastLoadedOpponentId !== this.opponentTeamId) {
@@ -521,21 +802,27 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
 
   loadOpponentScout(): void {
     if (!this.opponentTeamId) return;
+    const teamId = Number(this.opponentTeamId);
 
     const cached = this.cache.opponentScout$.value;
     if (cached?.teamId === this.opponentTeamId) {
       this.opponentScout = cached;
+      this.buildOpponentOptimalLineup();
       return;
     }
 
     this.loadingOpponentScout = true;
-    this.hattrickApi.getOpponentScout(this.opponentTeamId).subscribe({
+    this.hattrickApi.getOpponentScout(teamId).subscribe({
       next: (report) => {
+        if (teamId !== Number(this.opponentTeamId)) return;
         this.opponentScout = report;
         this.loadingOpponentScout = false;
         this.cache.opponentScout$.next(report);
+        this.onOptimizerInputChange();
+        this.buildOpponentOptimalLineup();
       },
       error: (err) => {
+        if (teamId !== Number(this.opponentTeamId)) return;
         console.error('Error loading opponent scout:', err);
         this.opponentScout = null;
         this.loadingOpponentScout = false;
@@ -550,23 +837,32 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
 
   get canSendOrders(): boolean {
     const nextOpp = this.cache.nextOpponent$.value;
-    return !!this.result?.optimalLineup?.positions
+    return !this.resultStale && !!this.displayedLineup?.positions
       && !!nextOpp?.matchId
-      && nextOpp.opponentTeamId === this.opponentTeamId;
+      && nextOpp.opponentTeamId === this.opponentTeamId
+      && this.resultTeamContext === this.currentTeamContext();
   }
 
   sendLineupToHattrick(): void {
     const nextOpp = this.cache.nextOpponent$.value;
     if (!this.canSendOrders || !nextOpp) return;
+    const lineup = this.displayedLineup;
+    if (!lineup) return;
 
     const positions: { [slot: string]: { playerId: number; behaviour: string } } = {};
     const players: Player[] = [];
-    for (const [slot, pos] of Object.entries(this.result!.optimalLineup.positions)) {
+    for (const [slot, pos] of Object.entries(lineup.positions)) {
       if (!pos.player) continue;
       positions[slot] = { playerId: pos.player.playerId, behaviour: pos.behavior };
       players.push(pos.player);
     }
-    if (players.length < 9) return;
+    const validSlots = new Set(['GK', 'RWB', 'RCD', 'CD', 'LCD', 'LWB', 'RW', 'RIM', 'IM', 'LIM', 'LW', 'RFW', 'FW', 'LFW']);
+    if (players.length !== 11 || new Set(players.map(p => p.playerId)).size !== 11
+      || Object.keys(positions).length !== 11 || !positions['GK']
+      || Object.keys(positions).some(slot => !validSlots.has(slot))) {
+      this.ordersError = this.translate.instant('matchOrders.invalidLineup');
+      return;
+    }
 
     // Kapitan: najbardziej doświadczony; wykonawca SFG: najlepsze stałe fragmenty.
     const captain = players.reduce((a, b) => ((a.experience ?? 0) >= (b.experience ?? 0) ? a : b));
@@ -578,14 +874,20 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     this.hattrickApi.sendMatchOrders({
       matchId: nextOpp.matchId,
       positions,
-      tactic: this.result!.optimalLineup.tacticType,
-      attitude: this.teamAttitude,
+      tactic: lineup.tacticType,
+      attitude: this.activeAlternative?.attitude ?? this.result?.inputSnapshot?.teamAttitude ?? 'Normal',
+      assistantManagerLevel: this.result?.inputSnapshot?.assistantManagerLevel ?? 0,
       captainId: captain.playerId,
       setPiecesTakerId: spTaker.playerId
     }).subscribe({
-      next: () => {
+      next: (response) => {
         this.sendingOrders = false;
-        this.ordersSuccess = true;
+        if (response?.success !== true) {
+          this.ordersError = response?.error ?? response?.message ?? this.translate.instant('matchOrders.failed');
+          this.ordersSuccess = false;
+        } else {
+          this.ordersSuccess = true;
+        }
       },
       error: (err) => {
         this.sendingOrders = false;
@@ -649,6 +951,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
 
   loadMyTeamStats(): void {
     if (!this.myTeamId) return;
+    const teamId = Number(this.myTeamId);
 
     if (this.cache.myTeamStats$.value) {
       this.myTeamStats = this.cache.myTeamStats$.value;
@@ -656,13 +959,16 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     }
 
     this.loadingMyTeamStats = true;
-    this.hattrickApi.getTeamMatchStats(this.myTeamId).subscribe({
+    this.hattrickApi.getTeamMatchStats(teamId).subscribe({
       next: (stats: any) => {
+        if (teamId !== Number(this.myTeamId)) return;
         this.myTeamStats = stats;
         this.loadingMyTeamStats = false;
         this.cache.myTeamStats$.next(stats);
+        this.onOptimizerInputChange();
       },
       error: (err: any) => {
+        if (teamId !== Number(this.myTeamId)) return;
         // Bez fallbacku do mocków — sekcja statystyk pozostaje pusta, błąd w konsoli.
         console.error('Error loading team stats:', err);
         this.myTeamStats = null;
@@ -673,6 +979,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
 
   loadOpponentTeamStats(): void {
     if (!this.opponentTeamId) return;
+    const teamId = Number(this.opponentTeamId);
 
     if (this.cache.opponentTeamStats$.value) {
       this.opponentTeamStats = this.cache.opponentTeamStats$.value;
@@ -683,17 +990,20 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     }
 
     this.loadingOpponentTeamStats = true;
-    this.hattrickApi.getTeamMatchStats(this.opponentTeamId).subscribe({
+    this.hattrickApi.getTeamMatchStats(teamId).subscribe({
       next: (stats: any) => {
+        if (teamId !== Number(this.opponentTeamId)) return;
         this.opponentTeamStats = stats;
         this.loadingOpponentTeamStats = false;
         this.cache.opponentTeamStats$.next(stats);
+        this.onOptimizerInputChange();
         // Przebuduj skład przeciwnika z poprawną formacją
         if (this.opponentTeamPlayers.length > 0) {
           this.buildOpponentOptimalLineup();
         }
       },
       error: (err: any) => {
+        if (teamId !== Number(this.opponentTeamId)) return;
         // Bez fallbacku do mocków — skład przeciwnika budujemy z dostępnych danych graczy.
         console.error('Error loading opponent stats:', err);
         this.opponentTeamStats = null;
@@ -770,6 +1080,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   // ==================== ZMIANA FORMACJI I TAKTYKI ====================
   
   onMyFormationChange(): void {
+    this.onOptimizerInputChange();
     this.persistUiState();
     // Po zmianie formacji natychmiast przelicz sklad z ograniczeniem do tej formacji.
     if (this.myTeamId && this.opponentTeamId && this.myTeamPlayers.length >= 11) {
@@ -778,6 +1089,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   }
 
   onMyTacticChange(): void {
+    this.onOptimizerInputChange();
     this.preferredTactic = this.selectedMyTactic;
     this.persistUiState();
     if (this.result && this.myTeamId && this.opponentTeamId) {
@@ -802,17 +1114,15 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   // ==================== OPTIMAL LINEUP DLA PRZECIWNIKA ====================
 
   buildOpponentOptimalLineup(): void {
-    if (this.opponentTeamPlayers.length < 11) return;
+    const starters = this.opponentScout?.likelyStarters ?? [];
+    if (!starters.length) { this.opponentOptimalLineup = null; return; }
     
     // Użyj najczęstszej formacji z ostatnich 5 meczów przeciwnika
-    const formation = this.selectedOpponentFormation === 'Auto' 
-      ? (this.opponentTeamStats?.statistics?.mostCommonFormation || this.getBestFormationForTeam(this.opponentTeamPlayers))
-      : this.selectedOpponentFormation;
+    const formation = this.opponentScout?.mostCommonFormation || '—';
     
-    const positions = this.getFormationPositions(formation);
     const lineup: Lineup = {
       positions: {},
-      tacticType: this.selectedOpponentTactic === 'Auto' ? 'Normal' : this.selectedOpponentTactic,
+      tacticType: this.opponentScout?.mostCommonTactic || '—',
       tacticSkill: '',
       predictedRatings: {
         midfield: 0, rightDefense: 0, centralDefense: 0, leftDefense: 0,
@@ -821,24 +1131,15 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       formation: formation
     };
 
-    const availablePlayers = [...this.opponentTeamPlayers].filter(p => p.injuryLevel <= 0);
-    const usedPlayers = new Set<number>();
-
-    for (const pos of positions) {
-      const bestPlayer = this.findBestPlayerForPosition(pos, availablePlayers, usedPlayers);
-      if (bestPlayer) {
-        lineup.positions[pos] = {
-          position: pos,
-          player: bestPlayer,
-          behavior: 'Normal',
-          rating: this.calculateSkillBasedRating(bestPlayer, pos)
-        };
-        usedPlayers.add(bestPlayer.playerId);
-      }
+    for (const starter of starters) {
+      lineup.positions[starter.slot] = {
+        position: starter.slot,
+        player: null,
+        behavior: 'Unknown'
+      };
     }
 
     this.opponentOptimalLineup = lineup;
-    this.cache.opponentOptimalLineup$.next(lineup);
   }
 
   getFormationPositions(formation: string): string[] {
@@ -987,14 +1288,14 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   }
 
   getPlayerPositionRating(player: Player, position: string, backendRating?: number): string {
-    // Priorytet 1: rzeczywista ocena z ostatnich meczow CHPP (positionRatings na danej pozycji).
+    // Prefer the selected optimizer result so ratings change together with its lineup.
+    if (backendRating !== undefined && backendRating > 0) {
+      return backendRating.toFixed(1);
+    }
+    // Use observed CHPP ratings only when the result did not include a placement rating.
     const real = player.matchStats?.positionRatings?.[position];
     if (real !== undefined && real > 0) {
       return real.toFixed(1);
-    }
-    // Priorytet 2: rating wyliczony przez backend (uwzglednia forme/XP/lojalnosc).
-    if (backendRating !== undefined && backendRating > 0) {
-      return backendRating.toFixed(1);
     }
     // Fallback: frontendowe oszacowanie na podstawie umiejetnosci.
     return this.calculateSkillBasedRating(player, position).toFixed(1);
@@ -1003,8 +1304,22 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   // ==================== POMOCNICZE ====================
 
   getOpponentPositionKeys(): string[] {
-    if (!this.opponentOptimalLineup?.positions) return [];
-    return Object.keys(this.opponentOptimalLineup.positions);
+    return this.opponentScout?.likelyStarters.map(s => s.slot) ?? [];
+  }
+
+  getOpponentPositionRows(): string[][] {
+    const positions = this.getOpponentPositionKeys();
+    const gk = positions.filter(p => p === 'GK');
+    const defenders = positions.filter(p => ['RWB', 'RCD', 'CD', 'LCD', 'LWB', 'CDO', 'CDTW', 'WBD', 'WBN', 'WBO', 'WBTM'].includes(p));
+    const midfielders = positions.filter(p => ['RW', 'RIM', 'IM', 'LIM', 'LW', 'WO', 'WD', 'WTM'].includes(p));
+    const forwards = positions.filter(p => ['RFW', 'FW', 'LFW', 'FTW', 'DF'].includes(p));
+    const known = new Set([...gk, ...defenders, ...midfielders, ...forwards]);
+    midfielders.push(...positions.filter(p => !known.has(p)));
+    return [gk, defenders, midfielders, forwards];
+  }
+
+  getOpponentStarter(position: string): ScoutLikelyStarter | null {
+    return this.opponentScout?.likelyStarters.find(s => s.slot === position) ?? null;
   }
 
   // Sektory uzywane w wykresie porownania (7 aspektow Hattrick)
@@ -1017,6 +1332,22 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     { key: 'centralAttack', label: 'optimizer.comparison.centralAttack' },
     { key: 'rightAttack', label: 'optimizer.comparison.rightAttack' }
   ];
+
+  get attackDefenseMatchups(): Array<{ lane: string; opponentLane: string; myKey: keyof LineupRatings; opponentKey: keyof LineupRatings }> {
+    return [
+      { lane: 'optimizer.comparison.lanes.right', opponentLane: 'optimizer.comparison.lanes.left', myKey: 'rightAttack', opponentKey: 'leftDefense' },
+      { lane: 'optimizer.comparison.lanes.center', opponentLane: 'optimizer.comparison.lanes.center', myKey: 'centralAttack', opponentKey: 'centralDefense' },
+      { lane: 'optimizer.comparison.lanes.left', opponentLane: 'optimizer.comparison.lanes.right', myKey: 'leftAttack', opponentKey: 'rightDefense' }
+    ];
+  }
+
+  get defenseAttackMatchups(): Array<{ lane: string; opponentLane: string; myKey: keyof LineupRatings; opponentKey: keyof LineupRatings }> {
+    return [
+      { lane: 'optimizer.comparison.lanes.right', opponentLane: 'optimizer.comparison.lanes.left', myKey: 'rightDefense', opponentKey: 'leftAttack' },
+      { lane: 'optimizer.comparison.lanes.center', opponentLane: 'optimizer.comparison.lanes.center', myKey: 'centralDefense', opponentKey: 'centralAttack' },
+      { lane: 'optimizer.comparison.lanes.left', opponentLane: 'optimizer.comparison.lanes.right', myKey: 'leftDefense', opponentKey: 'rightAttack' }
+    ];
+  }
 
   localizeText(text: string): string {
     const parts = text.split(' / ');
@@ -1035,13 +1366,17 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   // 6 akcji wspolnych + 4 unikatowe na druzyne. Szansa na akcje: x^a / (x^a + y^a),
   // gdzie a ~ 2.75 (przedzial 2.5-3), x/y = poziom pomocy. Max 10 akcji na zespol.
   getPredictedActions(myMid: number, oppMid: number, side: 'my' | 'opp'): number {
+    return 10 * this.getPredictedChanceShare(myMid, oppMid, side);
+  }
+
+  getPredictedChanceShare(myMid: number, oppMid: number, side: 'my' | 'opp'): number {
     const x = Math.max(myMid || 0, 0.01);
     const y = Math.max(oppMid || 0, 0.01);
-    const a = 2.75;
+    const a = 2.75; // Shared midfield exponent in the backend match model.
     const xa = Math.pow(x, a);
     const ya = Math.pow(y, a);
     const pMy = xa / (xa + ya);
-    return 10 * (side === 'my' ? pMy : 1 - pMy);
+    return side === 'my' ? pMy : 1 - pMy;
   }
 
   // Przewidywana liczba bramek: akcje * sredni P(gol) wazony rozkladem akcji.
@@ -1067,11 +1402,14 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     return actions * pGoal;
   }
 
+  getDisplayedExpectedGoals(side: 'my' | 'opp'): number {
+    if (side === 'my' && this.activeAlternative) return this.activeAlternative.expectedGoalsFor;
+    if (side === 'opp' && this.activeAlternative) return this.activeAlternative.expectedGoalsAgainst;
+    return this.result ? this.getExpectedGoals(this.result, side) : 0;
+  }
+
   getSkillLevel(value: number): string {
-    const levels = ['beznadziejny', 'fatalny', 'nędzny', 'kiepski', 'słaby', 'przeciętny',
-                    'zadowalający', 'solidny', 'znakomity', 'fantastyczny', 'olśniewający',
-                    'błyskotliwy', 'mistrzowski', 'światowej klasy', 'nadprzyrodzony', 'tytaniczny',
-                    'nieziemski', 'mityczny', 'magiczny', 'utopijny', 'boski'];
-    return levels[Math.min(value, levels.length - 1)] || `${value}`;
+    if (!Number.isInteger(value) || value < 0 || value > 20) return this.translate.instant('playerAbilities.0');
+    return this.translate.instant(`playerAbilities.${value}`);
   }
 }

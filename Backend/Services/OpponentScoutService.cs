@@ -15,8 +15,8 @@ namespace HattrickAnalizer.Services;
 public class OpponentScoutService
 {
     private const int DefaultMatchCount = 5;
-    // Waga swiezosci: najnowszy mecz 1.0, kazdy starszy x0.85.
-    private const double RecencyDecay = 0.85;
+    // Explicit heuristic weights: 45-day exponential recency and lower competition weight outside league/cup.
+    private const double RecencyHalfLifeDays = 45;
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(10);
     private static readonly ConcurrentDictionary<string, (DateTime At, OpponentScoutReport Report)> Cache = new();
 
@@ -68,7 +68,9 @@ public class OpponentScoutService
                 {
                     Ratings = report.WeightedRatings,
                     Source = "scout",
-                    SourceMatchDate = report.Matches.FirstOrDefault()?.MatchDate
+                    SourceMatchDate = report.Matches.FirstOrDefault()?.MatchDate,
+                    SampleCount = report.MatchesAnalyzed,
+                    Warnings = new() { "Observed ratings retain match tactic effects; home midfield is normalized by the public home advantage multiplier." }
                 };
             }
         }
@@ -90,10 +92,10 @@ public class OpponentScoutService
         var played = matchesDoc.Descendants("Match")
             .Where(m =>
             {
-                var status = m.Element("Status")?.Value ?? "";
-                var matchType = int.Parse(m.Element("MatchType")?.Value ?? "0");
+            var status = m.Element("Status")?.Value ?? "";
+                var matchTypeKnown = int.TryParse(m.Element("MatchType")?.Value, out var matchType);
                 bool typeOk = leagueOnly ? matchType == 1 : matchType >= 1 && matchType <= 12;
-                return status.Equals("FINISHED", StringComparison.OrdinalIgnoreCase) && typeOk;
+                return matchTypeKnown && status.Equals("FINISHED", StringComparison.OrdinalIgnoreCase) && typeOk;
             })
             .OrderByDescending(m => ParseDate(m.Element("MatchDate")?.Value) ?? DateTime.MinValue)
             .Take(count)
@@ -120,6 +122,8 @@ public class OpponentScoutService
         }
 
         report.MatchesAnalyzed = report.Matches.Count;
+        if (report.MatchesAnalyzed < played.Count)
+            report.Warnings.Add($"{played.Count - report.MatchesAnalyzed} candidate match(es) were excluded because public match details or ratings were unavailable/invalid.");
         if (report.MatchesAnalyzed == 0) return report;
 
         report.FormationCounts = report.Matches
@@ -139,7 +143,22 @@ public class OpponentScoutService
             .Select(kvp => kvp.Key)
             .FirstOrDefault() ?? "Normal";
 
-        report.WeightedRatings = ComputeWeightedRatings(report.Matches);
+        report.WeightedRatingsPrecise = ComputeWeightedRatingsPrecise(report.Matches);
+        report.WeightedRatings = report.WeightedRatingsPrecise.ToTeamRatings();
+        report.RatingUncertainty = ComputeUncertainty(report.Matches);
+        report.UncertaintyAvailable = report.Matches.Count >= 2;
+        report.EffectiveSampleSize = ComputeEffectiveSampleSize(report.Matches);
+        report.AverageSampleAgeDays = report.Matches.Where(m => m.MatchDate.HasValue)
+            .Select(m => Math.Max(0, (DateTime.UtcNow - m.MatchDate!.Value.ToUniversalTime()).TotalDays)).DefaultIfEmpty().Average();
+        report.CompetitionCounts = report.Matches.GroupBy(m => m.MatchType)
+            .ToDictionary(g => CompetitionName(g.Key), g => g.Count());
+        report.RatingsScopeNote = "Ratings are observed historical match ratings; home midfield is normalized once by dividing out the home multiplier. Historical tactic effects remain embedded and are not treated as future scenarios. Aggregation uses an explicit 45-day exponential half-life multiplied by competition weights (league/cup/Masters 1.00, qualification 0.95, friendlies 0.60-0.65, reserved/national competitions 0.90); these weights are a stated scouting heuristic, not an official Hattrick formula.";
+        if (!report.UncertaintyAvailable) report.Warnings.Add("At least two observed matches are required for rating dispersion; the reported zero placeholders are unavailable, not zero uncertainty.");
+        report.Sources = report.Matches.Select(m => new ScoutSource
+        {
+            MatchId = m.MatchId, MatchDate = m.MatchDate, MatchType = m.MatchType,
+            IsHomeMatch = m.IsHomeMatch, Source = "CHPP matchdetails"
+        }).ToList();
         report.LikelyStarters = BuildLikelyStarters(slotAppearances);
         return report;
     }
@@ -162,19 +181,15 @@ public class OpponentScoutService
         var oppElement = isHome ? awayTeam : homeTeam;
         if (myElement == null) return null;
 
-        var ratings = new TeamRatings
+        if (!TryParseObservedRatings(myElement, out var ratings) || ratings.MidfieldRating <= 0)
         {
-            MidfieldRating = ParseIntOrZero(myElement, "RatingMidfield"),
-            RightDefenseRating = ParseIntOrZero(myElement, "RatingRightDef"),
-            CentralDefenseRating = ParseIntOrZero(myElement, "RatingMidDef"),
-            LeftDefenseRating = ParseIntOrZero(myElement, "RatingLeftDef"),
-            RightAttackRating = ParseIntOrZero(myElement, "RatingRightAtt"),
-            CentralAttackRating = ParseIntOrZero(myElement, "RatingMidAtt"),
-            LeftAttackRating = ParseIntOrZero(myElement, "RatingLeftAtt"),
-            IndirectSetPiecesAttRating = ParseIntOrZero(myElement, "RatingIndirectSetPiecesAtt"),
-            IndirectSetPiecesDefRating = ParseIntOrZero(myElement, "RatingIndirectSetPiecesDef")
-        };
-        if (ratings.MidfieldRating <= 0) return null; // walkower / brak ocen
+            _logger.LogWarning("Scout excluded match {MatchId}: public rating sectors were missing or invalid.", matchId);
+            return null;
+        }
+        // Remove the public home-field midfield multiplier once, retaining fractional ratings
+        // until the final weighted aggregate. Other observed tactical effects remain in place.
+        var neutral = ScoutRatingVector.From(ratings);
+        if (isHome) neutral.Midfield /= FormationData.TacticModifiers.HomeAdvantage;
 
         var homeGoals = ParseIntOrZero(matchElement, "HomeGoals");
         var awayGoals = ParseIntOrZero(matchElement, "AwayGoals");
@@ -186,13 +201,16 @@ public class OpponentScoutService
         {
             MatchId = long.Parse(matchId),
             MatchDate = ParseDate(matchElement.Element("MatchDate")?.Value),
+            MatchType = int.TryParse(matchElement.Element("MatchType")?.Value, out var matchType) ? matchType : 0,
             IsHomeMatch = isHome,
             Opponent = opponentName,
             GoalsFor = isHome ? homeGoals : awayGoals,
             GoalsAgainst = isHome ? awayGoals : homeGoals,
             Formation = myElement.Element("Formation")?.Value ?? "",
             Tactic = CalibrationService.MapTacticCode(ParseIntOrZero(myElement, "TacticType")),
-            Ratings = ratings
+            Ratings = ratings,
+            NeutralRatings = neutral,
+            CompetitionWeight = CompetitionWeight(ParseIntOrZero(matchElement, "MatchType"))
         };
 
         if (!includeLineups) return entry;
@@ -236,37 +254,85 @@ public class OpponentScoutService
         return entry;
     }
 
-    private static TeamRatings ComputeWeightedRatings(List<ScoutMatchSummary> matches)
+    private static ScoutRatingVector ComputeWeightedRatingsPrecise(List<ScoutMatchSummary> matches)
     {
-        // matches sa juz od najnowszego; waga maleje wykladniczo ze swiezoscia.
         double wSum = 0;
         double mid = 0, rd = 0, cd = 0, ld = 0, ra = 0, ca = 0, la = 0, ispAtt = 0, ispDef = 0;
-        for (int i = 0; i < matches.Count; i++)
+        var now = DateTime.UtcNow;
+        foreach (var match in matches)
         {
-            double w = Math.Pow(RecencyDecay, i);
-            var r = matches[i].Ratings;
+            var ageDays = match.MatchDate.HasValue ? Math.Max(0, (now - match.MatchDate.Value.ToUniversalTime()).TotalDays) : 3650;
+            double w = Math.Exp(-Math.Log(2) * ageDays / RecencyHalfLifeDays) * match.CompetitionWeight;
+            var r = match.NeutralRatings;
             wSum += w;
-            mid += w * r.MidfieldRating;
-            rd += w * r.RightDefenseRating;
-            cd += w * r.CentralDefenseRating;
-            ld += w * r.LeftDefenseRating;
-            ra += w * r.RightAttackRating;
-            ca += w * r.CentralAttackRating;
-            la += w * r.LeftAttackRating;
-            ispAtt += w * r.IndirectSetPiecesAttRating;
-            ispDef += w * r.IndirectSetPiecesDefRating;
+            mid += w * r.Midfield; rd += w * r.RightDefense; cd += w * r.CentralDefense;
+            ld += w * r.LeftDefense; ra += w * r.RightAttack; ca += w * r.CentralAttack;
+            la += w * r.LeftAttack; ispAtt += w * r.IndirectSetPiecesAtt; ispDef += w * r.IndirectSetPiecesDef;
         }
+        return wSum <= 0 ? new ScoutRatingVector() : new ScoutRatingVector
+        {
+            Midfield = mid/wSum, RightDefense = rd/wSum, CentralDefense = cd/wSum, LeftDefense = ld/wSum,
+            RightAttack = ra/wSum, CentralAttack = ca/wSum, LeftAttack = la/wSum,
+            IndirectSetPiecesAtt = ispAtt/wSum, IndirectSetPiecesDef = ispDef/wSum
+        };
+    }
+
+    private static double CompetitionWeight(int matchType) => matchType switch
+    {
+        1 or 3 or 7 => 1.0, // league, cup, Hattrick Masters
+        2 => 0.95, // qualification
+        4 or 8 => 0.65, // friendly
+        5 or 9 or 12 => 0.60, // friendly with cup rules / national friendly
+        6 or 10 or 11 => 0.90,
+        _ => 0.75
+    };
+
+    private static string CompetitionName(int type) => type switch
+    {
+        1 => "league", 2 => "qualification", 3 => "cup", 4 => "friendly", 5 => "friendlyCupRules",
+        6 => "internationalCompetitionReserved", 7 => "hattrickMasters", 8 => "internationalFriendly",
+        9 => "internationalFriendlyCupRules", 10 => "nationalCompetition", 11 => "nationalCompetitionCupRules",
+        12 => "nationalFriendly", _ => $"unknown:{type}"
+    };
+
+    private static double ComputeEffectiveSampleSize(List<ScoutMatchSummary> matches)
+    {
+        var now = DateTime.UtcNow;
+        var weights = matches.Select(m =>
+        {
+            var age = m.MatchDate.HasValue ? Math.Max(0, (now - m.MatchDate.Value.ToUniversalTime()).TotalDays) : 3650;
+            return Math.Exp(-Math.Log(2) * age / RecencyHalfLifeDays) * m.CompetitionWeight;
+        }).ToList();
+        var sum = weights.Sum();
+        var squares = weights.Sum(w => w * w);
+        return squares > 0 ? sum * sum / squares : 0;
+    }
+
+    private static TeamRatings ComputeUncertainty(List<ScoutMatchSummary> matches)
+    {
+        var now = DateTime.UtcNow;
+        static double Sd(IEnumerable<(double Value, double Weight)> values)
+        {
+            var sample = values.Where(v => v.Weight > 0).ToList();
+            if (sample.Count < 2) return 0;
+            var total = sample.Sum(v => v.Weight);
+            var mean = sample.Sum(v => v.Value * v.Weight) / total;
+            return Math.Sqrt(sample.Sum(v => v.Weight * Math.Pow(v.Value - mean, 2)) / total);
+        }
+        var weighted = matches.Select(m =>
+        {
+            var age = m.MatchDate.HasValue ? Math.Max(0, (now - m.MatchDate.Value.ToUniversalTime()).TotalDays) : 3650;
+            return (m, Math.Exp(-Math.Log(2) * age / RecencyHalfLifeDays) * m.CompetitionWeight);
+        }).ToList();
         return new TeamRatings
         {
-            MidfieldRating = (int)Math.Round(mid / wSum),
-            RightDefenseRating = (int)Math.Round(rd / wSum),
-            CentralDefenseRating = (int)Math.Round(cd / wSum),
-            LeftDefenseRating = (int)Math.Round(ld / wSum),
-            RightAttackRating = (int)Math.Round(ra / wSum),
-            CentralAttackRating = (int)Math.Round(ca / wSum),
-            LeftAttackRating = (int)Math.Round(la / wSum),
-            IndirectSetPiecesAttRating = (int)Math.Round(ispAtt / wSum),
-            IndirectSetPiecesDefRating = (int)Math.Round(ispDef / wSum)
+            MidfieldRating = Sd(weighted.Select(x => (x.m.NeutralRatings.Midfield, x.Item2))),
+            RightDefenseRating = Sd(weighted.Select(x => (x.m.NeutralRatings.RightDefense, x.Item2))),
+            CentralDefenseRating = Sd(weighted.Select(x => (x.m.NeutralRatings.CentralDefense, x.Item2))),
+            LeftDefenseRating = Sd(weighted.Select(x => (x.m.NeutralRatings.LeftDefense, x.Item2))),
+            RightAttackRating = Sd(weighted.Select(x => (x.m.NeutralRatings.RightAttack, x.Item2))),
+            CentralAttackRating = Sd(weighted.Select(x => (x.m.NeutralRatings.CentralAttack, x.Item2))),
+            LeftAttackRating = Sd(weighted.Select(x => (x.m.NeutralRatings.LeftAttack, x.Item2)))
         };
     }
 
@@ -315,6 +381,26 @@ public class OpponentScoutService
     private static int ParseIntOrZero(System.Xml.Linq.XElement parent, string name) =>
         int.TryParse(parent.Element(name)?.Value, out var v) ? v : 0;
 
+    private static bool TryParseObservedRatings(System.Xml.Linq.XElement team, out TeamRatings ratings)
+    {
+        ratings = new TeamRatings();
+        var names = new[] { "RatingMidfield", "RatingRightDef", "RatingMidDef", "RatingLeftDef",
+            "RatingRightAtt", "RatingMidAtt", "RatingLeftAtt", "RatingIndirectSetPiecesAtt", "RatingIndirectSetPiecesDef" };
+        var values = new double[names.Length];
+        for (var i = 0; i < names.Length; i++)
+        {
+            if (!double.TryParse(team.Element(names[i])?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out values[i])
+                || !double.IsFinite(values[i]) || values[i] < 0) return false;
+        }
+        ratings = new TeamRatings
+        {
+            MidfieldRating = values[0], RightDefenseRating = values[1], CentralDefenseRating = values[2],
+            LeftDefenseRating = values[3], RightAttackRating = values[4], CentralAttackRating = values[5],
+            LeftAttackRating = values[6], IndirectSetPiecesAttRating = values[7], IndirectSetPiecesDefRating = values[8]
+        };
+        return true;
+    }
+
     private static DateTime? ParseDate(string? value) =>
         DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt) ? dt : null;
 
@@ -336,6 +422,15 @@ public class OpponentScoutReport
     public Dictionary<string, int> TacticCounts { get; set; } = new();
     // Oceny sektorowe wazone swiezoscia (najnowszy mecz najwazniejszy).
     public TeamRatings WeightedRatings { get; set; } = new();
+    public ScoutRatingVector WeightedRatingsPrecise { get; set; } = new();
+    public TeamRatings RatingUncertainty { get; set; } = new();
+    public bool UncertaintyAvailable { get; set; }
+    public double EffectiveSampleSize { get; set; }
+    public double AverageSampleAgeDays { get; set; }
+    public Dictionary<string, int> CompetitionCounts { get; set; } = new();
+    public string RatingsScopeNote { get; set; } = "";
+    public List<string> Warnings { get; set; } = new();
+    public List<ScoutSource> Sources { get; set; } = new();
     public List<ScoutMatchSummary> Matches { get; set; } = new();
     public List<ScoutLikelyStarter> LikelyStarters { get; set; } = new();
 }
@@ -344,6 +439,7 @@ public class ScoutMatchSummary
 {
     public long MatchId { get; set; }
     public DateTime? MatchDate { get; set; }
+    public int MatchType { get; set; }
     public bool IsHomeMatch { get; set; }
     public string Opponent { get; set; } = string.Empty;
     public int GoalsFor { get; set; }
@@ -351,6 +447,45 @@ public class ScoutMatchSummary
     public string Formation { get; set; } = string.Empty;
     public string Tactic { get; set; } = "Normal";
     public TeamRatings Ratings { get; set; } = new();
+    public ScoutRatingVector NeutralRatings { get; set; } = new();
+    public double CompetitionWeight { get; set; }
+}
+
+public class ScoutRatingVector
+{
+    public double Midfield { get; set; }
+    public double RightDefense { get; set; }
+    public double CentralDefense { get; set; }
+    public double LeftDefense { get; set; }
+    public double RightAttack { get; set; }
+    public double CentralAttack { get; set; }
+    public double LeftAttack { get; set; }
+    public double IndirectSetPiecesAtt { get; set; }
+    public double IndirectSetPiecesDef { get; set; }
+    public static ScoutRatingVector From(TeamRatings r) => new()
+    {
+        Midfield = r.MidfieldRating, RightDefense = r.RightDefenseRating, CentralDefense = r.CentralDefenseRating,
+        LeftDefense = r.LeftDefenseRating, RightAttack = r.RightAttackRating, CentralAttack = r.CentralAttackRating,
+        LeftAttack = r.LeftAttackRating, IndirectSetPiecesAtt = r.IndirectSetPiecesAttRating,
+        IndirectSetPiecesDef = r.IndirectSetPiecesDefRating
+    };
+    public TeamRatings ToTeamRatings() => new()
+    {
+        MidfieldRating = Midfield, RightDefenseRating = RightDefense,
+        CentralDefenseRating = CentralDefense, LeftDefenseRating = LeftDefense,
+        RightAttackRating = RightAttack, CentralAttackRating = CentralAttack,
+        LeftAttackRating = LeftAttack, IndirectSetPiecesAttRating = IndirectSetPiecesAtt,
+        IndirectSetPiecesDefRating = IndirectSetPiecesDef
+    };
+}
+
+public class ScoutSource
+{
+    public long MatchId { get; set; }
+    public DateTime? MatchDate { get; set; }
+    public int MatchType { get; set; }
+    public bool IsHomeMatch { get; set; }
+    public string Source { get; set; } = "";
 }
 
 public class ScoutLikelyStarter

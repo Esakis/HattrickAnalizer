@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { Team } from '../models/team.model';
-import { Lineup, OptimizerResponse } from '../models/lineup.model';
+import { Lineup, OptimizerRequest, OptimizerResponse } from '../models/lineup.model';
 import { Player } from '../models/player.model';
 import { OpponentScoutReport } from '../models/opponent-scout.model';
 
@@ -30,6 +30,7 @@ export interface OptimizerUiState {
   coachType: string;
   assistantManagerLevel: number;
   teamAttitude: string;
+  objective: OptimizerRequest['objective'];
   preferredTactic: string;
   selectedAlternative: number;
   playerSortColumn: string;
@@ -44,6 +45,7 @@ const DEFAULT_OPTIMIZER_UI: OptimizerUiState = {
   coachType: 'Neutral',
   assistantManagerLevel: 0,
   teamAttitude: 'Normal',
+  objective: 'Win',
   preferredTactic: 'Auto',
   selectedAlternative: 0,
   playerSortColumn: 'form',

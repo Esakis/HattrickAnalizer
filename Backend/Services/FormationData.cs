@@ -406,8 +406,8 @@ public static class FormationData
     public static readonly Dictionary<string, string[]> SlotBehaviourOptions = new()
     {
         ["GK"] = new[] { "GK" },
-        ["RWB"] = new[] { "WBD", "WBN", "WBO", "WBTM" },
-        ["LWB"] = new[] { "WBD", "WBN", "WBO", "WBTM" },
+        ["RWB"] = new[] { "RWB", "WBD", "WBN", "WBO", "WBTM" },
+        ["LWB"] = new[] { "LWB", "WBD", "WBN", "WBO", "WBTM" },
         ["RCD"] = new[] { "RCD", "CDO", "CDTW" },
         ["LCD"] = new[] { "LCD", "CDO", "CDTW" },
         ["CD"]  = new[] { "CD", "CDO" },
@@ -489,12 +489,14 @@ public static class FormationData
         // Derby (away team) - 111.493% midfield
         public const double DerbyAwayBonus = 1.11493;
 
-        // AIM - Atak rodkiem: +~10% CA, -~5% boczne
+        // Legacy unused central-attack multiplier retained for public compatibility; AIM only routes chances.
         public const double AIMCentralAttackBonus = 1.10;
+        // AIM defense penalty from the official rules approximation.
         public const double AIMSideAttackPenalty = 0.95;
 
-        // AOW - Atak skrzydlami: -~5% CA, +~10% boczne
+        // AOW defense penalty from the official rules approximation.
         public const double AOWCentralAttackPenalty = 0.95;
+        // Legacy unused attack multiplier retained for public compatibility; AOW only routes chances.
         public const double AOWSideAttackBonus = 1.10;
 
         // Pressing: -8% atak (oba), +6% obrona, wymaga kondycji
@@ -502,14 +504,16 @@ public static class FormationData
         public const double PressingDefenseBonus = 1.06;
         public const double PressingMidfieldPenalty = 0.97;
 
-        // Play Creatively: +6% atak, -4% obrona (uproszczenie - takt. SE)
+        // Play Creatively: only the approximate defense cost is modeled; SE generation is omitted.
+        // Legacy unused multiplier; special-event generation is not modeled.
         public const double CreativelyAttackBonus = 1.06;
         public const double CreativelyDefensePenalty = 0.96;
 
-        // Long Shots: -5% midfield, -2.7% attack; szansa na strzaly dystansowe
+        // Long Shots: -5% midfield, -2.7% open-play attack; conversion/shot quality is modeled separately.
         public const double LongShotsMidfieldPenalty = 0.95;
         public const double LongShotsAttackPenalty = 0.973;
-        public const double LongShotsGoalBonus = 1.05; // bonus do oczekiwanych goli gdy LS level wysoki
+        // Legacy unused multiplier; shot quality is calculated separately with uncertainty.
+        public const double LongShotsGoalBonus = 1.05;
 
         // AOW/AIM - poziom taktyki = (suma poda / 5) - 2
         public static int CalculateAOWAIMLevel(int totalPassing) => (totalPassing / 5) - 2;

@@ -12,6 +12,12 @@ export interface Player {
   leadership: number;
   specialty: string;
   injuryLevel: number;
+  injuryStatusKnown?: boolean;
+  skillsAvailable?: boolean;
+  canOptimize?: boolean;
+  isSuspended?: boolean;
+  suspensionStatusKnown?: boolean;
+  provenance?: PlayerDataProvenance;
   shirtNumber: number;
   // Rozszerzone statystyki
   matchStats?: PlayerMatchStats;
@@ -34,10 +40,25 @@ export interface PlayerMatchStats {
 
 export interface PlayerSkills {
   keeper: number;
+  keeperAvailable?: boolean;
   defending: number;
+  defendingAvailable?: boolean;
   playmaking: number;
+  playmakingAvailable?: boolean;
   winger: number;
+  wingerAvailable?: boolean;
   passing: number;
+  passingAvailable?: boolean;
   scoring: number;
+  scoringAvailable?: boolean;
   setPieces: number;
+  setPiecesAvailable?: boolean;
+  hasAllSkills?: boolean;
+}
+
+export interface PlayerDataProvenance {
+  source: string;
+  retrievedAt?: string | null;
+  warnings?: string[];
+  sampleCount?: number;
 }

@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - 'Backend/**'
+      - 'Backend.Tests/**'
+      - 'Backend.Benchmarks/**'
+      - 'Frontend/**'
+      - 'docs/**'
+      - '.github/workflows/**'
+      - 'README.md'
+      - 'INSTRUKCJA.md'
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet restore Backend.Tests/Backend.Tests.csproj
+      - run: dotnet build Backend/HattrickAnalizer.csproj --configuration Release --no-restore
+      - run: dotnet test Backend.Tests/Backend.Tests.csproj --configuration Release --no-restore
+      - run: dotnet restore Backend.Benchmarks/HattrickAnalizer.Benchmarks.csproj
+      - run: dotnet run --project Backend.Benchmarks/HattrickAnalizer.Benchmarks.csproj --configuration Release --no-restore
+      - run: dotnet run --project Backend.Benchmarks/HattrickAnalizer.Benchmarks.csproj --configuration Release --no-build --no-restore -- --legacy7
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: Frontend/package-lock.json
+      - run: npm ci
+        working-directory: Frontend
+      - run: npm run build
+        working-directory: Frontend
+      - run: npm test -- --watch=false --browsers=ChromeHeadless
+        working-directory: Frontend

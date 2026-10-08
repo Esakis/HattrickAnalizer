@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit, isDevMode } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { HattrickApiService } from '../../services/hattrick-api.service';
-import { Player } from '../../models/player.model';
+import { Player, PlayerSkills } from '../../models/player.model';
 import { TranslateService } from '@ngx-translate/core';
 import { DataCacheService } from '../../services/data-cache.service';
 import { LoadStatusService } from '../../services/load-status.service';
@@ -60,6 +60,14 @@ export class PlayersComponent implements OnInit, OnDestroy {
     private loadStatus: LoadStatusService,
     private playerHistory: PlayerHistoryService
   ) {}
+
+  isSkillAvailable(player: Player, skill: 'keeper' | 'defending' | 'playmaking' | 'winger' | 'passing' | 'scoring' | 'setPieces'): boolean {
+    const availability: Record<typeof skill, keyof PlayerSkills> = {
+      keeper: 'keeperAvailable', defending: 'defendingAvailable', playmaking: 'playmakingAvailable',
+      winger: 'wingerAvailable', passing: 'passingAvailable', scoring: 'scoringAvailable', setPieces: 'setPiecesAvailable'
+    };
+    return player.skillsAvailable !== false && player.skills[availability[skill]] !== false;
+  }
 
   ngOnInit(): void {
     this.initializeTranslations();

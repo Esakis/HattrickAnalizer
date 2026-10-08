@@ -36,6 +36,9 @@ export interface OptimizerRequest {
   focusAreas: string[];
   coachType: string;
   assistantManagerLevel: number;
+  teamSpiritLevel?: number | null;
+  confidenceLevel?: number | null;
+  objective: 'Win' | 'ExpectedPoints' | 'Draw';
   formationExperience: { [formation: string]: number };
   preferredFormation?: string;
   language: string;
@@ -63,6 +66,8 @@ export interface FormationAlternative {
   expectedGoalsAgainst: number;
   disorderRisk: number;
   ratings: LineupRatings;
+  lineup: Lineup;
+  expectedPoints: number;
 }
 
 export interface OptimizerResponse {
@@ -75,6 +80,21 @@ export interface OptimizerResponse {
   opponentRatingsMatchId?: number;
   opponentRatingsMatchDate?: string;
   weather?: MatchWeather | null;
+  inputSnapshot?: OptimizerRequest;
+  generatedAt?: string;
+  modelVersion?: string;
+  modelConfidence?: string;
+  modelWarnings?: string[];
+  warnings?: string[];
+  ownTeamProvenance?: DataProvenance;
+  opponentProvenance?: DataProvenance;
+}
+
+export interface DataProvenance {
+  source: string;
+  retrievedAt?: string;
+  warnings?: string[];
+  sampleCount?: number;
 }
 
 export interface TeamComparison {

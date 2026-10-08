@@ -165,13 +165,13 @@
             <td>{{ player.age }}</td>
             <td [class]="'form-' + player.form">{{ player.form }}</td>
             <td>{{ player.stamina }}</td>
-            <td>{{ player.skills.keeper || 0 }}</td>
-            <td>{{ player.skills.defending || 0 }}</td>
-            <td>{{ player.skills.playmaking || 0 }}</td>
-            <td>{{ player.skills.winger || 0 }}</td>
-            <td>{{ player.skills.passing || 0 }}</td>
-            <td>{{ player.skills.scoring || 0 }}</td>
-            <td>{{ player.skills.setPieces || 0 }}</td>
+            <td>{{ isSkillAvailable(player, 'keeper') ? player.skills.keeper : '—' }}</td>
+            <td>{{ isSkillAvailable(player, 'defending') ? player.skills.defending : '—' }}</td>
+            <td>{{ isSkillAvailable(player, 'playmaking') ? player.skills.playmaking : '—' }}</td>
+            <td>{{ isSkillAvailable(player, 'winger') ? player.skills.winger : '—' }}</td>
+            <td>{{ isSkillAvailable(player, 'passing') ? player.skills.passing : '—' }}</td>
+            <td>{{ isSkillAvailable(player, 'scoring') ? player.skills.scoring : '—' }}</td>
+            <td>{{ isSkillAvailable(player, 'setPieces') ? player.skills.setPieces : '—' }}</td>
             <td>{{ (player.matchStats?.goals ?? 0) || '—' }}</td>
             <td>{{ player.matchStats?.assists || '—' }}</td>
             <td>{{ (player.matchStats?.averageForm ?? player.form) | number:'1.1-1' }}</td>

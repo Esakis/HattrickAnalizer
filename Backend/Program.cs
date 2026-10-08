@@ -13,11 +13,12 @@ builder.Services.AddHttpClient<HattrickApiService>();
 builder.Services.AddHttpClient<OAuthService>();
 builder.Services.AddScoped<AdvancedLineupOptimizer>();
 builder.Services.AddScoped<CalibrationService>();
+builder.Services.AddSingleton<CalibrationSnapshotStore>();
 builder.Services.AddScoped<OpponentScoutService>();
 builder.Services.AddScoped<LeagueSimulationService>();
 builder.Services.AddScoped<TrainingService>();
 builder.Services.AddScoped<MatchOrdersService>();
-builder.Services.AddSingleton<OAuthService>();
+builder.Services.AddScoped<RatingEngine>();
 builder.Services.AddSingleton<TokenStore>();
 builder.Services.AddSingleton<PlayerHistoryService>();
 
@@ -37,10 +38,10 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-app.Logger.LogInformation("Dozwolone originy CORS: {Origins}", string.Join(", ", allowedOrigins));
+app.Logger.LogInformation("Allowed CORS origins: {Origins}", string.Join(", ", allowedOrigins));
 if (app.Configuration.GetValue<bool>("UseMockData"))
 {
-    app.Logger.LogWarning("UseMockData=true — aplikacja serwuje dane przykładowe, nie dane z CHPP!");
+    app.Logger.LogWarning("UseMockData=true: the application is serving deterministic example data, not CHPP data.");
 }
 
 if (app.Environment.IsDevelopment())
@@ -50,31 +51,48 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowAngular");
-
-// Jednolite mapowanie błędów domenowych: brak autoryzacji → 401, błąd CHPP → 502.
-// Dzięki temu frontend zawsze wie, czy ma przekierować do logowania, czy pokazać błąd.
-app.Use(async (context, next) =>
-{
-    try
-    {
-        await next();
-    }
-    catch (UnauthorizedAccessException ex)
-    {
-        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-        context.Response.ContentType = "application/json";
-        await context.Response.WriteAsync(JsonSerializer.Serialize(new { error = ex.Message }));
-    }
-    catch (ChppApiException ex)
-    {
-        app.Logger.LogError(ex, "Błąd CHPP API");
-        context.Response.StatusCode = StatusCodes.Status502BadGateway;
-        context.Response.ContentType = "application/json";
-        await context.Response.WriteAsync(JsonSerializer.Serialize(new { error = ex.Message }));
-    }
-});
-
+app.UseApiExceptionHandling(app.Logger);
 app.UseAuthorization();
 app.MapControllers();
-
 app.Run();
+
+public partial class Program { }
+
+public static class ApiExceptionHandlingExtensions
+{
+    public static IApplicationBuilder UseApiExceptionHandling(this IApplicationBuilder app, ILogger logger)
+    {
+        app.Use(async (context, next) =>
+        {
+            try
+            {
+                await next();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                await WriteError(context, StatusCodes.Status401Unauthorized, "unauthorized", ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                await WriteError(context, StatusCodes.Status400BadRequest, "validation_error", ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                await WriteError(context, StatusCodes.Status422UnprocessableEntity, "unprocessable_request", ex.Message);
+            }
+            catch (ChppApiException ex)
+            {
+                logger.LogError(ex, "CHPP API request failed");
+                await WriteError(context, StatusCodes.Status502BadGateway, "upstream_error", ex.Message);
+            }
+        });
+        return app;
+    }
+
+    private static Task WriteError(HttpContext context, int status, string code, string error)
+    {
+        context.Response.StatusCode = status;
+        context.Response.ContentType = "application/json";
+        return context.Response.WriteAsync(JsonSerializer.Serialize(new { error, code, status }));
+    }
+}

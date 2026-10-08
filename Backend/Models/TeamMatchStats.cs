@@ -4,6 +4,7 @@ public class TeamMatchStats
 {
     public int TeamId { get; set; }
     public string TeamName { get; set; } = string.Empty;
+    public DataProvenance Provenance { get; set; } = new();
     public List<MatchRecord> MatchHistory { get; set; } = new();
     public TeamStatisticsSummary Statistics { get; set; } = new();
 }

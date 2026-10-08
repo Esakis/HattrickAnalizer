@@ -1,138 +1,59 @@
-# Instrukcja Uruchomienia - Hattrick Analyzer
+# Instrukcja uruchomienia
 
-## Krok 1: Konfiguracja Hattrick API
+## Wymagania
 
-1. Zarejestruj się na https://www.hattrick.org/
-2. Przejdź do CHPP (Hattrick API): https://chpp.hattrick.org/
-3. Zarejestruj swoją aplikację i uzyskaj:
-   - Consumer Key
-   - Consumer Secret
-   - Access Token
-   - Access Token Secret
+- .NET 8 SDK
+- Node.js 18 lub nowszy oraz npm
+- Dane aplikacji CHPP tylko wtedy, gdy chcesz pobierać prawdziwe dane Hattricka
 
-## Krok 2: Konfiguracja Backendu
+## Uruchomienie lokalne
 
-1. Przejdź do folderu Backend:
+1. Skopiuj `Backend/appsettings.example.json` do `Backend/appsettings.json`.
+2. Wpisz klucz i sekret CHPP do lokalnego pliku. Nie dodawaj danych logowania do repozytorium.
+3. W katalogu głównym uruchom API:
+
    ```powershell
-   cd D:\GryWebowe\HattrickAnalizer\Backend
+   dotnet run --project Backend/HattrickAnalizer.csproj
    ```
 
-2. Skopiuj plik konfiguracyjny:
+4. W osobnym terminalu zainstaluj zależności i uruchom interfejs:
+
    ```powershell
-   copy appsettings.example.json appsettings.json
-   ```
-
-3. Edytuj `appsettings.json` i wpisz swoje dane API Hattrick:
-   ```json
-   {
-     "HattrickApi": {
-       "ConsumerKey": "TWOJ_CONSUMER_KEY",
-       "ConsumerSecret": "TWOJ_CONSUMER_SECRET",
-       "AccessToken": "TWOJ_ACCESS_TOKEN",
-       "AccessTokenSecret": "TWOJ_ACCESS_TOKEN_SECRET"
-     }
-   }
-   ```
-
-4. Uruchom backend:
-   ```powershell
-   dotnet run
-   ```
-
-Backend będzie dostępny pod adresem: http://localhost:5000
-Swagger UI: http://localhost:5000/swagger
-
-## Krok 3: Uruchomienie Frontendu
-
-1. Przejdź do folderu Frontend:
-   ```powershell
-   cd D:\GryWebowe\HattrickAnalizer\Frontend
-   ```
-
-2. Zainstaluj zależności (tylko przy pierwszym uruchomieniu):
-   ```powershell
-   npm install
-   ```
-
-3. Uruchom aplikację Angular:
-   ```powershell
+   cd Frontend
+   npm ci
    npm start
    ```
 
-Frontend będzie dostępny pod adresem: http://localhost:4200
+Adres API jest wypisany przez ASP.NET Core. Angular domyślnie działa pod `http://localhost:4200`; Swagger jest dostępny w środowisku Development pod `/swagger` na adresie API.
 
-## Krok 4: Użytkowanie
+Tryb bez CHPP włączysz lokalnie przez `UseMockData=true`. Mock jest deterministyczny i nie wykonuje zapytań do Hattricka.
 
-1. Otwórz przeglądarkę i przejdź do http://localhost:4200
-2. Wpisz ID swojej drużyny (znajdziesz je w URL na Hattrick)
-3. Wpisz ID drużyny przeciwnika
-4. Wybierz preferowaną taktykę
-5. Kliknij "Optymalizuj Skład"
+## Kompilacja i testy
 
-## Funkcje Aplikacji
+Uruchom z katalogu głównego:
 
-### ✅ Co aplikacja robi:
+```powershell
+dotnet build Backend/HattrickAnalizer.csproj --configuration Release
+dotnet test Backend.Tests/Backend.Tests.csproj --configuration Release
+cd Frontend
+npm ci
+npm run build
+npm test -- --watch=false --browsers=ChromeHeadless
+```
 
-- **Pobiera dane drużyny** z API Hattrick (lub używa danych testowych)
-- **Analizuje umiejętności zawodników** (obrona, rozgrywanie, strzelanie, itp.)
-- **Generuje optymalny skład** na podstawie:
-  - Umiejętności zawodników
-  - Formy zawodników
-  - Statystyk przeciwnika
-  - Wybranej taktyki
-- **Porównuje drużyny** i pokazuje:
-  - Przewagę w środku pola
-  - Siłę obrony i ataku
-  - Mocne i słabe strony
-- **Sugeruje taktykę** dostosowaną do przeciwnika
+Testy backendu korzystają z mocków i lokalnych danych. Nie łączą się z CHPP i nie wysyłają ustawień meczu.
 
-### 📊 Algorytm Optymalizacji
+Optymalizator domyślnie maksymalizuje prawdopodobieństwo wygranej (`Win`) i automatycznie dobiera formację oraz taktykę. Ręcznie wskazana formacja lub taktyka pozostaje ograniczeniem wyszukiwania; dla nieznanego doświadczenia formacji stosowany jest jawny poziom zastępczy 5. Prognozy są niezweryfikowanymi estymacjami (`unvalidated-low`), a nie gwarancją wyniku.
 
-Aplikacja automatycznie:
-1. Wybiera najlepszego bramkarza (najwyższa umiejętność bramkarza)
-2. Ustawia 4 obrońców (najwyższe umiejętności obronne)
-3. Ustawia 3 pomocników (najlepsze rozgrywanie + podania)
-4. Ustawia 3 napastników (najwyższe umiejętności strzeleckie)
-5. Oblicza przewidywane ratingi dla każdej strefy
-6. Porównuje z przeciwnikiem i generuje rekomendacje
+Porównanie optymalizatora celu Win na stałych danych uruchom poleceniem `dotnet run --project Backend.Benchmarks/HattrickAnalizer.Benchmarks.csproj --configuration Release`. Opcja `-- --legacy7` uruchamia oryginalne siedem scenariuszy porównujących legalny skład początkowy z wynikiem optymalizacji. Opis i zapisane wyniki sprzed zmiany są w [dokumentacji benchmarku](docs/win-optimization-benchmark.md).
 
-### 🎯 Rekomendacje Taktyczne
+## Niepewność prognoz i kalibracja
 
-Na podstawie analizy aplikacja sugeruje:
-- Czy grać ofensywnie czy defensywnie
-- Którą flanką atakować
-- Czy stawiać na rozgrywanie czy kontratak
-- Gdzie są Twoje mocne strony
-- Na co uważać (słabe punkty)
+Oceny sektorów i prawdopodobieństwa są prognozami modelu, a nie gwarancją wyniku. API zwraca wersję modelu, etykietę pewności, pochodzenie danych i ostrzeżenia. Etykieta `unvalidated-low` oznacza, że jakość prognoz nie została potwierdzona na rzeczywistych meczach. Testy regresji sprawdzają spójność i znane reguły, ale testy syntetyczne nie dowodzą poprawy trafności.
 
-## Tryb Testowy
+1. Przed meczem zapisz kompletną migawkę drużyny: dokładnie 11 zawodników, dostępne prywatne umiejętności, pozycje i zachowania, taktykę, postawę, trenera, ducha drużyny, pewność siebie, doświadczenie formacji, poziom asystenta, status gospodarza oraz pogodę. Endpoint: `POST /api/calibration/snapshots/capture`.
+2. Migawka zarejestrowana po rozpoczęciu meczu, z niepełnym kontekstem lub z zawodnikiem spoza zapisanego składu nie jest używana do odtworzenia.
+3. Po meczu pobierz `GET /api/calibration/own-matches?count=5`. Sprawdź liczbę próbek, wykluczenia, błędy treningowe i wyniki na zbiorze kontrolnym. Do odtworzenia nie używaj obecnego składu ani późniejszych zmian umiejętności zamiast zapisanej migawki.
+4. Kalibracja dzieli mecze chronologicznie i odkłada najnowsze 20% (co najmniej jeden mecz, jeśli próbek jest więcej niż jedna) jako zbiór kontrolny. Zmiany modelu dobieraj na wcześniejszych meczach; nie stroić ich na zbiorze kontrolnym. Oceniaj kolejne mecze przed podniesieniem etykiety pewności lub deklaracją lepszej trafności.
 
-Jeśli nie masz dostępu do API Hattrick, aplikacja automatycznie wygeneruje:
-- 18 losowych zawodników dla Twojej drużyny
-- Losowe statystyki przeciwnika
-
-Możesz przetestować wszystkie funkcje bez prawdziwego API!
-
-## Rozwiązywanie Problemów
-
-### Backend nie startuje
-- Sprawdź czy masz zainstalowany .NET 8 SDK
-- Uruchom: `dotnet --version`
-
-### Frontend nie startuje
-- Sprawdź czy masz zainstalowany Node.js
-- Uruchom: `node --version` i `npm --version`
-
-### Błąd CORS
-- Upewnij się, że backend działa na porcie 5000
-- Upewnij się, że frontend działa na porcie 4200
-
-### Błąd API Hattrick
-- Sprawdź czy dane API w `appsettings.json` są poprawne
-- Aplikacja automatycznie przełączy się na dane testowe w przypadku błędu
-
-## Technologie
-
-- **Backend**: .NET 8, ASP.NET Core Web API
-- **Frontend**: Angular 17, TypeScript, SCSS
-- **API**: Hattrick CHPP (Community Helper Program Protocol)
+Więcej szczegółów o ograniczeniach prognoz i procedurze znajduje się w [README.md](README.md).

@@ -1,6 +1,9 @@
 ## Backend
 Backend/bin/
 Backend/obj/
+Backend.Tests/bin/
+Backend.Tests/obj/
+Backend/App_Data/
 Backend/appsettings.json
 Backend/appsettings.Development.json
 Backend/oauth_tokens.json

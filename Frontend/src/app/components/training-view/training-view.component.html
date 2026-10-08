@@ -1,7 +1,7 @@
 <div class="training-container">
   <div class="page-header">
     <div class="header-content">
-      <h1>🏋️ {{ 'training.title' | translate }}</h1>
+      <h1>&#127947;&#65039; {{ 'training.title' | translate }}</h1>
       <p class="subtitle">{{ 'training.subtitle' | translate }}</p>
     </div>
   </div>
@@ -18,11 +18,35 @@
       </div>
       <div class="summary-item">
         <span class="label">{{ 'training.intensity' | translate }}:</span>
-        <span class="value">{{ summary.trainingLevel }}%</span>
+        <span class="value">{{ summary.trainingIntensityPercent == null ? ('training.unknown' | translate) : summary.trainingIntensityPercent + '%' }}</span>
+      </div>
+      <div class="summary-item" *ngIf="summary.coachSkillRaw !== null && summary.coachSkillRaw !== undefined">
+        <span class="label">{{ 'training.coachSkillRaw' | translate }}:</span>
+        <span class="value">{{ summary.coachSkillRaw }} <small *ngIf="summary.coachSkillSource">({{ summary.coachSkillSource }})</small></span>
+      </div>
+      <div class="summary-item" *ngIf="summary.coachType">
+        <span class="label">{{ 'training.coachType' | translate }}:</span>
+        <span class="value">{{ summary.coachType }} <small *ngIf="summary.coachTypeSource">({{ summary.coachTypeSource }})</small></span>
+      </div>
+      <div class="summary-item" *ngIf="summary.assistantSkillTotal !== null && summary.assistantSkillTotal !== undefined">
+        <span class="label">{{ 'training.assistantSkill' | translate }}:</span>
+        <span class="value">{{ summary.assistantSkillTotal }} <small *ngIf="summary.assistantSkillSource">({{ summary.assistantSkillSource }})</small></span>
+      </div>
+      <div class="summary-item" *ngIf="summary.coachSpeedMultiplier !== null && summary.coachSpeedMultiplier !== undefined">
+        <span class="label">{{ 'training.coachSpeedFactor' | translate }}:</span>
+        <span class="value">×{{ summary.coachSpeedMultiplier | number:'1.2-2' }}</span>
+      </div>
+      <div class="summary-item" *ngIf="summary.intensityAndStaminaMultiplier !== null && summary.intensityAndStaminaMultiplier !== undefined">
+        <span class="label">{{ 'training.intensityStaminaFactor' | translate }}:</span>
+        <span class="value">×{{ summary.intensityAndStaminaMultiplier | number:'1.2-2' }}</span>
+      </div>
+      <div class="summary-item" *ngIf="summary.assistantSpeedMultiplier !== null && summary.assistantSpeedMultiplier !== undefined">
+        <span class="label">{{ 'training.assistantSpeedFactor' | translate }}:</span>
+        <span class="value">×{{ summary.assistantSpeedMultiplier | number:'1.2-2' }}</span>
       </div>
       <div class="summary-item">
         <span class="label">{{ 'training.staminaShare' | translate }}:</span>
-        <span class="value">{{ summary.staminaTrainingPart }}%</span>
+        <span class="value">{{ summary.staminaTrainingSharePercent == null ? ('training.unknown' | translate) : summary.staminaTrainingSharePercent + '%' }}</span>
       </div>
       <div class="summary-item" *ngIf="summary.trainerName">
         <span class="label">{{ 'training.trainer' | translate }}:</span>
@@ -31,6 +55,10 @@
       <div class="summary-item" *ngIf="summary.lastMatchDate">
         <span class="label">{{ 'training.lastMatch' | translate }}:</span>
         <span class="value">{{ summary.lastMatchDate | date:'dd.MM.yyyy' }}</span>
+      </div>
+      <div class="summary-item" *ngIf="summary.weekStart || summary.weekEnd">
+        <span class="label">{{ 'training.week' | translate }}:</span>
+        <span class="value">{{ summary.weekStart | date:'dd.MM.yyyy' }} &ndash; {{ summary.weekEnd | date:'dd.MM.yyyy' }}</span>
       </div>
     </div>
 
@@ -43,26 +71,54 @@
             <th>{{ 'training.player' | translate }}</th>
             <th>{{ 'training.age' | translate }}</th>
             <th>{{ 'training.position' | translate }}</th>
+            <th>{{ 'training.coverageMinutes' | translate }}</th>
+            <th>{{ 'training.observedFullMinutes' | translate }}</th>
+            <th>{{ 'training.observedHalfMinutes' | translate }}</th>
+            <th>{{ 'training.fullMinutes' | translate }}</th>
+            <th>{{ 'training.halfMinutes' | translate }}</th>
+            <th>{{ 'training.smallEffectMinutes' | translate }}</th>
+            <th>{{ 'training.verySmallEffectMinutes' | translate }}</th>
+            <th>{{ 'training.setPiecesBonus' | translate }}</th>
+            <th>{{ 'training.setPiecesSpecialBonus' | translate }}</th>
+            <th>{{ 'training.effectiveMinutes' | translate }}</th>
+            <th>{{ 'training.trainingCoverage' | translate }}</th>
+            <th>{{ 'training.staminaCoverage' | translate }}</th>
             <th>{{ 'training.fullTraining' | translate }}</th>
             <th *ngIf="summary.trainedSkill">{{ 'training.skillLevel' | translate }}</th>
             <th *ngIf="summary.trainedSkill">{{ 'training.weeksToNext' | translate }}</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let p of summary.players" [class.full-training]="p.fullTraining">
-            <td class="player-col">{{ p.playerName }}</td>
+          <tr *ngFor="let p of summary.players" [class.full-training]="p.fullTraining" [class.partial-training]="(p.trainingFraction ?? (p.fullTraining ? 1 : 0)) > 0 && (p.trainingFraction ?? (p.fullTraining ? 1 : 0)) < 1">
+            <td class="player-col">{{ p.playerName }}<small *ngIf="hasPlayerWarning(p.warnings)" class="training-player-warning" [title]="getPlayerWarnings(p.warnings).join(' ')">{{ 'training.uncertain' | translate }}</small></td>
             <td>{{ p.age }}</td>
             <td>{{ p.slot }}</td>
-            <td>{{ p.fullTraining ? '✅' : '—' }}</td>
-            <td *ngIf="summary.trainedSkill">{{ p.trainedSkillValue }} ({{ getSkillLevelName(p.trainedSkillValue) }})</td>
+            <td>{{ p.coverageMinutes ?? '—' }}<span *ngIf="p.isEstimate" [title]="'training.uncertain' | translate"> ~</span></td>
+            <td>{{ p.observedFullMinutes ?? '—' }}</td>
+            <td>{{ p.observedHalfMinutes ?? '—' }}</td>
+            <td>{{ p.fullTrainingMinutes ?? '—' }}</td>
+            <td>{{ p.halfTrainingMinutes ?? '—' }}</td>
+            <td>{{ p.smallEffectMinutes ?? '—' }}</td>
+            <td>{{ p.verySmallEffectMinutes ?? '—' }}</td>
+            <td>{{ p.setPiecesBonusFullMinutes ?? 0 }} / {{ p.setPiecesBonusHalfMinutes ?? 0 }}<span *ngIf="(p.setPiecesBonusUnknownMinutes ?? 0) > 0"> · {{ 'training.unknown' | translate }}: {{ p.setPiecesBonusUnknownMinutes }}</span></td>
+            <td>{{ p.setPiecesSpecialBonusMinutes ?? 0 | number:'1.0-1' }}</td>
+            <td>{{ p.effectiveTrainingMinutes ?? '—' }}<span *ngIf="p.isEstimate" [title]="'training.uncertain' | translate"> ~</span></td>
+            <td>{{ p.trainingFraction !== undefined ? (p.trainingFraction | percent:'1.0-0') : (p.fullTraining ? ('training.full' | translate) : ('training.partialOrUnknown' | translate)) }}<span *ngIf="p.isEstimate"> · {{ 'training.uncertain' | translate }}</span></td>
+            <td>{{ p.staminaTrainingFraction !== undefined && p.staminaTrainingFraction !== null ? (p.staminaTrainingFraction | percent:'1.0-0') : '—' }}</td>
+            <td>{{ p.fullTraining ? '&#10003;' : '&mdash;' }}</td>
+            <td *ngIf="summary.trainedSkill">{{ getTrainedSkillLabel(p) }}</td>
             <td *ngIf="summary.trainedSkill">
-              <span *ngIf="p.estimatedWeeksToNextLevel !== null">~{{ p.estimatedWeeksToNextLevel }}</span>
-              <span *ngIf="p.estimatedWeeksToNextLevel === null">—</span>
+              <span *ngIf="p.estimatedWeeksToNextLevel !== null && !p.isEstimate && (p.trainingFraction === undefined || p.trainingFraction >= 1)">~{{ p.estimatedWeeksToNextLevel }}</span>
+              <span *ngIf="p.estimatedWeeksToNextLevel === null || p.isEstimate || (p.trainingFraction !== undefined && p.trainingFraction < 1)">—</span>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
+    <ul *ngIf="summaryWarnings.length" class="training-warnings">
+      <li *ngFor="let warning of summaryWarnings">{{ warning }}</li>
+    </ul>
+    <p *ngIf="summary.intensityAndStaminaMultiplier !== null && summary.intensityAndStaminaMultiplier !== undefined || summary.assistantSpeedMultiplier !== null && summary.assistantSpeedMultiplier !== undefined" class="training-hint">{{ 'training.speedMethodHint' | translate }}</p>
     <p class="training-hint">{{ 'training.hint' | translate }}</p>
     </div>
   </div>

@@ -21,12 +21,14 @@ public class MatchOrdersController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> SendLineup([FromBody] MatchOrdersRequest request)
     {
-        if (request.MatchId == 0 || request.Positions.Count < 9)
+        var validationError = MatchOrdersService.ValidateRequest(request);
+        if (validationError != null)
         {
-            return BadRequest(new { error = "Wymagany matchId i co najmniej 9 obsadzonych pozycji." });
+            return BadRequest(new MatchOrdersResult { Success = false, Error = validationError, RawResponse = "validation" });
         }
 
         var result = await _matchOrders.SendLineupAsync(request);
+        if (!result.Success) return BadRequest(result);
         return Ok(result);
     }
 }

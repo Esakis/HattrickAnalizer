@@ -9,33 +9,37 @@ namespace HattrickAnalizer.Services;
 /// z PRAWDZIWYMI ocenami z matchdetails dla rozegranych meczow wlasnej druzyny.
 /// Sluzy do dopasowania stalych silnika (RatingScale, wspolczynniki XP itd.).
 ///
-/// Ograniczenie: uzywa BIEZACYCH umiejetnosci graczy, nie historycznych —
-/// dla meczow z ostatnich tygodni przyblizenie jest akceptowalne.
 /// </summary>
 public class CalibrationService
 {
     private readonly HattrickApiService _api;
     private readonly ILogger<CalibrationService> _logger;
-    private readonly RatingEngine _engine = new();
+    private readonly CalibrationSnapshotStore _snapshots;
+    private readonly RatingEngine _ratingEngine;
 
-    public CalibrationService(HattrickApiService api, ILogger<CalibrationService> logger)
+    public CalibrationService(HattrickApiService api, ILogger<CalibrationService> logger,
+        CalibrationSnapshotStore snapshots, RatingEngine ratingEngine)
     {
         _api = api;
         _logger = logger;
+        _snapshots = snapshots;
+        _ratingEngine = ratingEngine;
     }
 
     public async Task<CalibrationReport> CompareOwnMatchesAsync(int teamId, int count)
     {
         count = Math.Clamp(count, 1, 10);
 
-        // Biezace umiejetnosci graczy (players file).
-        var playersDoc = await _api.FetchChppXmlAsync(new Dictionary<string, string>
+        var roster = await _api.GetTeamPlayersAsync(teamId);
+        await _snapshots.SaveAsync(new CalibrationSnapshot
         {
-            { "file", "players" }, { "teamId", teamId.ToString() }, { "version", "2.8" }
-        }, $"players teamId={teamId}");
-        var players = playersDoc.Descendants("Player")
-            .Select(_api.ParsePlayer)
-            .ToDictionary(p => p.PlayerId);
+            TeamId = teamId,
+            RecordedAt = DateTimeOffset.UtcNow,
+            Players = roster,
+            Source = "CHPP own roster",
+            Warnings = new() { "Match context not supplied; this snapshot is not eligible for calibration." }
+        });
+        var availableSnapshots = await _snapshots.GetAsync(teamId);
 
         // Ostatnie rozegrane mecze seniorskie.
         var matchesDoc = await _api.FetchChppXmlAsync(new Dictionary<string, string>
@@ -47,7 +51,7 @@ public class CalibrationService
             .Where(m =>
             {
                 var status = m.Element("Status")?.Value ?? "";
-                var matchType = int.Parse(m.Element("MatchType")?.Value ?? "0");
+                var matchType = ParseIntOrZero(m, "MatchType");
                 return status.Equals("FINISHED", StringComparison.OrdinalIgnoreCase)
                     && matchType >= 1 && matchType <= 12;
             })
@@ -62,22 +66,47 @@ public class CalibrationService
             var matchId = match.Element("MatchID")?.Value;
             if (string.IsNullOrEmpty(matchId)) continue;
 
+            var kickoff = ParseDate(match.Element("MatchDate")?.Value);
+            var snapshot = long.TryParse(matchId, out var numericMatchId) && kickoff.HasValue
+                ? availableSnapshots.Where(s => s.Context.MatchId == numericMatchId
+                        && s.RecordedAt <= kickoff.Value && s.Context.MatchDate <= kickoff
+                        && s.Context.IsComplete && s.Context.BehavioursBySlot.Count == 11
+                        && s.Context.PlayerIdsBySlot.Values.Distinct().Count() == 11
+                        && s.Context.PlayerIdsBySlot.Values.All(id => s.Players.Any(p => p.PlayerId == id && p.SkillsAvailable)))
+                    .OrderByDescending(s => s.RecordedAt).FirstOrDefault()
+                : null;
+            if (snapshot == null)
+            {
+                report.ExcludedMatches++;
+                report.ExclusionReasons.Add($"Match {matchId}: no complete roster and match-context snapshot captured by kickoff.");
+                continue;
+            }
             try
             {
-                var entry = await CompareMatchAsync(teamId, matchId, players);
-                if (entry != null) report.Matches.Add(entry);
+                var entry = await CompareMatchAsync(teamId, matchId, snapshot);
+                if (entry == null)
+                {
+                    report.ExcludedMatches++;
+                    report.ExclusionReasons.Add($"Match {matchId}: snapshot lineup/context did not match the observed lineup.");
+                }
+                else report.Matches.Add(entry);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Kalibracja: pominieto mecz {MatchId}", matchId);
+                report.ExcludedMatches++;
+                report.ExclusionReasons.Add($"Match {matchId}: replay failed ({ex.Message}).");
+                _logger.LogWarning(ex, "Calibration replay skipped match {MatchId}", matchId);
             }
         }
 
         ComputeAggregates(report);
+        report.EvaluationStatus = report.Matches.Count == 0 ? "No evaluable snapshots"
+            : report.Matches.Count < 2 ? "Evaluated without chronological holdout (one match)"
+            : "Evaluated with chronological holdout";
         return report;
     }
 
-    private async Task<CalibrationMatchEntry?> CompareMatchAsync(int teamId, string matchId, Dictionary<int, Player> players)
+    private async Task<CalibrationMatchEntry?> CompareMatchAsync(int teamId, string matchId, CalibrationSnapshot snapshot)
     {
         // matchdetails: prawdziwe oceny + taktyka + dom/wyjazd.
         var detailsDoc = await _api.FetchChppXmlAsync(new Dictionary<string, string>
@@ -87,25 +116,35 @@ public class CalibrationService
 
         var homeTeam = detailsDoc.Descendants("HomeTeam").FirstOrDefault();
         var awayTeam = detailsDoc.Descendants("AwayTeam").FirstOrDefault();
-        var homeTeamId = int.Parse(homeTeam?.Element("HomeTeamID")?.Value ?? "0");
+        if (!int.TryParse(homeTeam?.Element("HomeTeamID")?.Value, out var homeTeamId)) return null;
         bool isHome = homeTeamId == teamId;
+        if (snapshot.Context.IsHomeMatch != isHome) return null;
         var myElement = isHome ? homeTeam : awayTeam;
         if (myElement == null) return null;
 
+        if (!TryParseRatings(myElement, out var actualRatings)) return null;
         var actual = new LineupRatings
         {
-            Midfield = ParseIntOrZero(myElement, "RatingMidfield"),
-            RightDefense = ParseIntOrZero(myElement, "RatingRightDef"),
-            CentralDefense = ParseIntOrZero(myElement, "RatingMidDef"),
-            LeftDefense = ParseIntOrZero(myElement, "RatingLeftDef"),
-            RightAttack = ParseIntOrZero(myElement, "RatingRightAtt"),
-            CentralAttack = ParseIntOrZero(myElement, "RatingMidAtt"),
-            LeftAttack = ParseIntOrZero(myElement, "RatingLeftAtt")
+            Midfield = actualRatings.MidfieldRating, RightDefense = actualRatings.RightDefenseRating,
+            CentralDefense = actualRatings.CentralDefenseRating, LeftDefense = actualRatings.LeftDefenseRating,
+            RightAttack = actualRatings.RightAttackRating, CentralAttack = actualRatings.CentralAttackRating,
+            LeftAttack = actualRatings.LeftAttackRating
         };
         if (actual.Midfield <= 0) return null; // brak ocen (np. walkower)
 
-        var tacticCode = int.Parse(myElement.Element("TacticType")?.Value ?? "0");
-        var tactic = MapTacticCode(tacticCode);
+        if (!int.TryParse(myElement.Element("TacticType")?.Value, out var tacticCode)) return null;
+        var observedTactic = MapTacticCode(tacticCode);
+        if (string.IsNullOrEmpty(observedTactic)) return null;
+        var tactic = snapshot.Context.Tactic!;
+        if (!string.Equals(tactic, observedTactic, StringComparison.OrdinalIgnoreCase)) return null;
+        if (!string.Equals(myElement.Element("Formation")?.Value, snapshot.Context.Formation, StringComparison.Ordinal)) return null;
+        var attitudeText = myElement.Element("TeamAttitude")?.Value ?? myElement.Element("Attitude")?.Value;
+        if (!int.TryParse(attitudeText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var attitudeCode)
+            || MapAttitudeCode(attitudeCode) != snapshot.Context.Attitude) return null;
+        var weatherText = detailsDoc.Descendants("WeatherID").FirstOrDefault()?.Value;
+        if (!int.TryParse(weatherText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var observedWeather)
+            || observedWeather != snapshot.Context.WeatherId) return null;
+        var players = snapshot.Players.ToDictionary(p => p.PlayerId);
 
         // matchlineup: faktyczne pozycje i zachowania.
         var lineupDoc = await _api.FetchChppXmlAsync(new Dictionary<string, string>
@@ -118,41 +157,40 @@ public class CalibrationService
         var lineupContainer = teamElement?.Element("Lineup") ?? teamElement?.Element("StartingLineup");
         if (lineupContainer == null) return null;
 
-        var assigned = new AssignedLineup
-        {
-            Formation = FormationData.Formations["4-4-2"], // formacja nieistotna dla ComputeRatings
-            Slots = new Dictionary<string, AssignedSlot>()
-        };
+        var lineup = new Lineup { Formation = snapshot.Context.Formation, TacticType = snapshot.Context.Tactic! };
 
         foreach (var playerEl in lineupContainer.Elements("Player"))
         {
             if (!int.TryParse(playerEl.Element("PlayerID")?.Value, out int pid)) continue;
-            var roleId = int.Parse(playerEl.Element("RoleID")?.Value ?? "0");
+            if (!int.TryParse(playerEl.Element("RoleID")?.Value, out var roleId)) continue;
             if (roleId < 100 || roleId > 113) continue; // tylko podstawowa 11
 
             var slot = MapRoleIdToSlot(roleId);
             if (string.IsNullOrEmpty(slot)) continue;
-            if (!players.TryGetValue(pid, out var player)) continue; // sprzedany — brak skilli
+            if (!snapshot.Context.PlayerIdsBySlot.TryGetValue(slot, out var expectedPlayerId) || expectedPlayerId != pid) return null;
+            if (!players.TryGetValue(pid, out var player) || !player.SkillsAvailable) return null;
 
-            var behaviourCode = int.Parse(playerEl.Element("Behaviour")?.Value ?? "0");
-            assigned.Slots[slot] = new AssignedSlot
-            {
-                SlotId = slot,
-                Player = player,
-                Behaviour = MapSlotBehaviour(slot, behaviourCode)
-            };
+            if (!int.TryParse(playerEl.Element("Behaviour")?.Value, out var behaviourCode)
+                || !IsValidBehaviourCode(slot, behaviourCode)) return null;
+            var behaviour = MapSlotBehaviour(slot, behaviourCode);
+            if (!snapshot.Context.BehavioursBySlot.TryGetValue(slot, out var expectedBehaviour)
+                || !string.Equals(expectedBehaviour, behaviour, StringComparison.OrdinalIgnoreCase)) return null;
+            lineup.Positions[slot] = new LineupPosition { Position = slot, Player = player, Behavior = behaviour };
         }
 
-        if (assigned.Slots.Count < 9)
+        if (lineup.Positions.Count != 11 || !lineup.Positions.ContainsKey("GK")
+            || lineup.Positions.Values.Select(s => s.Player!.PlayerId).Distinct().Count() != 11)
         {
             // Za duzo brakujacych graczy (sprzedani) — porownanie byloby zaklamane.
             return null;
         }
 
-        var predicted = _engine.ComputeRatings(assigned);
-        _engine.ApplyTactic(predicted, tactic);
-        // Postawa (PIC/MOTS) nie jest publiczna — zakladamy Normal.
-        _engine.ApplyHomeAdvantage(predicted, isHome);
+        var context = snapshot.Context;
+        var disorderRisk = AdvancedLineupOptimizer.ComputeDisorderRisk(context.FormationExperience!.Value);
+        var predicted = _ratingEngine.ComputeContextualRatings(lineup, context.WeatherId!.Value,
+            context.Attitude!, context.CoachType!, disorderRisk, context.TeamSpiritLevel,
+            context.ConfidenceLevel, applyHomeAdvantage: isHome);
+        _ratingEngine.ApplyTactic(predicted, tactic);
 
         return new CalibrationMatchEntry
         {
@@ -160,7 +198,7 @@ public class CalibrationService
             MatchDate = ParseDate(detailsDoc.Descendants("MatchDate").FirstOrDefault()?.Value),
             IsHomeMatch = isHome,
             Tactic = tactic,
-            PlayersMatched = assigned.Slots.Count,
+            PlayersMatched = lineup.Positions.Count,
             Predicted = predicted,
             Actual = actual
         };
@@ -169,28 +207,73 @@ public class CalibrationService
     private static void ComputeAggregates(CalibrationReport report)
     {
         if (report.Matches.Count == 0) return;
+        var ordered = report.Matches.OrderBy(m => m.MatchDate).ToList();
+        var holdoutCount = ordered.Count > 1 ? Math.Max(1, (int)Math.Ceiling(ordered.Count * 0.2)) : 0;
+        var training = ordered.Take(ordered.Count - holdoutCount).ToList();
+        var heldOut = ordered.Skip(ordered.Count - holdoutCount).ToList();
+        report.TrainingSampleCount = training.Count;
+        report.HeldOutSampleCount = heldOut.Count;
+        report.TrainingSectorSampleCounts = SectorCounts(training.Count);
+        report.HeldOutSectorSampleCounts = SectorCounts(heldOut.Count);
+        if (training.Count == 0) return;
         report.MeanAbsoluteError = new LineupRatings
         {
-            Midfield = report.Matches.Average(m => Math.Abs(m.Predicted.Midfield - m.Actual.Midfield)),
-            CentralDefense = report.Matches.Average(m => Math.Abs(m.Predicted.CentralDefense - m.Actual.CentralDefense)),
-            RightDefense = report.Matches.Average(m => Math.Abs(m.Predicted.RightDefense - m.Actual.RightDefense)),
-            LeftDefense = report.Matches.Average(m => Math.Abs(m.Predicted.LeftDefense - m.Actual.LeftDefense)),
-            CentralAttack = report.Matches.Average(m => Math.Abs(m.Predicted.CentralAttack - m.Actual.CentralAttack)),
-            RightAttack = report.Matches.Average(m => Math.Abs(m.Predicted.RightAttack - m.Actual.RightAttack)),
-            LeftAttack = report.Matches.Average(m => Math.Abs(m.Predicted.LeftAttack - m.Actual.LeftAttack))
+            Midfield = training.Average(m => Math.Abs(m.Predicted.Midfield - m.Actual.Midfield)),
+            CentralDefense = training.Average(m => Math.Abs(m.Predicted.CentralDefense - m.Actual.CentralDefense)),
+            RightDefense = training.Average(m => Math.Abs(m.Predicted.RightDefense - m.Actual.RightDefense)),
+            LeftDefense = training.Average(m => Math.Abs(m.Predicted.LeftDefense - m.Actual.LeftDefense)),
+            CentralAttack = training.Average(m => Math.Abs(m.Predicted.CentralAttack - m.Actual.CentralAttack)),
+            RightAttack = training.Average(m => Math.Abs(m.Predicted.RightAttack - m.Actual.RightAttack)),
+            LeftAttack = training.Average(m => Math.Abs(m.Predicted.LeftAttack - m.Actual.LeftAttack))
         };
+        report.MeanBias = ErrorBias(training);
+        if (heldOut.Count > 0)
+        {
+            report.HeldOutMeanAbsoluteError = new LineupRatings
+            {
+                Midfield = heldOut.Average(m => Math.Abs(m.Predicted.Midfield - m.Actual.Midfield)),
+                CentralDefense = heldOut.Average(m => Math.Abs(m.Predicted.CentralDefense - m.Actual.CentralDefense)),
+                RightDefense = heldOut.Average(m => Math.Abs(m.Predicted.RightDefense - m.Actual.RightDefense)),
+                LeftDefense = heldOut.Average(m => Math.Abs(m.Predicted.LeftDefense - m.Actual.LeftDefense)),
+                CentralAttack = heldOut.Average(m => Math.Abs(m.Predicted.CentralAttack - m.Actual.CentralAttack)),
+                RightAttack = heldOut.Average(m => Math.Abs(m.Predicted.RightAttack - m.Actual.RightAttack)),
+                LeftAttack = heldOut.Average(m => Math.Abs(m.Predicted.LeftAttack - m.Actual.LeftAttack))
+            };
+            report.HeldOutMeanBias = ErrorBias(heldOut);
+        }
         // Sredni stosunek actual/predicted per sektor — bezposrednia wskazowka dla RatingScale.K.
         report.MeanActualToPredictedRatio = new LineupRatings
         {
-            Midfield = SafeRatio(report.Matches.Select(m => (m.Actual.Midfield, m.Predicted.Midfield))),
-            CentralDefense = SafeRatio(report.Matches.Select(m => (m.Actual.CentralDefense, m.Predicted.CentralDefense))),
-            RightDefense = SafeRatio(report.Matches.Select(m => (m.Actual.RightDefense, m.Predicted.RightDefense))),
-            LeftDefense = SafeRatio(report.Matches.Select(m => (m.Actual.LeftDefense, m.Predicted.LeftDefense))),
-            CentralAttack = SafeRatio(report.Matches.Select(m => (m.Actual.CentralAttack, m.Predicted.CentralAttack))),
-            RightAttack = SafeRatio(report.Matches.Select(m => (m.Actual.RightAttack, m.Predicted.RightAttack))),
-            LeftAttack = SafeRatio(report.Matches.Select(m => (m.Actual.LeftAttack, m.Predicted.LeftAttack)))
+            Midfield = SafeRatio(training.Select(m => (m.Actual.Midfield, m.Predicted.Midfield))),
+            CentralDefense = SafeRatio(training.Select(m => (m.Actual.CentralDefense, m.Predicted.CentralDefense))),
+            RightDefense = SafeRatio(training.Select(m => (m.Actual.RightDefense, m.Predicted.RightDefense))),
+            LeftDefense = SafeRatio(training.Select(m => (m.Actual.LeftDefense, m.Predicted.LeftDefense))),
+            CentralAttack = SafeRatio(training.Select(m => (m.Actual.CentralAttack, m.Predicted.CentralAttack))),
+            RightAttack = SafeRatio(training.Select(m => (m.Actual.RightAttack, m.Predicted.RightAttack))),
+            LeftAttack = SafeRatio(training.Select(m => (m.Actual.LeftAttack, m.Predicted.LeftAttack)))
         };
     }
+
+    private static LineupRatings ErrorBias(IEnumerable<CalibrationMatchEntry> matches)
+    {
+        var items = matches.ToList();
+        return new LineupRatings
+        {
+            Midfield = items.Average(m => m.Predicted.Midfield - m.Actual.Midfield),
+            CentralDefense = items.Average(m => m.Predicted.CentralDefense - m.Actual.CentralDefense),
+            RightDefense = items.Average(m => m.Predicted.RightDefense - m.Actual.RightDefense),
+            LeftDefense = items.Average(m => m.Predicted.LeftDefense - m.Actual.LeftDefense),
+            CentralAttack = items.Average(m => m.Predicted.CentralAttack - m.Actual.CentralAttack),
+            RightAttack = items.Average(m => m.Predicted.RightAttack - m.Actual.RightAttack),
+            LeftAttack = items.Average(m => m.Predicted.LeftAttack - m.Actual.LeftAttack)
+        };
+    }
+
+    private static Dictionary<string, int> SectorCounts(int count) => new()
+    {
+        ["midfield"] = count, ["rightDefense"] = count, ["centralDefense"] = count,
+        ["leftDefense"] = count, ["rightAttack"] = count, ["centralAttack"] = count, ["leftAttack"] = count
+    };
 
     private static double SafeRatio(IEnumerable<(double Actual, double Predicted)> pairs)
     {
@@ -200,6 +283,23 @@ public class CalibrationService
 
     private static int ParseIntOrZero(XElement parent, string name) =>
         int.TryParse(parent.Element(name)?.Value, out var v) ? v : 0;
+
+    private static bool TryParseRatings(XElement element, out TeamRatings ratings)
+    {
+        ratings = new TeamRatings();
+        var fields = new[] { "RatingMidfield", "RatingRightDef", "RatingMidDef", "RatingLeftDef", "RatingRightAtt", "RatingMidAtt", "RatingLeftAtt", "RatingIndirectSetPiecesAtt", "RatingIndirectSetPiecesDef" };
+        var values = new int[fields.Length];
+        for (var i = 0; i < fields.Length; i++)
+            if (!int.TryParse(element.Element(fields[i])?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out values[i]) || values[i] < 0)
+                return false;
+        ratings = new TeamRatings
+        {
+            MidfieldRating = values[0], RightDefenseRating = values[1], CentralDefenseRating = values[2],
+            LeftDefenseRating = values[3], RightAttackRating = values[4], CentralAttackRating = values[5],
+            LeftAttackRating = values[6], IndirectSetPiecesAttRating = values[7], IndirectSetPiecesDefRating = values[8]
+        };
+        return true;
+    }
 
     private static DateTime? ParseDate(string? value) =>
         DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt) ? dt : null;
@@ -212,7 +312,13 @@ public class CalibrationService
         4 => "AttackOnWings",
         7 => "PlayCreatively",
         8 => "LongShots",
-        _ => "Normal"
+        0 => "Normal",
+        _ => ""
+    };
+
+    private static string MapAttitudeCode(int code) => code switch
+    {
+        -1 => "PIC", 0 => "Normal", 1 => "MOTS", _ => ""
     };
 
     internal static string MapRoleIdToSlot(int roleId) => roleId switch
@@ -248,12 +354,52 @@ public class CalibrationService
             _ => slot
         };
     }
+
+    internal static bool IsValidBehaviourCode(string slot, int code) => (slot, code) switch
+    {
+        ("GK", 0) => true,
+        ("RWB" or "LWB", 0 or 1 or 2 or 3) => true,
+        ("RCD" or "CD" or "LCD", 0 or 1) => true,
+        ("RCD" or "LCD", 4) => true,
+        ("RW" or "LW", 0 or 1 or 2 or 3) => true,
+        ("RIM" or "IM" or "LIM", 0 or 1 or 2) => true,
+        ("RIM" or "LIM", 4) => true,
+        ("RFW" or "FW" or "LFW", 0 or 2 or 4) => true,
+        _ => false
+    };
+
+    public static bool IsValidSlotBehaviour(string slot, string behaviour)
+    {
+        var code = (slot, behaviour) switch
+        {
+            ("GK", "GK") => 0,
+            ("RWB", "RWB") or ("LWB", "LWB") or ("RCD", "RCD") or ("CD", "CD") or ("LCD", "LCD")
+                or ("RW", "RW") or ("LW", "LW") or ("RIM", "RIM") or ("IM", "IM") or ("LIM", "LIM")
+                or ("RFW", "RFW") or ("FW", "FW") or ("LFW", "LFW") => 0,
+            (_, "WBO" or "CDO" or "WO" or "IMO") => 1,
+            (_, "WBD" or "WD" or "IMD" or "DF") => 2,
+            (_, "WBTM" or "WTM") => 3,
+            (_, "CDTW" or "FTW" or "IMTW") => 4,
+            _ => -1
+        };
+        return code >= 0 && IsValidBehaviourCode(slot, code);
+    }
 }
 
 public class CalibrationReport
 {
     public int TeamId { get; set; }
     public List<CalibrationMatchEntry> Matches { get; set; } = new();
+    public string EvaluationStatus { get; set; } = "Not evaluated";
+    public int ExcludedMatches { get; set; }
+    public int TrainingSampleCount { get; set; }
+    public int HeldOutSampleCount { get; set; }
+    public LineupRatings? MeanBias { get; set; }
+    public LineupRatings? HeldOutMeanAbsoluteError { get; set; }
+    public LineupRatings? HeldOutMeanBias { get; set; }
+    public Dictionary<string, int> TrainingSectorSampleCounts { get; set; } = new();
+    public Dictionary<string, int> HeldOutSectorSampleCounts { get; set; } = new();
+    public List<string> ExclusionReasons { get; set; } = new();
     // Sredni blad bezwzgledny per sektor (cel: <= ~2 punkty denominacji HT).
     public LineupRatings? MeanAbsoluteError { get; set; }
     // Sredni actual/predicted per sektor — gdy stabilnie != 1, skoryguj RatingScale.

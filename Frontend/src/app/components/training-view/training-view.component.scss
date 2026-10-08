@@ -7,7 +7,6 @@
 
 .training-body {
   padding: 0 0 20px;
-  max-width: 1000px;
 }
 
 .training-summary-card,
@@ -69,19 +68,70 @@
     white-space: nowrap;
   }
 
+  // Dużo kolumn z długimi nazwami — nagłówki zawijamy zamiast rozpychać tabelę.
   th {
     background: #2e7d32;
     color: white;
     font-weight: 600;
+    font-size: 0.85em;
+    line-height: 1.25;
+    white-space: normal;
+    min-width: 64px;
+    vertical-align: bottom;
   }
 
+  // Kolumna z nazwiskiem zostaje widoczna przy przewijaniu tabeli w poziomie.
   .player-col {
+    position: sticky;
+    left: 0;
+    z-index: 1;
     text-align: left;
-    min-width: 160px;
+    min-width: 170px;
+    background: white;
   }
 
-  .full-training {
+  th.player-col {
+    z-index: 2;
+    background: #2e7d32;
+  }
+
+  .full-training,
+  .full-training .player-col {
     background: #f1f8e9;
+  }
+
+  .partial-training,
+  .partial-training .player-col {
+    background: #fffde7;
+  }
+}
+
+.training-player-warning {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: #fff3e0;
+  border: 1px solid #ffcc80;
+  color: #e65100;
+  font-size: 0.75em;
+  font-weight: 600;
+  cursor: help;
+}
+
+.training-warnings {
+  margin: 12px 0 0;
+  padding: 8px 14px;
+  list-style: none;
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  border-left: 4px solid #ffc107;
+  border-radius: 8px;
+  color: #8d6e00;
+  font-size: 0.85em;
+
+  li + li {
+    margin-top: 4px;
   }
 }
 

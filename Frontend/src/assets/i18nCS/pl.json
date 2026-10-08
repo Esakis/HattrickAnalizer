@@ -229,6 +229,7 @@
       "win": "Wygrana",
       "draw": "Remis",
       "loss": "Porażka",
+      "expectedPoints": "Oczek. punkty",
       "xg": "Oczekiwane gole",
       "disorder": "Ryzyko nieładu"
     },

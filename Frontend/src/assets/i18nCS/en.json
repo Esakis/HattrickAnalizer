@@ -229,6 +229,7 @@
       "win": "Win",
       "draw": "Draw",
       "loss": "Loss",
+      "expectedPoints": "Exp. points",
       "xg": "Expected goals",
       "disorder": "Disorder risk"
     },

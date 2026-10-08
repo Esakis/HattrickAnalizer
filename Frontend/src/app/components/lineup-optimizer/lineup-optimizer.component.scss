@@ -640,7 +640,7 @@
 }
 
 @media (max-width: 768px) {
-  .input-section, .results-section, .recommendations-section {
+  .input-section, .recommendations-section {
     margin: 0 0 15px 0;
     padding: 15px;
   }
@@ -691,15 +691,21 @@ details > summary {
 }
 
 .alternatives-section {
-  margin-top: 20px;
+  margin: 0 0 15px 0;
   background: white;
-  padding: 15px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  padding: 15px 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(46, 125, 50, 0.15);
+  border: 2px solid #a5d6a7;
+  overflow-x: auto;
 
   h2 {
     margin: 0 0 10px 0;
     color: #1b5e20;
+    font-size: 1.3em;
+    font-weight: 600;
+    border-bottom: 2px solid #66bb6a;
+    padding-bottom: 6px;
   }
 
   .alternatives-hint {
@@ -717,6 +723,7 @@ details > summary {
       padding: 8px 10px;
       text-align: left;
       border-bottom: 1px solid #e0e0e0;
+      white-space: nowrap;
     }
 
     th {
@@ -1038,6 +1045,56 @@ details > summary {
       padding-bottom: 6px;
     }
 
+    > h3,
+    .lane-matchups h3 {
+      color: #1b5e20;
+      font-size: 1em;
+      font-weight: 600;
+      margin: 14px 0 8px;
+    }
+
+    .tradeoff-hint {
+      margin: 0 0 4px;
+      font-size: 0.85em;
+      color: #5f6f5f;
+      line-height: 1.45;
+    }
+
+    .optimizer-help {
+      display: block;
+      margin: -4px 0 12px;
+      font-size: 0.78em;
+      color: #5f6f5f;
+    }
+
+    .lane-matchups {
+      margin-bottom: 15px;
+
+      .rating-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 10px;
+        margin-bottom: 6px;
+        background: #f1f8e9;
+        border-radius: 6px;
+        border-left: 3px solid #66bb6a;
+        font-size: 0.85em;
+
+        .rating-label {
+          font-weight: 600;
+          color: #2e7d32;
+          white-space: nowrap;
+        }
+
+        span:last-child {
+          text-align: right;
+          color: #1f2a1f;
+        }
+      }
+    }
+
     .ratings-comparison {
       margin-bottom: 15px;
 
@@ -1084,19 +1141,21 @@ details > summary {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 15px;
+      margin-top: 15px;
 
       .strengths, .weaknesses {
         padding: 12px;
         border-radius: 8px;
 
         h3 {
-          margin-bottom: 8px;
+          margin: 0 0 8px;
           font-size: 1.05em;
         }
 
         ul {
           list-style: none;
           padding: 0;
+          margin: 0;
 
           li {
             padding: 8px 10px;
@@ -1148,7 +1207,8 @@ details > summary {
     border-radius: 10px;
     box-shadow: 0 4px 15px rgba(46, 125, 50, 0.15);
     border: 2px solid #a5d6a7;
-    height: 100%;
+    // Karta ma wysokość treści — nie rozciąga się do wysokiego „Porównania drużyn”.
+    align-self: start;
     border-left: 5px solid #ff9800;
 
     h2 {
@@ -1493,4 +1553,69 @@ details > summary {
       }
     }
   }
+}
+
+// ==================== PODPOWIEDZI I STATUS WYNIKU ====================
+
+.input-section .input-form .optimizer-help {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.78em;
+  line-height: 1.4;
+  color: #5f6f5f;
+}
+
+.lineups-side-by-side .lineup-section {
+  .forecast-caveat,
+  .scout-uncertainty {
+    margin: 4px 0 10px;
+    font-size: 0.8em;
+    font-style: italic;
+    line-height: 1.4;
+    color: #5f6f5f;
+  }
+}
+
+// Status wyniku: nieaktualny wynik, pochodzenie danych i ostrzeżenia modelu.
+.warning-message,
+.result-provenance,
+.model-warnings {
+  margin: 0 0 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.85em;
+}
+
+.warning-message {
+  background: #fff8e1;
+  border: 1px solid #ffcc80;
+  border-left: 4px solid #ff9800;
+  color: #e65100;
+  font-weight: 600;
+}
+
+.result-provenance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  background: white;
+  border: 1px solid #dfe7dc;
+  color: #5f6f5f;
+}
+
+.model-warnings {
+  list-style: none;
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  border-left: 4px solid #ffc107;
+  color: #8d6e00;
+
+  li + li {
+    margin-top: 4px;
+  }
+}
+
+.model-warnings + .results-section,
+.result-provenance + .results-section {
+  margin-top: 15px;
 }

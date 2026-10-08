@@ -1,7 +1,7 @@
 <div class="training-container">
   <div class="page-header">
     <div class="header-content">
-      <h1>&#127947;&#65039; {{ 'training.title' | translate }}</h1>
+      <h1>🏋️ {{ 'training.title' | translate }}</h1>
       <p class="subtitle">{{ 'training.subtitle' | translate }}</p>
     </div>
   </div>
@@ -68,7 +68,7 @@
       <table class="training-table">
         <thead>
           <tr>
-            <th>{{ 'training.player' | translate }}</th>
+            <th class="player-col">{{ 'training.player' | translate }}</th>
             <th>{{ 'training.age' | translate }}</th>
             <th>{{ 'training.position' | translate }}</th>
             <th>{{ 'training.coverageMinutes' | translate }}</th>
@@ -105,7 +105,7 @@
             <td>{{ p.effectiveTrainingMinutes ?? '—' }}<span *ngIf="p.isEstimate" [title]="'training.uncertain' | translate"> ~</span></td>
             <td>{{ p.trainingFraction !== undefined ? (p.trainingFraction | percent:'1.0-0') : (p.fullTraining ? ('training.full' | translate) : ('training.partialOrUnknown' | translate)) }}<span *ngIf="p.isEstimate"> · {{ 'training.uncertain' | translate }}</span></td>
             <td>{{ p.staminaTrainingFraction !== undefined && p.staminaTrainingFraction !== null ? (p.staminaTrainingFraction | percent:'1.0-0') : '—' }}</td>
-            <td>{{ p.fullTraining ? '&#10003;' : '&mdash;' }}</td>
+            <td>{{ p.fullTraining ? '✓' : '—' }}</td>
             <td *ngIf="summary.trainedSkill">{{ getTrainedSkillLabel(p) }}</td>
             <td *ngIf="summary.trainedSkill">
               <span *ngIf="p.estimatedWeeksToNextLevel !== null && !p.isEstimate && (p.trainingFraction === undefined || p.trainingFraction >= 1)">~{{ p.estimatedWeeksToNextLevel }}</span>

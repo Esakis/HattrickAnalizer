@@ -1,4 +1,4 @@
-﻿<div class="optimizer-container">
+<div class="optimizer-container">
   <div class="page-header">
     <div class="header-content">
       <h1>&#9917; {{ 'optimizer.title' | translate }}</h1>
@@ -120,9 +120,9 @@
             </div>
           </div>
 
-          <!-- Poziomy doĹ›wiadczenia formacji -->
+          <!-- Poziomy doświadczenia formacji -->
           <details class="formation-exp-details">
-            <summary>&#128202; {{ 'optimizer.staff.formationExperience' | translate }}</summary>
+            <summary>📊 {{ 'optimizer.staff.formationExperience' | translate }}</summary>
             <div class="formation-exp-grid-2x5">
               <div class="formation-exp-row">
                 <div *ngFor="let f of availableFormations.slice(0, 5)" class="formation-exp-item">
@@ -149,7 +149,7 @@
       </div>
 
       <div class="team-info my-team-info">
-        <h3>&#127968; {{ myTeamName || ('optimizer.myTeam' | translate) }}</h3>
+        <h3>🏠 {{ myTeamName || ('optimizer.myTeam' | translate) }}</h3>
         <div *ngIf="loadingMyTeam" class="loading-indicator">
           {{ 'common.loading' | translate }}...
         </div>
@@ -281,7 +281,7 @@
           {{ 'common.loading' | translate }} {{ 'scout.title' | translate }}...
         </div>
         <div *ngIf="!loadingOpponentScout && opponentScout && opponentScout.matchesAnalyzed > 0" class="scout-report">
-          <h4>&#128269; {{ 'scout.title' | translate }} ({{ 'scout.matchesAnalyzed' | translate }}: {{ opponentScout.matchesAnalyzed }})</h4>
+          <h4>🔎 {{ 'scout.title' | translate }} ({{ 'scout.matchesAnalyzed' | translate }}: {{ opponentScout.matchesAnalyzed }})</h4>
           <div class="stat-item">
             <span class="stat-label">{{ 'scout.mostCommonTactic' | translate }}:</span>
             <span class="stat-value stat-highlight">{{ scoutTacticSummary }}</span>
@@ -325,8 +325,7 @@
             </div>
           </div>
         </div>
-
-        <!-- WybĂłr formacji i taktyki przeciwnika -->
+
       </div>
     </div>
   </div>
@@ -362,9 +361,9 @@
   </div>
 
   <div *ngIf="result" class="results-section">
-    <!-- OBA SKĹADY OBOK SIEBIE -->
+    <!-- OBA SKŁADY OBOK SIEBIE -->
     <div class="lineups-side-by-side">
-      <!-- MĂ“J OPTYMALNY SKĹAD -->
+      <!-- MÓJ OPTYMALNY SKŁAD -->
       <div class="lineup-section my-lineup-section">
         <h2> {{ 'optimizer.optimalLineup' | translate }}</h2>
         <div class="send-orders" *ngIf="canSendOrders">
@@ -454,7 +453,7 @@
         </div>
       </div>
 
-      <!-- PRZEWIDYWANY SKĹAD PRZECIWNIKA -->
+      <!-- PRZEWIDYWANY SKŁAD PRZECIWNIKA -->
       <div class="lineup-section opponent-lineup-section" *ngIf="opponentOptimalLineup && opponentScout">
         <h2>{{ 'optimizer.predictedOpponentLineup' | translate }}</h2>
         <p class="scout-uncertainty">{{ 'optimizer.scoutPredictionWarning' | translate }} ({{ opponentScout.matchesAnalyzed }} {{ 'optimizer.scoutSamples' | translate }})</p>
@@ -581,7 +580,7 @@
 
         <div class="strengths-weaknesses">
           <div class="strengths" *ngIf="displayedStrengths.length > 0">
-            <h3>&#128170; {{ 'optimizer.strengths' | translate }}</h3>
+            <h3>💪 {{ 'optimizer.strengths' | translate }}</h3>
             <ul>
               <li *ngFor="let strength of displayedStrengths">{{ strength }}</li>
             </ul>
@@ -607,7 +606,7 @@
     </div>
 
     <div class="alternatives-section" *ngIf="result.alternatives?.length">
-      <h2>&#128260; {{ 'optimizer.alternatives.title' | translate }}</h2>
+      <h2>🔄 {{ 'optimizer.alternatives.title' | translate }}</h2>
       <p class="alternatives-hint">{{ 'optimizer.alternatives.hint' | translate }}</p>
       <table class="alternatives-table">
         <thead>
@@ -618,7 +617,7 @@
             <th>{{ 'optimizer.alternatives.win' | translate }}</th>
             <th>{{ 'optimizer.alternatives.draw' | translate }}</th>
             <th>{{ 'optimizer.alternatives.loss' | translate }}</th>
-            <th>{{ 'optimizer.objective.expectedPoints' | translate }}</th>
+            <th>{{ 'optimizer.alternatives.expectedPoints' | translate }}</th>
             <th>{{ 'optimizer.alternatives.xg' | translate }}</th>
             <th>{{ 'optimizer.alternatives.disorder' | translate }}</th>
           </tr>

@@ -137,3 +137,11 @@
   color: #c62828;
   border-radius: 6px;
 }
+.forecast-evidence { padding: 1rem 1.2rem; margin-bottom: 1rem; background: #fff9eb; border: 1px solid #e6c983; border-radius: 9px; color: #654d17; }
+.forecast-evidence h3 { margin: 0 0 .5rem; font-size: 1rem; }
+.forecast-evidence p { margin: .4rem 0; font-size: .88rem; }
+.forecast-evidence summary { margin-top: .75rem; cursor: pointer; font-size: .85rem; }
+.forecast-evidence li { font-size: .82rem; margin-top: .4rem; }
+.fallback-warning { font-weight: 600; }
+.rating-source { display: block; font-size: .7rem; font-weight: 400; color: #637a6c; margin-top: .2rem; white-space: normal; }
+.default-source { color: #965a0a; }

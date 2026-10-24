@@ -9,11 +9,13 @@ public class TrainingController : ControllerBase
 {
     private readonly TrainingService _training;
     private readonly TokenStore _tokenStore;
+    private readonly IConfiguration _configuration;
 
-    public TrainingController(TrainingService training, TokenStore tokenStore)
+    public TrainingController(TrainingService training, TokenStore tokenStore, IConfiguration configuration)
     {
         _training = training;
         _tokenStore = tokenStore;
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -23,6 +25,7 @@ public class TrainingController : ControllerBase
     [HttpGet("summary")]
     public async Task<IActionResult> GetSummary()
     {
+        if (_configuration.GetValue<bool>("UseMockData")) return Ok(await _training.GetSummaryAsync(MockChppData.TeamId));
         var sessionId = Request.Cookies["ht_session"] ?? "";
         var stored = _tokenStore.Get(sessionId);
         if (stored == null || stored.OwnTeamId == 0)

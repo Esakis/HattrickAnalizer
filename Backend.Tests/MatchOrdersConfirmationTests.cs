@@ -28,16 +28,17 @@ public class MatchOrdersConfirmationTests
         using var client = new HttpClient(handler);
         var oauth = new OAuthService(configuration, client);
         var tokenStore = new TokenStore(configuration, new EphemeralDataProtectionProvider(), NullLogger<TokenStore>.Instance);
-        tokenStore.Save("test-session", new StoredToken { AccessToken = "fixture-token", AccessTokenSecret = "fixture-token-secret" });
+        tokenStore.Save("test-session", new StoredToken { OwnTeamId = 10, AccessToken = "fixture-token", AccessTokenSecret = "fixture-token-secret" });
         var context = new DefaultHttpContext();
         context.Request.Headers.Cookie = "ht_session=test-session";
-        var service = new MatchOrdersService(oauth, tokenStore, new HttpContextAccessor { HttpContext = context },
-            NullLogger<MatchOrdersService>.Instance);
+        var accessor = new HttpContextAccessor { HttpContext = context };
+        var api = new HattrickApiService(client, configuration, oauth, tokenStore, accessor, NullLogger<HattrickApiService>.Instance);
+        var service = new MatchOrdersService(oauth, tokenStore, accessor, NullLogger<MatchOrdersService>.Instance, api);
 
         var result = await service.SendLineupAsync(ValidRequest());
 
         Assert.Equal(expectedSuccess, result.Success);
-        Assert.Equal(1, handler.RequestCount);
+        Assert.Equal(3, handler.RequestCount);
         Assert.Contains("file=matchorders", handler.LastRequestUri, StringComparison.Ordinal);
         if (!expectedSuccess) Assert.Contains(expectedError, result.Error, StringComparison.OrdinalIgnoreCase);
     }
@@ -65,9 +66,15 @@ public class MatchOrdersConfirmationTests
         {
             RequestCount++;
             LastRequestUri = request.RequestUri?.ToString() ?? "";
+            var xml = responseXml;
+            if (LastRequestUri.Contains("actionType=view", StringComparison.Ordinal))
+                xml = "<HattrickData><MatchData Available=\"True\"><HomeTeam><HomeTeamID>10</HomeTeamID></HomeTeam><AwayTeam><AwayTeamID>20</AwayTeamID></AwayTeam></MatchData></HattrickData>";
+            if (LastRequestUri.Contains("file=players", StringComparison.Ordinal))
+                xml = "<HattrickData><Team><PlayerList>" + string.Concat(Enumerable.Range(1, 11).Select(i =>
+                    $"<Player><PlayerID>{i}</PlayerID><InjuryLevel>-1</InjuryLevel><Cards>0</Cards></Player>")) + "</PlayerList></Team></HattrickData>";
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent(responseXml, System.Text.Encoding.UTF8, "application/xml")
+                Content = new StringContent(xml, System.Text.Encoding.UTF8, "application/xml")
             });
         }
     }

@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, isDevMode } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { HattrickApiService } from '../../services/hattrick-api.service';
@@ -42,11 +42,12 @@ export class PlayersComponent implements OnInit, OnDestroy {
   playerSortColumn: string = 'position';
   playerSortDirection: 'asc' | 'desc' = 'asc';
 
-  isDebug = isDevMode();
   selectedPlayerId: number | null = null;
   selectedPlayerName: string = '';
 
   savingHistory = false;
+  historyError: string | null = null;
+  recentChanges: PlayerChangeResult[] = [];
   saveResults: PlayerChangeResult[] | null = null;
   saveResultsVisible = false;
 
@@ -71,6 +72,8 @@ export class PlayersComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.initializeTranslations();
+    this.loadRecentHistory();
+    this.playerHistory.changed$.pipe(takeUntil(this.destroy$)).subscribe(() => this.loadRecentHistory());
 
     const cachedTeam = this.cache.ownTeam$.value;
     if (cachedTeam?.players?.length) {
@@ -292,16 +295,26 @@ export class PlayersComponent implements OnInit, OnDestroy {
   checkAndSaveHistory(): void {
     if (!this.teamId || this.players.length === 0) return;
     this.savingHistory = true;
+    this.historyError = null;
     this.saveResults = null;
-    this.playerHistory.checkAndSave(this.players, this.teamId).subscribe({
+    this.playerHistory.sync().pipe(takeUntil(this.destroy$)).subscribe({
       next: (results) => {
         this.saveResults = results;
+        this.loadRecentHistory();
         this.saveResultsVisible = true;
         this.savingHistory = false;
       },
-      error: () => {
+      error: (err) => {
+        this.historyError = err?.error?.error ?? this.translate.instant('history.syncError');
         this.savingHistory = false;
       }
+    });
+  }
+
+  private loadRecentHistory(): void {
+    this.playerHistory.recent().pipe(takeUntil(this.destroy$)).subscribe({
+      next: changes => this.recentChanges = changes,
+      error: () => this.historyError = this.translate.instant('history.loadError')
     });
   }
 
@@ -310,7 +323,6 @@ export class PlayersComponent implements OnInit, OnDestroy {
   }
 
   openPlayerHistory(player: Player): void {
-    if (!this.isDebug) return;
     this.selectedPlayerId = player.playerId;
     this.selectedPlayerName = `${player.firstName} ${player.lastName}`;
   }

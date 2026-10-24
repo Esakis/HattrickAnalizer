@@ -9,11 +9,13 @@ public class LeagueController : ControllerBase
 {
     private readonly LeagueSimulationService _simulation;
     private readonly TokenStore _tokenStore;
+    private readonly IConfiguration _configuration;
 
-    public LeagueController(LeagueSimulationService simulation, TokenStore tokenStore)
+    public LeagueController(LeagueSimulationService simulation, TokenStore tokenStore, IConfiguration configuration)
     {
         _simulation = simulation;
         _tokenStore = tokenStore;
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -24,6 +26,7 @@ public class LeagueController : ControllerBase
     [HttpGet("simulation")]
     public async Task<IActionResult> GetSimulation([FromQuery] bool fromFirstRound = false)
     {
+        if (_configuration.GetValue<bool>("UseMockData")) return Ok(await _simulation.SimulateAsync(MockChppData.TeamId, fromFirstRound));
         var sessionId = Request.Cookies["ht_session"] ?? "";
         var stored = _tokenStore.Get(sessionId);
         if (stored == null || stored.OwnTeamId == 0)

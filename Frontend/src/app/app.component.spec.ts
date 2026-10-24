@@ -8,6 +8,7 @@ import { DataCacheService } from './services/data-cache.service';
 import { HattrickApiService } from './services/hattrick-api.service';
 import { LoadStatusService } from './services/load-status.service';
 import { TranslationService } from './services/translation.service';
+import { PlayerHistoryService } from './services/player-history.service';
 
 describe('AppComponent', () => {
   beforeEach(() => TestBed.configureTestingModule({
@@ -15,6 +16,7 @@ describe('AppComponent', () => {
     declarations: [AppComponent],
     schemas: [NO_ERRORS_SCHEMA],
     providers: [
+      { provide: PlayerHistoryService, useValue: { sync: () => of([]) } },
       { provide: TranslationService, useValue: { switchLanguage: jasmine.createSpy('switchLanguage'), getCurrentLanguage: () => 'en' } },
       { provide: HattrickApiService, useValue: { getCurrentOAuth: () => of({ authorized: false }) } },
       { provide: LoadStatusService, useValue: { register: jasmine.createSpy('register'), set: jasmine.createSpy('set') } },

@@ -23,6 +23,8 @@ public class PlayerSkillHistory
     public int Loyalty { get; set; }
     public int Leadership { get; set; }
     public int InjuryLevel { get; set; }
+    public bool InjuryStatusKnown { get; set; }
+    public bool MatchStatsAvailable { get; set; }
     // Statystyki meczowe
     public int TotalMatches { get; set; }
     public int Goals { get; set; }

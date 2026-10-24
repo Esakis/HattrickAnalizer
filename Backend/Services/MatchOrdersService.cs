@@ -15,31 +15,46 @@ public class MatchOrdersService
     private readonly TokenStore _tokenStore;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<MatchOrdersService> _logger;
+    private readonly HattrickApiService _api;
+    public bool MockMode => _api.MockMode;
 
     public MatchOrdersService(
         OAuthService oauthService,
         TokenStore tokenStore,
         IHttpContextAccessor httpContextAccessor,
-        ILogger<MatchOrdersService> logger)
+        ILogger<MatchOrdersService> logger, HattrickApiService api)
     {
         _oauthService = oauthService;
         _tokenStore = tokenStore;
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
+        _api = api;
     }
 
     public async Task<MatchOrdersResult> SendLineupAsync(MatchOrdersRequest request)
     {
+        if (_api.MockMode)
+            return new MatchOrdersResult { Success = false, Error = "Sending match orders is disabled in demo mode. No CHPP request was made.", RawResponse = "mock-write-blocked" };
         var validationError = ValidateRequest(request);
         if (validationError != null)
             return new MatchOrdersResult { Success = false, Error = validationError, RawResponse = "validation" };
 
         var sessionId = _httpContextAccessor.HttpContext?.Request.Cookies["ht_session"] ?? "";
         var stored = _tokenStore.Get(sessionId);
-        if (stored == null || string.IsNullOrEmpty(stored.AccessToken))
+        if (stored == null || string.IsNullOrEmpty(stored.AccessToken) || stored.OwnTeamId <= 0)
         {
             return new MatchOrdersResult { Success = false, Error = "OAuth authorization is unavailable." };
         }
+
+        string? preflightError;
+        try { preflightError = await ValidateLiveContextAsync(request, stored); }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not verify match order context for {MatchId}", request.MatchId);
+            return new MatchOrdersResult { Success = false, Error = "Current match and player availability could not be verified. Nothing was sent.", RawResponse = "preflight-unavailable" };
+        }
+        if (preflightError != null)
+            return new MatchOrdersResult { Success = false, Error = preflightError, RawResponse = "preflight" };
 
         var lineupJson = BuildLineupJson(request);
         var queryParams = new Dictionary<string, string>
@@ -91,6 +106,38 @@ public class MatchOrdersService
         }
     }
 
+    private async Task<string?> ValidateLiveContextAsync(MatchOrdersRequest request, StoredToken stored)
+    {
+        // These reads bypass the OAuth cache so transfers/injuries and a closed order window are checked again.
+        var matchXml = await _oauthService.MakeAuthenticatedRequestAsync(stored.AccessToken, stored.AccessTokenSecret,
+            new Dictionary<string, string> { ["file"] = "matchorders", ["version"] = "3.0",
+                ["actionType"] = "view", ["matchID"] = request.MatchId.ToString(), ["sourceSystem"] = "hattrick",
+                ["teamID"] = stored.OwnTeamId.ToString() }, useCache: false);
+        var matchDoc = XDocument.Parse(matchXml);
+        var match = matchDoc.Descendants("MatchData").FirstOrDefault();
+        if (matchDoc.Descendants("Error").Any() || match == null
+            || !bool.TryParse(match.Attribute("Available")?.Value, out var available) || !available)
+            return "CHPP did not confirm that this match is available for orders.";
+        var teamIds = match.Descendants().Where(e => e.Name.LocalName is "HomeTeamID" or "AwayTeamID")
+            .Select(e => int.TryParse(e.Value, out var id) ? id : 0);
+        if (!teamIds.Contains(stored.OwnTeamId)) return "The match does not belong to your authenticated team.";
+        var rosterXml = await _oauthService.MakeAuthenticatedRequestAsync(stored.AccessToken, stored.AccessTokenSecret,
+            new Dictionary<string, string> { ["file"] = "players", ["version"] = "2.8",
+                ["teamID"] = stored.OwnTeamId.ToString() }, useCache: false);
+        var rosterDoc = XDocument.Parse(rosterXml);
+        if (rosterDoc.Descendants("Error").Any()) return "CHPP could not verify the current roster.";
+        var roster = rosterDoc.Descendants("Player").Select(_api.ParsePlayer).ToDictionary(p => p.PlayerId);
+        var selected = request.Positions.Values.Select(p => p.PlayerId).Concat(request.Bench.Select(p => p.PlayerId))
+            .Concat(request.Kickers).Distinct();
+        foreach (var id in selected)
+        {
+            if (!roster.TryGetValue(id, out var player)) return $"Player {id} is no longer in your team's roster.";
+            if (!player.InjuryStatusKnown || player.InjuryLevel > 0 || !player.SuspensionStatusKnown || player.IsSuspended)
+                return $"Player {id} is unavailable, or current injury/suspension status could not be verified.";
+        }
+        return null;
+    }
+
     public static string? ValidateRequest(MatchOrdersRequest? request)
     {
         if (request == null) return "Request body is required.";
@@ -115,6 +162,41 @@ public class MatchOrdersService
         var customBehaviours = request.Positions.Count(p => p.Key != p.Value.Behaviour);
         if (customBehaviours > Math.Min(10, 5 + request.AssistantManagerLevel))
             return $"This lineup uses {customBehaviours} custom behaviours; the allowed maximum is {Math.Min(10, 5 + request.AssistantManagerLevel)}.";
+        if (request.Bench == null || request.Kickers == null || request.Substitutions == null)
+            return "Bench, kickers and substitutions must not be null.";
+        if (request.Bench.Any(p => p == null || p.PlayerId <= 0 || p.PositionCode is < 0 or > 13)
+            || request.Bench.Select(p => p.PositionCode).Distinct().Count() != request.Bench.Count)
+            return "Bench positions must be unique indices 0..13 with positive player IDs.";
+        var primary = request.Bench.Where(p => p.PositionCode < 7).Select(p => p.PlayerId).ToHashSet();
+        if (primary.Count != request.Bench.Count(p => p.PositionCode < 7) || primary.Overlaps(ids))
+            return "Primary substitutes must be distinct and cannot be in the starting XI.";
+        if (request.Bench.Any(p => p.PositionCode >= 7 && !primary.Contains(p.PlayerId)))
+            return "Backup bench slots must refer to a primary substitute.";
+        var squad = ids.Concat(primary).ToHashSet();
+        if (request.Kickers.Count > 11 || request.Kickers.Distinct().Count() != request.Kickers.Count
+            || request.Kickers.Any(id => !squad.Contains(id)))
+            return "Select up to eleven distinct penalty takers from the starting XI and bench.";
+        if (request.Substitutions.Count > 5) return "At most five player orders are supported.";
+        foreach (var order in request.Substitutions)
+        {
+            if (order == null || !squad.Contains(order.PlayerOutId) || !squad.Contains(order.PlayerInId))
+                return "Every substitution player must be in the selected match squad.";
+            if (order.PlayerInId != order.PlayerOutId && !primary.Contains(order.PlayerInId))
+                return "A substitute entering the pitch must be on the bench.";
+            if (order.Minute != -1 && order.Minute != 46 && order.Minute != 91
+                && (order.Minute is < 5 or > 115 || order.Minute % 5 != 0))
+                return "Choose any time (-1), half time (46), before extra time (91), or a five-minute mark from 5 to 115.";
+            if (order.Position is < -1 or > 13 || order.Behaviour is < -1 or > 4 || order.Standing is < -1 or > 9)
+                return "A substitution position, behaviour or score condition is invalid.";
+            if (order.Position >= 0 && order.Behaviour >= 0)
+            {
+                var slot = RoleIdToSlot(100 + order.Position);
+                if (!FormationData.SlotBehaviourOptions[slot].Any(b => BehaviourCode(slot, b) == order.Behaviour))
+                    return "The substitution behaviour is not legal for its target position.";
+            }
+            if (order.PlayerInId == order.PlayerOutId && order.Position == -1 && order.Behaviour == -1)
+                return "A behaviour-change order must change position or behaviour.";
+        }
         return null;
     }
 
@@ -138,32 +220,34 @@ public class MatchOrdersService
     {
         var error = ValidateRequest(request);
         if (error != null) throw new ArgumentException(error, nameof(request));
-        var positions = new List<object>();
+        // CHPP 3.0 uses fixed-length positional arrays, not sparse role-code objects.
+        // Reference implementation: github.com/lucianoq/hattrick/chpp/type_lineup.go
+        var positions = Enumerable.Range(0, 14).Select(_ => new { id = 0, behaviour = 0 }).ToArray();
         foreach (var (slot, order) in request.Positions)
-        {
-            var roleId = SlotToRoleId(slot);
-            if (roleId == 0 || order.PlayerId == 0) throw new ArgumentException("Invalid position in lineup.", nameof(request));
-            positions.Add(new
-            {
-                id = order.PlayerId,
-                behaviour = BehaviourCode(slot, order.Behaviour),
-                positionCode = roleId
-            });
-        }
-
+            positions[SlotToRoleId(slot) - 100] = new { id = order.PlayerId, behaviour = BehaviourCode(slot, order.Behaviour) };
+        var bench = Enumerable.Range(0, 14).Select(_ => new { id = 0, behaviour = 0 }).ToArray();
+        foreach (var entry in request.Bench) bench[entry.PositionCode] = new { id = entry.PlayerId, behaviour = 0 };
+        var kickers = Enumerable.Range(0, 11).Select(i => new { id = i < request.Kickers.Count ? request.Kickers[i] : 0, behaviour = 0 }).ToArray();
         var lineup = new
         {
-            positions,
-            bench = Array.Empty<object>(),
-            kickers = Array.Empty<object>(),
-            captain = request.CaptainId,
-            setPieces = request.SetPiecesTakerId,
+            positions, bench, kickers,
+            captain = request.CaptainId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            setPieces = request.SetPiecesTakerId.ToString(System.Globalization.CultureInfo.InvariantCulture),
             settings = new
             {
-                tactic = TacticCode(request.Tactic),
-                speechLevel = AttitudeCode(request.Attitude)
+                tactic = TacticCode(request.Tactic).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                speechLevel = AttitudeCode(request.Attitude).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                newLineup = "", coachModifier = "0", manMarkerPlayerId = "0", manMarkingPlayerId = "0"
             },
-            substitutions = Array.Empty<object>()
+            substitutions = request.Substitutions.Select(s => new
+            {
+                playerin = s.PlayerInId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                playerout = s.PlayerOutId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                orderType = "1", min = s.Minute.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                pos = s.Position.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                beh = s.Behaviour.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                card = "-1", standing = s.Standing.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            }).ToArray()
         };
 
         // Bez spacji — tresc wchodzi do podpisu OAuth (spojnosc percent-encodingu).
@@ -178,6 +262,9 @@ public class MatchOrdersService
         "RFW" => 111, "FW" => 112, "LFW" => 113,
         _ => 0
     };
+
+    private static string RoleIdToSlot(int roleId) => new[]
+    { "GK", "RWB", "RCD", "CD", "LCD", "LWB", "RW", "RIM", "IM", "LIM", "LW", "RFW", "FW", "LFW" }[roleId - 100];
 
     // Odwrotnosc CalibrationService.MapSlotBehaviour: klucz zachowania -> kod CHPP.
     public static int BehaviourCode(string slot, string behaviour) => behaviour switch
@@ -213,6 +300,9 @@ public class MatchOrdersService
 
 public class MatchOrdersRequest
 {
+    public List<MatchBenchSlot> Bench { get; set; } = new();
+    public List<int> Kickers { get; set; } = new();
+    public List<MatchSubstitution> Substitutions { get; set; } = new();
     public long MatchId { get; set; }
     // slot (GK, RWB, ...) -> zawodnik + zachowanie (klucze z optymalizatora, np. "WBO").
     public Dictionary<string, MatchOrderSlot> Positions { get; set; } = new();
@@ -221,6 +311,23 @@ public class MatchOrdersRequest
     public int AssistantManagerLevel { get; set; }
     public int CaptainId { get; set; }
     public int SetPiecesTakerId { get; set; }
+}
+
+public class MatchBenchSlot
+{
+    public int PlayerId { get; set; }
+    // Primary GK, CD, WB, IM, FW, W, extra: 0..6. Backup slots: 7..13.
+    public int PositionCode { get; set; }
+}
+
+public class MatchSubstitution
+{
+    public int PlayerOutId { get; set; }
+    public int PlayerInId { get; set; }
+    public int Minute { get; set; } = -1;
+    public int Position { get; set; } = -1;
+    public int Behaviour { get; set; } = -1;
+    public int Standing { get; set; } = -1;
 }
 
 public class MatchOrderSlot

@@ -185,3 +185,12 @@
   color: #c62828;
   border-radius: 6px;
 }
+.observations-header { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.prepare-opponent { background: #276641; color: #fff; padding: .65rem 1rem; border-radius: 6px; text-decoration: none; font-size: .9rem; font-weight: 600; }
+.observation-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8rem; margin-top: .6rem; }
+.observation-grid > div { background: #f0f6f2; border: 1px solid #d6e4da; padding: .9rem; border-radius: 6px; }
+.observation-grid span, .observation-grid small { display: block; color: #5a7061; font-size: .79rem; }
+.observation-grid strong { display: block; font-size: 1.1rem; margin: .5rem 0; color: #203e2c; }
+.observation-note { color: #68776c; font-size: .85rem; line-height: 1.5; }
+@media (max-width: 1100px) { .observation-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 550px) { .observation-grid { grid-template-columns: 1fr; } }

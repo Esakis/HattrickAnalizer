@@ -24,6 +24,16 @@
     <div *ngIf="error" class="error-message">{{ error }}</div>
 
     <ng-container *ngIf="!loading && report && report.matchesAnalyzed > 0">
+      <section class="scout-card observations">
+        <div class="observations-header"><h3>{{ 'scoutEvidence.title' | translate }}</h3><a class="prepare-opponent" routerLink="/optimizer" [queryParams]="{ opponentId: report.teamId }">{{ 'scoutEvidence.prepare' | translate }}</a></div>
+        <div class="observation-grid">
+          <div *ngIf="commonFormation as formation"><span>{{ 'scoutEvidence.formation' | translate }}</span><strong>{{ formation[0] }}</strong><small>{{ 'scoutEvidence.sample' | translate:{ count: formation[1], total: report.matchesAnalyzed } }}</small></div>
+          <div *ngIf="commonTactic as tactic"><span>{{ 'scoutEvidence.tactic' | translate }}</span><strong>{{ getTacticLabel(tactic[0]) }}</strong><small>{{ 'scoutEvidence.sample' | translate:{ count: tactic[1], total: report.matchesAnalyzed } }}</small></div>
+          <div *ngIf="weakestDefense as sector"><span>{{ 'scoutEvidence.weakestDefense' | translate }}</span><strong>{{ ('scoutEvidence.' + sector.side) | translate }}</strong><small>{{ sector.rating | number:'1.1-2' }}</small></div>
+          <div *ngIf="strongestAttack as sector"><span>{{ 'scoutEvidence.strongestAttack' | translate }}</span><strong>{{ ('scoutEvidence.' + sector.side) | translate }}</strong><small>{{ sector.rating | number:'1.1-2' }}</small></div>
+        </div>
+        <p class="observation-note">{{ 'scoutEvidence.caution' | translate }}</p>
+      </section>
       <div class="scout-columns">
         <div class="scout-card">
           <h3>📊 {{ 'scout.summaryHeader' | translate }} ({{ 'scout.matchesAnalyzed' | translate }}: {{ report.matchesAnalyzed }})</h3>
@@ -39,7 +49,7 @@
           <div class="ratings-grid">
             <div class="rating-cell" *ngFor="let row of ratingRows">
               <span class="rating-label">{{ row.label | translate }}</span>
-              <span class="rating-value">{{ row.value }}</span>
+              <span class="rating-value">{{ row.value | number:'1.1-2' }}</span>
             </div>
           </div>
         </div>
@@ -88,9 +98,9 @@
                 <td><strong>{{ m.goalsFor }}-{{ m.goalsAgainst }}</strong></td>
                 <td>{{ m.formation }}</td>
                 <td>{{ getTacticLabel(m.tactic) }}</td>
-                <td>{{ m.ratings.midfieldRating }}</td>
-                <td>{{ m.ratings.leftDefenseRating }}/{{ m.ratings.centralDefenseRating }}/{{ m.ratings.rightDefenseRating }}</td>
-                <td>{{ m.ratings.leftAttackRating }}/{{ m.ratings.centralAttackRating }}/{{ m.ratings.rightAttackRating }}</td>
+                <td>{{ m.ratings.midfieldRating | number:'1.1-2' }}</td>
+                <td>{{ m.ratings.leftDefenseRating | number:'1.1-2' }}/{{ m.ratings.centralDefenseRating | number:'1.1-2' }}/{{ m.ratings.rightDefenseRating | number:'1.1-2' }}</td>
+                <td>{{ m.ratings.leftAttackRating | number:'1.1-2' }}/{{ m.ratings.centralAttackRating | number:'1.1-2' }}/{{ m.ratings.rightAttackRating | number:'1.1-2' }}</td>
               </tr>
             </tbody>
           </table>

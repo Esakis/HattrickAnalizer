@@ -61,6 +61,23 @@ export class LeagueTableComponent implements OnInit {
     return Array.from({ length: n }, (_, i) => i + 1);
   }
 
+  get evidence(): LeagueSimulationReport | null { return this.simReport ?? this.report; }
+
+  get hasDefaultRatings(): boolean {
+    return !!this.evidence?.teams.some(team => team.ratingsSource === 'default');
+  }
+
+  sourceKey(source: string): string {
+    return `leagueEvidence.${['scout', 'default', 'mock'].includes(source) ? source : 'unknown'}`;
+  }
+
+  confidenceKey(value?: string): string {
+    const keys: Record<string, string> = {
+      'unvalidated-low': 'unvalidatedLow', low: 'low', 'low-moderate': 'lowModerate', moderate: 'moderate', high: 'high'
+    };
+    return value && keys[value] ? `optimizer.confidenceLevels.${keys[value]}` : 'planning.unknown';
+  }
+
   // Intensywność tła komórki heatmapy proporcjonalna do prawdopodobieństwa.
   probabilityStyle(p: number): { [k: string]: string } {
     const alpha = Math.min(1, Math.max(0, p));

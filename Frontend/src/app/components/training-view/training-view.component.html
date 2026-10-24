@@ -11,6 +11,105 @@
   <div *ngIf="error" class="error-message">{{ error }}</div>
 
   <div *ngIf="!loading && summary">
+    <section class="training-card planner-intro">
+      <div>
+        <h2>{{ 'planning.title' | translate }}</h2>
+        <p>{{ getTrainingTypeLabel() }} · {{ summary.weekStart | date:'dd.MM HH:mm' }} — <span *ngIf="summary.nextTrainingAt; else currentWeek">{{ summary.nextTrainingAt | date:'dd.MM HH:mm' }}</span><ng-template #currentWeek>{{ 'planning.currentWeek' | translate }}</ng-template></p>
+        <p class="training-hint">{{ 'planning.explanation' | translate }}</p>
+      </div>
+      <button type="button" class="plan-button secondary" (click)="loadSummary()">{{ 'planning.refresh' | translate }}</button>
+    </section>
+
+    <ng-container *ngIf="plan">
+      <section class="training-card">
+        <h3>1. {{ 'planning.selectTrainees' | translate }}</h3>
+        <label class="roster-search">{{ 'planning.searchPlayer' | translate }}
+          <input type="search" [(ngModel)]="search">
+        </label>
+        <p *ngIf="!roster.length" class="training-hint">{{ 'planning.rosterLoading' | translate }}</p>
+        <div class="trainee-picker">
+          <label *ngFor="let player of filteredRoster" [class.selected]="plan.selectedPlayerIds.includes(player.playerId)">
+            <input type="checkbox" [checked]="plan.selectedPlayerIds.includes(player.playerId)" (change)="togglePlayer(player.playerId)">
+            <span>{{ player.firstName }} {{ player.lastName }} <small>{{ player.age }} · {{ 'players.form' | translate }} {{ player.form }}</small></span>
+            <span *ngIf="player.injuryLevel > 0" class="availability-badge">{{ 'planning.injured' | translate }}</span>
+            <span *ngIf="player.isSuspended" class="availability-badge">{{ 'planning.suspended' | translate }}</span>
+            <span *ngIf="player.canOptimize === false && !player.isSuspended && !(player.injuryLevel > 0)" class="availability-badge">{{ 'planning.unavailable' | translate }}</span>
+          </label>
+        </div>
+        <p *ngIf="!plan.selectedPlayerIds.length" class="training-hint">{{ 'planning.selectHint' | translate }}</p>
+      </section>
+
+      <section class="training-card" *ngIf="assessment.players.length">
+        <h3>{{ 'planning.coverageTitle' | translate }}</h3>
+        <p class="coverage-status" [class.ready]="assessment.ready">{{ (assessment.ready ? 'planning.coverageReady' : 'planning.coveragePending') | translate }}</p>
+        <div class="training-table-wrap">
+          <table class="training-table coverage-table">
+            <thead><tr><th class="player-col">{{ 'training.player' | translate }}</th><th>{{ 'planning.recorded' | translate }}</th><th>{{ 'planning.projected' | translate }}</th><th>{{ 'planning.missing' | translate }}</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let coverage of assessment.players" [class.full-training]="coverage.missing === 0">
+                <td class="player-col">{{ playerName(coverage.playerId) }}<small *ngIf="coverage.hasUnknownEffect" class="training-player-warning" [title]="'planning.unknownEffectHint' | translate">{{ 'planning.unquantified' | translate }}</small></td>
+                <td>{{ coverage.recorded === null ? ('planning.unknown' | translate) : coverage.recorded + ' / 90' }}</td>
+                <td>{{ coverage.projected === null ? ('planning.unknown' | translate) : coverage.projected + ' / 90' }}</td>
+                <td><strong>{{ coverage.missing === null ? ('planning.unknown' | translate) : coverage.missing + ' min' }}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="training-hint">{{ 'planning.coverageHint' | translate }}</p>
+      </section>
+
+      <section class="training-card">
+        <h3>2. {{ 'planning.allocateMatches' | translate }}</h3>
+        <p class="training-hint">{{ 'planning.datesHint' | translate }}</p>
+        <p *ngIf="fixturesError" class="training-hint">{{ 'planning.fixturesError' | translate }}</p>
+        <div class="plan-actions suggestion-actions"><button type="button" class="plan-button" (click)="suggestAssignments()" [disabled]="!selectedPlayers.length">{{ 'planning.suggest' | translate }}</button><span class="training-hint">{{ 'planning.suggestHint' | translate }}</span></div>
+        <div *ngIf="suggestionMade" class="suggestion-result" aria-live="polite">
+          <p *ngIf="unassignedNames.length">{{ 'planning.unassigned' | translate }} {{ unassignedNames.join(', ') }}</p>
+          <p *ngIf="unknownNames.length">{{ 'planning.skippedUnknown' | translate }} {{ unknownNames.join(', ') }}</p>
+          <p *ngIf="!unassignedNames.length && !unknownNames.length">{{ 'planning.suggested' | translate }}</p>
+        </div>
+        <div class="match-plan-grid">
+          <article class="match-plan" *ngFor="let match of matches">
+            <h4>{{ ('planning.matches.' + match) | translate }}</h4>
+            <label *ngIf="fixturesFor(match).length" class="fixture-select">{{ 'planning.knownFixture' | translate }}
+              <select [ngModel]="fixtureForPlan(match)?.matchId ?? 0" (ngModelChange)="selectFixture(match, $event)">
+                <option [ngValue]="0">{{ 'planning.manualDate' | translate }}</option>
+                <option *ngFor="let fixture of fixturesFor(match)" [ngValue]="fixture.matchId">{{ fixture.opponentTeamName }} · {{ fixture.matchDate | date:'dd.MM HH:mm' }}</option>
+              </select>
+            </label>
+            <label>{{ 'planning.matchDate' | translate }} <input type="datetime-local" [(ngModel)]="plan.matchDates[match]" (ngModelChange)="save()"></label>
+            <p *ngIf="!assignments(match).length" class="training-hint">{{ 'planning.noAssignments' | translate }}</p>
+            <div class="assignment" *ngFor="let assignment of assignments(match)">
+              <label class="assignment-player">{{ 'training.player' | translate }}
+                <select [(ngModel)]="assignment.playerId" (ngModelChange)="save()"><option *ngFor="let player of roster" [ngValue]="player.playerId">{{ player.firstName }} {{ player.lastName }}</option></select>
+              </label>
+              <label>{{ 'training.position' | translate }}
+                <select [(ngModel)]="assignment.slot" (ngModelChange)="save()"><option *ngFor="let slot of slots" [value]="slot">{{ slot }} · {{ factorLabel(slot) }}</option></select>
+              </label>
+              <label>{{ 'planning.fromMinute' | translate }}<input type="number" min="0" max="89" step="1" [(ngModel)]="assignment.startMinute" (ngModelChange)="save()"></label>
+              <label>{{ 'planning.minutes' | translate }}<input type="number" min="1" max="90" step="1" [(ngModel)]="assignment.minutes" (ngModelChange)="save()"></label>
+              <button type="button" class="plan-button remove" (click)="removeAssignment(assignment)">{{ 'planning.remove' | translate }}</button>
+            </div>
+            <div class="plan-actions">
+              <button type="button" class="plan-button secondary" (click)="addAssignment(match)" [disabled]="!selectedPlayers.length">{{ 'planning.addAssignment' | translate }}</button>
+              <button type="button" class="plan-button" (click)="prepareMatch(match)" [disabled]="!canPrepare(match)">{{ 'planning.prepareLineup' | translate }}</button>
+            </div>
+          </article>
+        </div>
+        <p class="training-hint">{{ 'planning.handoffHint' | translate }}</p>
+        <ul class="plan-issues" *ngIf="assessment.issues.length">
+          <li *ngFor="let issue of assessment.issues" [class.issue-error]="issue.severity === 'error'">
+            <strong *ngIf="issue.match">{{ ('planning.matches.' + issue.match) | translate }}: </strong>
+            <strong *ngIf="issue.playerId">{{ playerName(issue.playerId) }} — </strong>{{ ('planning.issues.' + issue.code) | translate }}
+          </li>
+        </ul>
+        <p *ngIf="storageError" class="error-message" role="alert">{{ 'planning.saveError' | translate }}</p>
+        <p *ngIf="!storageError && plan.updatedAt" class="training-hint" aria-live="polite">{{ 'planning.saved' | translate }} {{ plan.updatedAt | date:'dd.MM HH:mm' }}</p>
+      </section>
+    </ng-container>
+
+    <details class="training-details">
+      <summary>{{ 'planning.details' | translate }}</summary>
     <div class="training-summary-card">
       <div class="summary-item">
         <span class="label">{{ 'training.type' | translate }}:</span>
@@ -121,6 +220,7 @@
     <p *ngIf="summary.intensityAndStaminaMultiplier !== null && summary.intensityAndStaminaMultiplier !== undefined || summary.assistantSpeedMultiplier !== null && summary.assistantSpeedMultiplier !== undefined" class="training-hint">{{ 'training.speedMethodHint' | translate }}</p>
     <p class="training-hint">{{ 'training.hint' | translate }}</p>
     </div>
+    </details>
   </div>
   </div>
 </div>

@@ -9,6 +9,11 @@ public class CalibrationSnapshot
     public List<Player> Players { get; set; } = new();
     public CalibrationMatchContext Context { get; set; } = new();
     public List<string> Warnings { get; set; } = new();
+    public LineupRatings? PredictedRatings { get; set; }
+    public string? ModelVersion { get; set; }
+    public string PredictionSource { get; set; } = "legacy-replay";
+    public bool IsComplete => Context.IsComplete;
+    public List<string> MissingFields => Context.MissingFields;
 }
 
 public class CalibrationMatchContext
@@ -27,11 +32,41 @@ public class CalibrationMatchContext
     public int? AssistantManagerLevel { get; set; }
     public Dictionary<string, int> PlayerIdsBySlot { get; set; } = new();
     public Dictionary<string, string> BehavioursBySlot { get; set; } = new();
+    // Optional forecast already displayed to the manager, frozen with this pre-match capture.
+    public LineupRatings? PredictedRatings { get; set; }
+    public string? ModelVersion { get; set; }
+
+    public List<string> MissingFields
+    {
+        get
+        {
+            var missing = new List<string>();
+            if (MatchId is not > 0) missing.Add("matchId");
+            if (!MatchDate.HasValue) missing.Add("matchDate");
+            if (!IsHomeMatch.HasValue) missing.Add("isHomeMatch");
+            if (Tactic is not ("Normal" or "Pressing" or "Counter" or "AttackInMiddle" or "AttackOnWings" or "PlayCreatively" or "LongShots")) missing.Add("tactic");
+            if (Attitude is not ("Normal" or "PIC" or "MOTS")) missing.Add("attitude");
+            if (CoachType is not ("Neutral" or "Offensive" or "Defensive")) missing.Add("coachType");
+            if (TeamSpiritLevel is not (>= 0 and <= 10)) missing.Add("teamSpiritLevel");
+            if (ConfidenceLevel is not (>= 0 and <= 10)) missing.Add("confidenceLevel");
+            if (FormationExperience is not (>= 3 and <= 10)) missing.Add("formationExperience");
+            if (WeatherId is not (>= 0 and <= 3)) missing.Add("weatherId");
+            if (AssistantManagerLevel is not (>= 0 and <= 5)) missing.Add("assistantManagerLevel");
+            var ids = PlayerIdsBySlot ?? new();
+            if (ids.Count != 11 || ids.Values.Any(id => id <= 0) || ids.Values.Distinct().Count() != 11) missing.Add("playerIdsBySlot");
+            if (Formation == null || !HattrickAnalizer.Services.FormationData.Formations.TryGetValue(Formation, out var definition)
+                || !definition.Positions.ToHashSet(StringComparer.Ordinal).SetEquals(ids.Keys)) missing.Add("formation");
+            if (BehavioursBySlot == null || !ids.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(BehavioursBySlot.Keys)
+                || BehavioursBySlot.Any(kv => !HattrickAnalizer.Services.CalibrationService.IsValidSlotBehaviour(kv.Key, kv.Value))) missing.Add("behavioursBySlot");
+            return missing;
+        }
+    }
 
     public bool IsComplete
     {
         get
         {
+            if (PlayerIdsBySlot == null || BehavioursBySlot == null) return false;
             var slots = PlayerIdsBySlot.Keys.ToHashSet(StringComparer.Ordinal);
             var formationMatchesSlots = Formation != null
                 && HattrickAnalizer.Services.FormationData.Formations.TryGetValue(Formation, out var definition)

@@ -45,6 +45,7 @@ public class OAuthController : ControllerBase
     [HttpGet("start")]
     public async Task<IActionResult> StartAuthorization([FromQuery] string? scope = null)
     {
+        if (_mockMode) return BadRequest(new { error = "Tryb demonstracyjny jest już aktywny. Nie łączy się z kontem Hattrick." });
         try
         {
             var sessionId = GetOrCreateSessionId();
@@ -73,6 +74,7 @@ public class OAuthController : ControllerBase
     [HttpPost("complete")]
     public async Task<IActionResult> CompleteAuthorization([FromBody] CompleteAuthRequest request)
     {
+        if (_mockMode) return BadRequest(new { error = "Autoryzacja Hattrick jest wyłączona w trybie demonstracyjnym." });
         try
         {
             // Fallback na sessionId z body: pierwszy request mógł nie mieć jeszcze cookie.
@@ -122,6 +124,8 @@ public class OAuthController : ControllerBase
     [HttpGet("current")]
     public IActionResult GetCurrent()
     {
+        if (_mockMode) return Ok(new { authorized = true, mockMode = true,
+            ownTeamId = MockChppData.TeamId, ownTeamName = MockChppData.TeamName });
         var sessionId = Request.Cookies["ht_session"] ?? "";
         var stored = _tokenStore.Get(sessionId);
         if (stored == null || !_tokenStore.IsAuthorized(sessionId))
@@ -145,6 +149,9 @@ public class OAuthController : ControllerBase
     [HttpGet("my-teams")]
     public async Task<IActionResult> GetMyTeams()
     {
+        if (_mockMode) return Ok(new { currentTeamId = MockChppData.TeamId, teams = new[] {
+            new AccountTeam { TeamId = MockChppData.TeamId, TeamName = MockChppData.TeamName,
+                LeagueName = "Liga demonstracyjna", IsPrimaryClub = true } } });
         var sessionId = Request.Cookies["ht_session"] ?? "";
         var stored = _tokenStore.Get(sessionId);
         if (stored == null || string.IsNullOrEmpty(stored.AccessToken))
@@ -163,6 +170,10 @@ public class OAuthController : ControllerBase
     [HttpPost("select-team")]
     public async Task<IActionResult> SelectTeam([FromBody] SelectTeamRequest request)
     {
+        if (_mockMode)
+            return request.TeamId == MockChppData.TeamId
+                ? Ok(new { ownTeamId = MockChppData.TeamId, ownTeamName = MockChppData.TeamName })
+                : BadRequest(new { error = "W trybie demonstracyjnym dostępny jest jeden klub." });
         var sessionId = Request.Cookies["ht_session"] ?? "";
         var stored = _tokenStore.Get(sessionId);
         if (stored == null || string.IsNullOrEmpty(stored.AccessToken))
@@ -214,6 +225,7 @@ public class OAuthController : ControllerBase
     [HttpPost("logout")]
     public IActionResult Logout()
     {
+        if (_mockMode) return Ok(new { success = true, mockMode = true });
         var sessionId = Request.Cookies["ht_session"] ?? "";
         _tokenStore.Clear(sessionId);
         // Usunięcie cross-site cookie wymaga tych samych opcji, z którymi było ustawione.

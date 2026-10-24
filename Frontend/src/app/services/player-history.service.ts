@@ -1,7 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { Player } from '../models/player.model';
+import { Observable, Subject, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export interface PlayerSkillHistory {
@@ -26,6 +25,8 @@ export interface PlayerSkillHistory {
   loyalty: number;
   leadership: number;
   injuryLevel: number;
+  injuryStatusKnown?: boolean;
+  matchStatsAvailable?: boolean;
   // Statystyki meczowe
   totalMatches: number;
   goals: number;
@@ -42,10 +43,16 @@ export interface PlayerChangeResult {
   playerName: string;
   changed: boolean;
   changedFields: string[];
+  teamId: number;
+  recordedAt: string;
+  firstSnapshot: boolean;
+  fields: { field: string; previous: number; current: number }[];
+  warnings: string[];
 }
 
 @Injectable({ providedIn: 'root' })
 export class PlayerHistoryService {
+  readonly changed$ = new Subject<void>();
   private readonly apiUrl = `${environment.apiUrl}/playerhistory`;
 
   constructor(private http: HttpClient) {}
@@ -54,7 +61,11 @@ export class PlayerHistoryService {
     return this.http.get<PlayerSkillHistory[]>(`${this.apiUrl}/${playerId}`);
   }
 
-  checkAndSave(players: Player[], teamId: number): Observable<PlayerChangeResult[]> {
-    return this.http.post<PlayerChangeResult[]>(`${this.apiUrl}/check-and-save`, { players, teamId });
+  sync(): Observable<PlayerChangeResult[]> {
+    return this.http.post<PlayerChangeResult[]>(`${this.apiUrl}/sync`, {}).pipe(tap(() => this.changed$.next()));
+  }
+
+  recent(count = 30): Observable<PlayerChangeResult[]> {
+    return this.http.get<PlayerChangeResult[]>(`${this.apiUrl}/recent`, { params: { count } });
   }
 }

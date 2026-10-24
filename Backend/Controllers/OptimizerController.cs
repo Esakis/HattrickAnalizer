@@ -18,7 +18,12 @@ public class OptimizerController : ControllerBase
     [HttpPost("optimize")]
     public async Task<IActionResult> OptimizeLineup([FromBody] OptimizerRequest request)
     {
-        var result = await _optimizer.OptimizeLineupAsync(request);
-        return Ok(result);
+        return Ok(await _optimizer.OptimizeLineupAsync(request));
+    }
+
+    [HttpPost("evaluate")]
+    public async Task<IActionResult> EvaluateLineup([FromBody] EvaluateLineupRequest request)
+    {
+        return Ok(await _optimizer.EvaluateLineupAsync(request));
     }
 }

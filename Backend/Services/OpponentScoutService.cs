@@ -36,7 +36,7 @@ public class OpponentScoutService
     public async Task<OpponentScoutReport> GetScoutReportAsync(int teamId, int count = DefaultMatchCount, bool includeLineups = true, bool leagueOnly = false)
     {
         count = Math.Clamp(count, 2, 10);
-        var cacheKey = $"{teamId}:{count}:{includeLineups}:{leagueOnly}";
+        var cacheKey = $"{_api.MockMode}:{teamId}:{count}:{includeLineups}:{leagueOnly}";
         if (Cache.TryGetValue(cacheKey, out var cached) && DateTime.UtcNow - cached.At < CacheTtl)
         {
             return cached.Report;

@@ -70,6 +70,7 @@ public class HattrickApiService
     // danych na mockowe po cichu. Mocki tylko jawnie przez UseMockData (dev).
     private (string AccessToken, string AccessTokenSecret) RequireTokens()
     {
+        if (_useMockData) return ("offline-demo", "offline-demo");
         var (accessToken, accessTokenSecret) = ResolveTokens();
         if (accessToken == null || accessTokenSecret == null)
         {
@@ -108,6 +109,7 @@ public class HattrickApiService
 
         if (_useMockData)
         {
+            team.TeamName = MockChppData.Name(teamId);
             team.Players = GenerateMockPlayers();
             team.TeamSpiritLevel = 5;
             team.ConfidenceLevel = 5;
@@ -650,64 +652,46 @@ public class HattrickApiService
         public Dictionary<string, List<double>> PositionRatings { get; set; } = new();
     }
 
+    public async Task<List<NextOpponentInfo>> GetUpcomingMatchesAsync(int teamId)
+    {
+        var doc = await FetchChppXmlAsync(new Dictionary<string, string>
+        {
+            ["file"] = "matches", ["teamId"] = teamId.ToString(), ["version"] = "2.8"
+        }, $"matches teamId={teamId}");
+        return doc.Descendants("Match")
+            .Select(m => new { Element = m, Date = ParseDate(m.Element("MatchDate")?.Value),
+                Status = m.Element("Status")?.Value ?? "" })
+            .Where(m => m.Date > DateTime.UtcNow && !m.Status.Equals("FINISHED", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(m => m.Date)
+            .Select(m =>
+            {
+                var home = m.Element.Element("HomeTeam");
+                var away = m.Element.Element("AwayTeam");
+                var homeId = int.TryParse(home?.Element("HomeTeamID")?.Value, out var h) ? h : 0;
+                var awayId = int.TryParse(away?.Element("AwayTeamID")?.Value, out var a) ? a : 0;
+                var isHome = homeId == teamId;
+                return new NextOpponentInfo
+                {
+                    MatchId = long.TryParse(m.Element.Element("MatchID")?.Value, out var id) ? id : 0,
+                    OpponentTeamId = isHome ? awayId : homeId,
+                    OpponentTeamName = isHome ? away?.Element("AwayTeamName")?.Value ?? "" : home?.Element("HomeTeamName")?.Value ?? "",
+                    MatchDate = m.Date, MatchType = m.Element.Element("MatchType")?.Value ?? "", IsHomeMatch = isHome
+                };
+            }).Where(m => m.MatchId > 0 && m.OpponentTeamId > 0).ToList();
+    }
+
     public async Task<NextOpponentInfo?> GetNextOpponentAsync(int teamId)
     {
-        var (accessToken, accessTokenSecret) = RequireTokens();
-
-        var queryParams = new Dictionary<string, string>
-        {
-            { "file", "matches" },
-            { "teamId", teamId.ToString() },
-            { "version", "2.8" }
-        };
-        var xml = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
-        var doc = ParseChppXml(xml, $"matches teamId={teamId}");
-
-        var upcoming = doc.Descendants("Match")
-            .Select(m => new
-            {
-                Element = m,
-                Status = m.Element("Status")?.Value ?? "",
-                Date = ParseDate(m.Element("MatchDate")?.Value)
-            })
-            .Where(x => x.Status.Equals("UPCOMING", StringComparison.OrdinalIgnoreCase) || x.Date > DateTime.UtcNow)
-            .OrderBy(x => x.Date)
-            .FirstOrDefault();
-
-        if (upcoming == null) return null;
-
-        var home = upcoming.Element.Element("HomeTeam");
-        var away = upcoming.Element.Element("AwayTeam");
-        var homeId = int.Parse(home?.Element("HomeTeamID")?.Value ?? "0");
-        var awayId = int.Parse(away?.Element("AwayTeamID")?.Value ?? "0");
-        var isHome = homeId == teamId;
-        var opponent = isHome ? away : home;
-        var opponentId = isHome ? awayId : homeId;
-        var opponentName = isHome
-            ? (away?.Element("AwayTeamName")?.Value ?? "")
-            : (home?.Element("HomeTeamName")?.Value ?? "");
-
-        var info = new NextOpponentInfo
-        {
-            MatchId = long.Parse(upcoming.Element.Element("MatchID")?.Value ?? "0"),
-            OpponentTeamId = opponentId,
-            OpponentTeamName = opponentName,
-            MatchDate = upcoming.Date,
-            MatchType = upcoming.Element.Element("MatchType")?.Value ?? "",
-            IsHomeMatch = isHome
-        };
-
+        var info = (await GetUpcomingMatchesAsync(teamId)).FirstOrDefault();
+        if (info == null) return null;
         try
         {
-            var hostTeamId = isHome ? teamId : opponentId;
-            info.Weather = await GetMatchWeatherAsync(hostTeamId, info.MatchDate);
+            info.Weather = await GetMatchWeatherAsync(info.IsHomeMatch ? teamId : info.OpponentTeamId, info.MatchDate);
         }
         catch (Exception ex)
         {
-            // Pogoda jest dodatkiem — jej brak nie moze wywracac next-opponent.
-            _logger.LogWarning(ex, "Nie udało się pobrać pogody dla meczu {MatchId}.", info.MatchId);
+            _logger.LogWarning(ex, "Could not load weather for match {MatchId}.", info.MatchId);
         }
-
         return info;
     }
 
@@ -891,6 +875,7 @@ public class HattrickApiService
     /// <summary>Surowe zapytanie CHPP z tokenami biezacej sesji — dla serwisow pomocniczych (kalibracja).</summary>
     internal async Task<XDocument> FetchChppXmlAsync(Dictionary<string, string> queryParams, string context)
     {
+        if (_useMockData) return MockChppData.Create(queryParams);
         var (accessToken, accessTokenSecret) = RequireTokens();
         var xml = await _oauthService.MakeAuthenticatedRequestAsync(accessToken, accessTokenSecret, queryParams);
         return ParseChppXml(xml, context);
@@ -1052,7 +1037,7 @@ public class HattrickApiService
         return true;
     }
 
-    private List<Player> GenerateMockPlayers()
+    internal static List<Player> GenerateMockPlayers()
     {
         var random = new Random(1337);
         var players = new List<Player>();

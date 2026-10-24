@@ -30,15 +30,6 @@ public class CalibrationService
     {
         count = Math.Clamp(count, 1, 10);
 
-        var roster = await _api.GetTeamPlayersAsync(teamId);
-        await _snapshots.SaveAsync(new CalibrationSnapshot
-        {
-            TeamId = teamId,
-            RecordedAt = DateTimeOffset.UtcNow,
-            Players = roster,
-            Source = "CHPP own roster",
-            Warnings = new() { "Match context not supplied; this snapshot is not eligible for calibration." }
-        });
         var availableSnapshots = await _snapshots.GetAsync(teamId);
 
         // Ostatnie rozegrane mecze seniorskie.
@@ -186,11 +177,15 @@ public class CalibrationService
         }
 
         var context = snapshot.Context;
-        var disorderRisk = AdvancedLineupOptimizer.ComputeDisorderRisk(context.FormationExperience!.Value);
-        var predicted = _ratingEngine.ComputeContextualRatings(lineup, context.WeatherId!.Value,
-            context.Attitude!, context.CoachType!, disorderRisk, context.TeamSpiritLevel,
-            context.ConfidenceLevel, applyHomeAdvantage: isHome);
-        _ratingEngine.ApplyTactic(predicted, tactic);
+        var predicted = snapshot.PredictedRatings;
+        if (predicted == null)
+        {
+            var disorderRisk = AdvancedLineupOptimizer.ComputeDisorderRisk(context.FormationExperience!.Value);
+            predicted = _ratingEngine.ComputeContextualRatings(lineup, context.WeatherId!.Value,
+                context.Attitude!, context.CoachType!, disorderRisk, context.TeamSpiritLevel,
+                context.ConfidenceLevel, applyHomeAdvantage: isHome);
+            _ratingEngine.ApplyTactic(predicted, tactic);
+        }
 
         return new CalibrationMatchEntry
         {
@@ -200,7 +195,10 @@ public class CalibrationService
             Tactic = tactic,
             PlayersMatched = lineup.Positions.Count,
             Predicted = predicted,
-            Actual = actual
+            Actual = actual,
+            RecordedAt = snapshot.RecordedAt,
+            ModelVersion = snapshot.PredictedRatings != null ? snapshot.ModelVersion : MatchPredictionModel.Version,
+            PredictionSource = snapshot.PredictedRatings != null ? snapshot.PredictionSource : "replayed-current-model"
         };
     }
 
@@ -382,7 +380,7 @@ public class CalibrationService
             (_, "CDTW" or "FTW" or "IMTW") => 4,
             _ => -1
         };
-        return code >= 0 && IsValidBehaviourCode(slot, code);
+        return code >= 0 && IsValidBehaviourCode(slot, code) && MapSlotBehaviour(slot, code) == behaviour;
     }
 }
 
@@ -392,6 +390,9 @@ public class CalibrationReport
     public List<CalibrationMatchEntry> Matches { get; set; } = new();
     public string EvaluationStatus { get; set; } = "Not evaluated";
     public int ExcludedMatches { get; set; }
+    public int SavedForecastCount => Matches.Count(m => m.PredictionSource != "replayed-current-model");
+    public int ReplayedForecastCount => Matches.Count - SavedForecastCount;
+    public List<string> ModelVersions => Matches.Select(m => m.ModelVersion ?? "unknown").Distinct().ToList();
     public int TrainingSampleCount { get; set; }
     public int HeldOutSampleCount { get; set; }
     public LineupRatings? MeanBias { get; set; }
@@ -413,6 +414,9 @@ public class CalibrationMatchEntry
     public bool IsHomeMatch { get; set; }
     public string Tactic { get; set; } = "Normal";
     public int PlayersMatched { get; set; }
+    public DateTimeOffset RecordedAt { get; set; }
+    public string? ModelVersion { get; set; }
+    public string PredictionSource { get; set; } = "replayed-current-model";
     public LineupRatings Predicted { get; set; } = new();
     public LineupRatings Actual { get; set; } = new();
 }

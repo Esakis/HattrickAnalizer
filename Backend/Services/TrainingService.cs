@@ -100,6 +100,10 @@ public class TrainingService
         var (start, end, configured) = GetTrainingWindow(DateTimeOffset.UtcNow, _configuration);
         summary.WeekStart = start.UtcDateTime;
         summary.WeekEnd = end.UtcDateTime;
+        var zoneId = _configuration["Training:TimeZoneId"];
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(string.IsNullOrWhiteSpace(zoneId) ? "Europe/Warsaw" : zoneId);
+        var nextLocal = TimeZoneInfo.ConvertTime(start, zone).DateTime.AddDays(7);
+        summary.NextTrainingAt = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(nextLocal, DateTimeKind.Unspecified), zone);
         summary.IsEstimate = true;
         if (!configured)
             summary.Warnings.Add("Training week uses the documented fallback Thursday 22:00 Europe/Warsaw; set Training:UpdateDay, Training:UpdateHour and Training:TimeZoneId to the Hattrick country's update schedule.");
@@ -894,6 +898,7 @@ public class TrainingSummary
     public DateTime? LastMatchDate { get; set; }
     public DateTime WeekStart { get; set; }
     public DateTime WeekEnd { get; set; }
+    public DateTime NextTrainingAt { get; set; }
     public bool IsEstimate { get; set; }
     public List<string> Warnings { get; set; } = new();
     public List<TrainingPlayerEntry> Players { get; set; } = new();

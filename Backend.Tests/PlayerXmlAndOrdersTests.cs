@@ -90,8 +90,7 @@ public class PlayerXmlAndOrdersTests : IClassFixture<ApiTestFactory>
             oneCustom[slot].Behaviour = behavior;
             var request = ValidOrderRequest(oneCustom, assistantLevel: 5);
             var json = JsonDocument.Parse(MatchOrdersService.BuildLineupJson(request));
-            var order = json.RootElement.GetProperty("positions").EnumerateArray()
-                .Single(p => p.GetProperty("positionCode").GetInt32() == MatchOrdersService.SlotToRoleId(slot));
+            var order = json.RootElement.GetProperty("positions")[MatchOrdersService.SlotToRoleId(slot) - 100];
 
             Assert.Equal(expectedCode, order.GetProperty("behaviour").GetInt32());
             Assert.Equal(behavior, CalibrationService.MapSlotBehaviour(slot, expectedCode));

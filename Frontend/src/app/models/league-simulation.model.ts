@@ -21,4 +21,7 @@ export interface LeagueSimulationReport {
   iterations: number;
   fromFirstRound: boolean;
   teams: LeagueTeamForecast[];
+  modelVersion?: string;
+  modelConfidence?: string;
+  modelWarnings?: string[];
 }

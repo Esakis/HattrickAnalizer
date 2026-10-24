@@ -10,6 +10,8 @@ export interface TrainingPlayerEntry {
   coverageMinutes?: number;
   observedFullMinutes?: number;
   observedHalfMinutes?: number;
+  observedSmallEffectMinutes?: number;
+  observedVerySmallEffectMinutes?: number;
   fullTrainingMinutes?: number;
   halfTrainingMinutes?: number;
   smallEffectMinutes?: number;
@@ -39,6 +41,7 @@ export interface TrainingSummary {
   players: TrainingPlayerEntry[];
   weekStart?: string | null;
   weekEnd?: string | null;
+  nextTrainingAt?: string | null;
   trainingIntensityPercent?: number | null;
   staminaTrainingSharePercent?: number | null;
   staminaTrainingPartKnown?: boolean;
@@ -59,4 +62,6 @@ export interface TrainingSummary {
   warnings?: string[];
   source?: string;
   isEstimate?: boolean;
+  teamSpiritLevel?: number | null;
+  confidenceLevel?: number | null;
 }

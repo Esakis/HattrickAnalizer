@@ -11,6 +11,18 @@ namespace Backend.Tests;
 public class CalibrationSnapshotTests
 {
     [Fact]
+    public void Unknown_context_and_wrong_role_behaviours_remain_incomplete()
+    {
+        var context = new CalibrationMatchContext();
+        Assert.False(context.IsComplete);
+        Assert.Contains("weatherId", context.MissingFields);
+        Assert.Contains("playerIdsBySlot", context.MissingFields);
+        Assert.False(CalibrationService.IsValidSlotBehaviour("RIM", "WBO"));
+        Assert.True(CalibrationService.IsValidSlotBehaviour("RIM", "IMO"));
+        Assert.True(CalibrationService.IsValidSlotBehaviour("RWB", "WBO"));
+    }
+
+    [Fact]
     public async Task Snapshot_round_trip_keeps_capture_immutable_and_rejects_post_kickoff_capture()
     {
         var root = Path.Combine(Path.GetTempPath(), "hattrick-snapshot-tests", Guid.NewGuid().ToString("N"));

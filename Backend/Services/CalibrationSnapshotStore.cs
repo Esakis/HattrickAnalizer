@@ -21,6 +21,7 @@ public sealed class CalibrationSnapshotStore
             ? Path.Combine(environment.ContentRootPath, "App_Data", "calibration")
             : Path.IsPathRooted(configured) ? configured : Path.Combine(environment.ContentRootPath, configured);
         _root = Path.GetFullPath(path);
+        if (configuration.GetValue<bool>("UseMockData")) _root = Path.Combine(_root, "demo");
     }
 
     public async Task<IReadOnlyList<CalibrationSnapshot>> GetAsync(int teamId, CancellationToken cancellationToken = default)
@@ -84,11 +85,21 @@ public sealed class CalibrationSnapshotStore
     private static void Validate(CalibrationSnapshot snapshot)
     {
         if (snapshot.TeamId <= 0) throw new ArgumentException("A positive own-team id is required.");
+        if (snapshot.Players == null) throw new ArgumentException("A captured roster is required.");
         if (snapshot.RecordedAt == default || snapshot.RecordedAt > DateTimeOffset.UtcNow.AddMinutes(1))
             throw new ArgumentException("Snapshot timestamp must be present and cannot be in the future.");
         if (snapshot.Players.Select(p => p.PlayerId).Distinct().Count() != snapshot.Players.Count)
             throw new ArgumentException("Snapshot player ids must be unique.");
         var c = snapshot.Context ?? throw new ArgumentException("Snapshot match context must not be null.");
+        if (c.PlayerIdsBySlot == null || c.BehavioursBySlot == null)
+            throw new ArgumentException("Lineup slots and behaviours must not be null.");
+        if (snapshot.PredictedRatings is { } ratings)
+        {
+            var sectors = new[] { ratings.Midfield, ratings.RightDefense, ratings.CentralDefense, ratings.LeftDefense,
+                ratings.RightAttack, ratings.CentralAttack, ratings.LeftAttack };
+            if (sectors.Any(v => !double.IsFinite(v) || v < 0) || string.IsNullOrWhiteSpace(snapshot.ModelVersion))
+                throw new ArgumentException("A saved forecast needs finite non-negative ratings and its model version.");
+        }
         var hasAnyContext = c.MatchId.HasValue || c.MatchDate.HasValue || c.IsHomeMatch.HasValue || c.Tactic != null
             || c.Attitude != null || c.CoachType != null || c.TeamSpiritLevel.HasValue || c.ConfidenceLevel.HasValue
             || c.Formation != null || c.FormationExperience.HasValue || c.WeatherId.HasValue

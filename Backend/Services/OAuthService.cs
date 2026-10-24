@@ -24,6 +24,7 @@ public class OAuthService
     // Przekazywany TYLKO w URL autoryzacji (nie wchodzi do podpisu OAuth).
     public async Task<(string Token, string TokenSecret, string AuthUrl)> GetRequestTokenAsync(string callbackUrl = "oob", string scope = "")
     {
+        if (_configuration.GetValue<bool>("UseMockData")) throw new InvalidOperationException("OAuth authorization is disabled in offline demo mode.");
         var consumerKey = _configuration["HattrickApi:ConsumerKey"];
         var consumerSecret = _configuration["HattrickApi:ConsumerSecret"];
 
@@ -73,6 +74,7 @@ public class OAuthService
         string requestTokenSecret, 
         string verifier)
     {
+        if (_configuration.GetValue<bool>("UseMockData")) throw new InvalidOperationException("OAuth token exchange is disabled in offline demo mode.");
         var consumerKey = _configuration["HattrickApi:ConsumerKey"];
         var consumerSecret = _configuration["HattrickApi:ConsumerSecret"];
 
@@ -126,6 +128,8 @@ public class OAuthService
         Dictionary<string, string> queryParams,
         bool useCache = true)
     {
+        if (_configuration.GetValue<bool>("UseMockData"))
+            return MockChppData.Create(queryParams).ToString(System.Xml.Linq.SaveOptions.DisableFormatting);
         var cacheKey = accessToken + "|" + string.Join("&", queryParams.OrderBy(p => p.Key).Select(p => $"{p.Key}={p.Value}"));
         if (useCache && _responseCache.TryGetValue(cacheKey, out var cached) && DateTime.UtcNow - cached.FetchedAt < CacheTtl)
         {

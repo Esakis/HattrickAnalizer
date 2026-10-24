@@ -45,6 +45,11 @@ export interface OptimizerRequest {
   matchId?: number;
   isHomeMatch?: boolean;
   matchDate?: string;
+  requiredPlayerIds?: number[];
+  excludedPlayerIds?: number[];
+  lockedPositions?: { [slot: string]: number };
+  opponentScenario?: { tactic: string; ratings: { [sector: string]: number } };
+  opponentRatingScale?: number;
 }
 
 // Pogoda regionu gospodarza (kody CHPP: 0=deszcz, 1=pochmurno, 2=częściowe zachmurzenie, 3=słońce).

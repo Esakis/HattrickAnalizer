@@ -158,7 +158,11 @@
       "opponentDefense": "Opponent defense",
       "yourDefense": "Your defense",
       "opponentAttack": "Opponent attack",
-      "lanes": { "right": "Right lane", "center": "Central lane", "left": "Left lane" },
+      "lanes": {
+        "right": "Right lane",
+        "center": "Central lane",
+        "left": "Left lane"
+      },
       "matchupLabels": {
         "midfield": "Midfield (chance share)",
         "attack": "{{lane}} attack vs {{opponentLane}} defense",
@@ -670,7 +674,7 @@
     "partialOrUnknown": "Partial / unknown",
     "uncertain": "uncertain",
     "title": "Training",
-    "subtitle": "Who trains, how intensely, and when to expect a skill pop",
+    "subtitle": "Plan trainee minutes and review this week's training coverage",
     "type": "Training type",
     "intensity": "Intensity",
     "staminaShare": "Stamina share",

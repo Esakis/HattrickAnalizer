@@ -2,6 +2,10 @@
 
 Hattrick Analyzer is a .NET 8 API and Angular 16 application for reviewing team data, comparing match sectors, and exploring lineup scenarios. CHPP access is optional for local development: the backend has an explicit deterministic mock mode.
 
+The [weekly workflow guide](docs/weekly-workflow.md) covers the home dashboard, training-minute planning, opponent scouting, editable match plans, player history and post-match forecast review. Saving a plan locally and submitting match orders to Hattrick are separate actions.
+
+Match and training plans are stored in this browser's `localStorage`; they are not synchronized between devices. Player history and calibration captures persist on the server under `App_Data/player-history` and `App_Data/calibration`, relative to the backend content root. Override these with `PlayerHistory:StoragePath` and `Calibration:StoragePath`; deployed instances need persistent writable storage. SQL is optional for importing existing player history. Demo records use separate `demo/` subdirectories.
+
 ## Requirements
 
 - .NET 8 SDK
@@ -55,7 +59,7 @@ For a real-world check:
 
 1. Capture a complete own-team snapshot before kickoff with all 11 player IDs, their available private skills, positions and behaviors, tactic, attitude, coach type, team spirit, confidence, formation experience, assistant level, home/away status, and weather. The snapshot endpoint is `POST /api/calibration/snapshots/capture`.
 2. Keep the snapshot time and match context. A snapshot recorded after kickoff, missing required context, or containing players absent from the captured roster is not eligible for replay.
-Calibration replay rounds recorded team spirit and confidence to the integer inputs accepted by the optimizer; it does not substitute their later live values.
+New captures preserve server-verified predicted ratings and their model version. Incomplete context or a displayed forecast that no longer matches the server calculation is reported without saving a forecast. Legacy snapshots without predicted ratings replay their captured context with the current model; they do not substitute later live skill or psychology values.
 3. After the match, request `GET /api/calibration/own-matches?count=5`. Review included and excluded matches, sample counts, training metrics, and held-out metrics. Historical roster or skill changes must not be substituted for the snapshot captured before kickoff.
 4. Calibration sorts observations by match date and reserves the latest 20% (at least one match when there is more than one) as a chronological holdout. Use the earlier training observations to propose changes; do not tune against held-out results. Re-evaluate on later matches before changing the confidence label or claiming improved predictive accuracy.
 

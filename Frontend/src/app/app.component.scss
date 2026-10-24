@@ -129,7 +129,7 @@
 .app-body {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 220px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   padding: 1rem 1.2rem;
   align-items: start;
@@ -138,6 +138,11 @@
     grid-template-columns: 1fr;
   }
 }
+
+.sync-bar { display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:.7rem;font-size:.85rem;color:#526657; }
+.sync-bar summary { cursor:pointer;padding:.4rem 0; }
+.sync-bar button { border:1px solid #bfd0c3;background:#fff;color:#225a32;padding:.4rem .7rem;border-radius:5px;cursor:pointer; }
+.sync-bar details { flex:1; }
 
 .app-content {
   min-width: 0;

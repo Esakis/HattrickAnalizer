@@ -153,13 +153,13 @@
         <tbody>
           <tr *ngFor="let player of sortedPlayers"
               [class.injured]="player.injuryLevel > 0"
-              [class.clickable-row]="isDebug"
-              (click)="isDebug ? openPlayerHistory(player) : null"
-              [title]="isDebug ? 'Kliknij aby zobaczyć historię umiejętności' : ''">
+              class="clickable-row"
+              (click)="openPlayerHistory(player)"
+              [title]="'history.open' | translate">
             <td class="player-name-cell">
               <span class="injury-icon" *ngIf="player.injuryLevel > 0">🤕</span>
               {{ player.firstName }} {{ player.lastName }}
-              <span class="debug-icon" *ngIf="isDebug" title="Historia dostępna">📊</span>
+              <span class="debug-icon" title="Historia dostępna">📊</span>
             </td>
             <td>{{ getPositionLabel(getPlayerPosition(player)) }}</td>
             <td>{{ player.age }}</td>
@@ -185,9 +185,9 @@
     <!-- WIDOK KART -->
     <div *ngIf="viewMode === 'cards'" class="players-grid">
       <div class="player-card" *ngFor="let player of filteredPlayers"
-           [class.clickable-card]="isDebug"
-           (click)="isDebug ? openPlayerHistory(player) : null"
-           [title]="isDebug ? 'Kliknij aby zobaczyć historię umiejętności' : ''"
+           [class.clickable-card]="true"
+           (click)="openPlayerHistory(player)"
+           [title]="'history.open' | translate"
       >
         <div class="player-header">
           <div class="player-info">
@@ -266,31 +266,32 @@
     <p class="hint">{{ 'players.checkTeamId' | translate }}</p>
   </div>
 
-    <!-- PRZYCISK DEBUG: ZAPISZ HISTORIĘ -->
-  <div *ngIf="isDebug" class="debug-save-bar">
+  <div class="debug-save-bar">
     <button class="btn-save-history" (click)="checkAndSaveHistory()" [disabled]="savingHistory">
-      {{ savingHistory ? '⏳ Sprawdzam...' : '💾 Sprawdź i zapisz zmiany do bazy' }}
+      {{ (savingHistory ? 'history.syncing' : 'history.sync') | translate }}
     </button>
     <div *ngIf="saveResultsVisible && saveResults" class="save-summary">
-      <span class="save-ok" *ngIf="saveChangedCount > 0">
-        ✅ Zapisano zmiany dla {{ saveChangedCount }} zawodników:
-      </span>
-      <span class="save-none" *ngIf="saveChangedCount === 0">
-        ℹ️ Brak zmian – wszystko aktualne
-      </span>
-      <ul *ngIf="saveChangedCount > 0" class="save-changes-list">
-        <li *ngFor="let r of saveResults">
-          <ng-container *ngIf="r.changed">
-            <strong>{{ r.playerName }}</strong>: {{ r.changedFields.join(', ') }}
-          </ng-container>
-        </li>
-      </ul>
+      <span class="save-ok" *ngIf="saveChangedCount > 0">{{ 'history.saved' | translate:{count: saveChangedCount} }}</span>
+      <span class="save-none" *ngIf="saveChangedCount === 0">{{ 'history.unchanged' | translate }}</span>
     </div>
   </div>
 </div>
 
+<section class="recent-history">
+  <h2>{{ 'history.recentTitle' | translate }}</h2>
+  <p>{{ 'history.autoSyncHint' | translate }}</p>
+  <p *ngIf="historyError" role="alert" class="error">{{ historyError }}</p>
+  <p *ngIf="!recentChanges.length">{{ 'history.noChanges' | translate }}</p>
+  <article *ngFor="let change of recentChanges" class="history-change">
+    <div><strong>{{ change.playerName }}</strong> <time>{{ change.recordedAt | date:'dd.MM.yyyy HH:mm' }}</time></div>
+    <span *ngIf="change.firstSnapshot">{{ 'history.firstSnapshot' | translate }}</span>
+    <span *ngFor="let field of change.fields" class="change-field">{{ 'history.fields.' + field.field | translate }}: {{ field.previous | number:'1.0-2' }} &rarr; {{ field.current | number:'1.0-2' }}</span>
+    <span *ngFor="let warning of change.warnings">{{ warning }}</span>
+  </article>
+</section>
+
 <app-player-history-modal
-  *ngIf="isDebug && selectedPlayerId !== null"
+  *ngIf="selectedPlayerId !== null"
   [playerId]="selectedPlayerId"
   [playerName]="selectedPlayerName"
   (closed)="closePlayerHistory()">

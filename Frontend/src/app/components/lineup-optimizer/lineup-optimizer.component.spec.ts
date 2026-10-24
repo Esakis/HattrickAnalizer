@@ -4,6 +4,7 @@ import { Lineup, OptimizerResponse } from '../../models/lineup.model';
 import { Player } from '../../models/player.model';
 import { DataCacheService } from '../../services/data-cache.service';
 import { LineupOptimizerComponent } from './lineup-optimizer.component';
+import { rosterFingerprint, teamContextFingerprint } from '../../services/match-plan.service';
 
 describe('LineupOptimizerComponent', () => {
   let component: LineupOptimizerComponent;
@@ -99,6 +100,86 @@ describe('LineupOptimizerComponent', () => {
     expect(request.attitude).toBe('PIC');
     expect(request.assistantManagerLevel).toBe(4);
     expect(component.ordersSuccess).toBeTrue();
+  });
+
+  it('keeps an explicitly unlinked draft separate from the next real match', () => {
+    component.selectUpcomingMatch(0);
+    expect(component.nextMatch).toBeNull();
+    expect((component as any).createRequestSnapshot().matchId).toBe(0);
+  });
+
+  it('preserves bench and substitution drafts when selecting another alternative', () => {
+    const orders = {bench:[{playerId:999,positionCode:0}],substitutions:[{minute:60}]};
+    const plans = {getPlan:()=>({orders}),save:jasmine.createSpy().and.returnValue(true)};
+    (component as any).plans = plans;
+    component.result=response();
+    component.selectAlternative(1);
+    expect(plans.save.calls.mostRecent().args[0].orders).toEqual(orders);
+    expect(plans.save.calls.mostRecent().args[0].status).toBe('draft');
+  });
+
+  it('restores a matching saved result and detects changed form or team context', () => {
+    const result=response();
+    result.inputSnapshot!.matchId=42;
+    result.inputSnapshot!.matchDate='2099-01-01T00:00:00Z';
+    result.inputSnapshot!.isHomeMatch=true;
+    result.inputSnapshot!.teamSpiritLevel=5;
+    result.inputSnapshot!.confidenceLevel=5;
+    cache.nextOpponent$.next({ ...cache.nextOpponent$.value!, matchDate: result.inputSnapshot!.matchDate });
+    const players=Object.values(result.optimalLineup.positions).map(p=>p.player!);
+    const team={teamId:1,teamName:'Test',players,teamSpiritLevel:5,confidenceLevel:5};
+    cache.ownTeam$.next(team);
+    component.myTeamPlayers=players;
+    const saved={result,referenceResult:result,selectedAlternative:1,rosterFingerprint:rosterFingerprint(players),teamContextKey:teamContextFingerprint(team),matchDate:result.inputSnapshot!.matchDate};
+    (component as any).plans={getPlan:()=>saved};
+    (component as any).tryRestorePlan();
+    expect(component.result).toBe(result);
+    expect(component.selectedAlternative).toBe(1);
+    expect(component.resultStale).toBeFalse();
+    expect(component.teamSpiritLevel).toBe(5);
+    expect(component.confidenceLevel).toBe(5);
+    component.result=null; (component as any).restoredPlanKey='';
+    component.myTeamPlayers=players.map((p,i)=>i===0?{...p,form:p.form+1}:p);
+    (component as any).tryRestorePlan();
+    expect(component.resultStale).toBeTrue();
+    component.result=null; (component as any).restoredPlanKey=''; component.myTeamPlayers=players;
+    cache.ownTeam$.next({...team,teamSpiritLevel:4,confidenceLevel:7});
+    (component as any).tryRestorePlan();
+    expect(component.resultStale).toBeTrue();
+    expect(component.teamSpiritLevel).toBe(4);
+    expect(component.confidenceLevel).toBe(7);
+    expect((component as any).createRequestSnapshot().teamSpiritLevel).toBe(4);
+    expect((component as any).createRequestSnapshot().confidenceLevel).toBe(7);
+  });
+
+  [
+    { description: 'kickoff changes', matchDate: '2099-01-02T00:00:00Z', isHomeMatch: true },
+    { description: 'home/away changes', matchDate: '2099-01-01T00:00:00Z', isHomeMatch: false }
+  ].forEach(fixture => {
+    it(`marks a restored plan stale when the same fixture's ${fixture.description}`, () => {
+      const result = response();
+      Object.assign(result.inputSnapshot!, { matchId: 42, matchDate: '2099-01-01T00:00:00Z', isHomeMatch: true });
+      const players = Object.values(result.optimalLineup.positions).map(p => p.player!);
+      const team = { teamId: 1, teamName: 'Test', players, teamSpiritLevel: 5, confidenceLevel: 5 };
+      cache.ownTeam$.next(team);
+      cache.nextOpponent$.next({ ...cache.nextOpponent$.value!, matchDate: fixture.matchDate, isHomeMatch: fixture.isHomeMatch });
+      component.myTeamPlayers = players;
+      (component as any).plans = { getPlan: () => ({
+        result, referenceResult: result, selectedAlternative: 1, rosterFingerprint: rosterFingerprint(players),
+        teamContextKey: teamContextFingerprint(team), matchDate: result.inputSnapshot!.matchDate
+      }) };
+
+      (component as any).tryRestorePlan();
+
+      expect(component.result).toBe(result);
+      expect(component.resultStale).toBeTrue();
+      expect(cache.optimizerResult$.value).toBeNull();
+      expect(component.canSendOrders).toBeFalse();
+      const request = (component as any).createRequestSnapshot();
+      expect(request.matchId).toBe(42);
+      expect(request.matchDate).toBe(fixture.matchDate);
+      expect(request.isHomeMatch).toBe(fixture.isHomeMatch);
+    });
   });
 
   it('shows backend success=false as a failed send', () => {

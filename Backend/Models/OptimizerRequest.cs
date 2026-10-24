@@ -8,6 +8,9 @@ public class OptimizerRequest
     // Postawa druzyny: "Normal" (normalne spotkanie), "PIC" (gra na luzie), "MOTS" (mecz sezonu)
     public string TeamAttitude { get; set; } = "Normal";
     public List<string> FocusAreas { get; set; } = new();
+    public List<int> RequiredPlayerIds { get; set; } = new();
+    public List<int> ExcludedPlayerIds { get; set; } = new();
+    public Dictionary<string, int> LockedPositions { get; set; } = new();
 
     // Typ trenera: "Offensive", "Defensive", "Neutral"
     public string CoachType { get; set; } = "Neutral";
@@ -19,6 +22,8 @@ public class OptimizerRequest
     public string Objective { get; set; } = "Win";
     // Optional explicit opponent scenario. Ratings must be supplied by the caller; skills are never inferred.
     public OpponentScenario? OpponentScenario { get; set; }
+    // Sensitivity evaluation only; scales all resolved sectors and indirect set pieces together.
+    public double OpponentRatingScale { get; set; } = 1;
     // Doswiadczenie formacji: nazwa formacji (np. "4-4-2") -> poziom 3..10
     // 3=kiepskie, 4=slabe, 5=niewystarczajace, 6=znosne, 7=solidne, 8=doskonale, 9=fantastyczne, 10=olsniewajace
     public Dictionary<string, int> FormationExperience { get; set; } = new();
@@ -35,6 +40,19 @@ public class OptimizerRequest
     public bool IsHomeMatch { get; set; }
     // Data meczu (z next-opponent) — do prognozy pogody (HT zna tylko dzis i jutro).
     public DateTime? MatchDate { get; set; }
+}
+
+public class EvaluateLineupRequest
+{
+    public OptimizerRequest Context { get; set; } = new();
+    public Dictionary<string, EvaluationPosition> Positions { get; set; } = new();
+    public string Tactic { get; set; } = "Normal";
+}
+
+public class EvaluationPosition
+{
+    public int PlayerId { get; set; }
+    public string Behaviour { get; set; } = "";
 }
 
 public class OptimizerResponse

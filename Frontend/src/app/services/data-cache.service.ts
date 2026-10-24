@@ -57,6 +57,8 @@ export class DataCacheService {
   readonly auth$ = new BehaviorSubject<AuthInfo>({ authorized: false });
   readonly ownTeam$ = new BehaviorSubject<Team | null>(null);
   readonly nextOpponent$ = new BehaviorSubject<NextOpponent | null>(null);
+  readonly selectedMatch$ = new BehaviorSubject<NextOpponent | null>(null);
+  matchSelectionExplicit = false;
   readonly opponentTeam$ = new BehaviorSubject<Team | null>(null);
 
   readonly opponentPlayers$ = new BehaviorSubject<Player[] | null>(null);

@@ -6,6 +6,7 @@ import { HattrickApiService, AccountTeam } from './services/hattrick-api.service
 import { LoadStatusService } from './services/load-status.service';
 import { DataCacheService } from './services/data-cache.service';
 import { TranslateService } from '@ngx-translate/core';
+import { PlayerHistoryService } from './services/player-history.service';
 
 @Component({
   selector: 'app-root',
@@ -21,6 +22,8 @@ export class AppComponent implements OnInit {
   accountTeams: AccountTeam[] = [];
   currentTeamId: number = 0;
   switchingTeam = false;
+  syncing = false;
+  lastSyncedAt: string | null = null;
 
   constructor(
     public translationService: TranslationService,
@@ -28,12 +31,14 @@ export class AppComponent implements OnInit {
     private api: HattrickApiService,
     private loadStatus: LoadStatusService,
     private cache: DataCacheService,
-    private router: Router
+    private router: Router,
+    private history: PlayerHistoryService
   ) {
     this.loadStatus.register('auth', 'loadStatus.auth');
     this.loadStatus.register('ownTeam', 'loadStatus.ownTeam');
     this.loadStatus.register('nextOpponent', 'loadStatus.nextOpponent');
     this.loadStatus.register('opponentTeam', 'loadStatus.opponentTeam');
+    this.loadStatus.register('history', 'workspaceNav.history');
   }
 
   ngOnInit(): void {
@@ -79,6 +84,13 @@ export class AppComponent implements OnInit {
   }
 
   async runStartupLoad(): Promise<void> {
+    if (this.syncing) return;
+    this.syncing = true;
+    try { await this.loadStartup(); }
+    finally { this.syncing = false; }
+  }
+
+  private async loadStartup(): Promise<void> {
     this.loadStatus.set('auth', 'loading');
     let auth;
     try {
@@ -107,7 +119,13 @@ export class AppComponent implements OnInit {
     try {
       const team = await firstValueFrom(this.api.getTeam(teamId));
       this.cache.ownTeam$.next(team);
+      this.lastSyncedAt = new Date().toISOString();
       this.loadStatus.set('ownTeam', 'success', `${team.teamName} · ${team.players.length} zaw.`);
+      this.loadStatus.set('history', 'loading');
+      this.history.sync().subscribe({
+        next: () => this.loadStatus.set('history', 'success'),
+        error: err => this.loadStatus.set('history', 'error', err?.error?.error ?? err.message)
+      });
     } catch (err: any) {
       this.loadStatus.set('ownTeam', 'error', err?.message ?? 'error');
     }

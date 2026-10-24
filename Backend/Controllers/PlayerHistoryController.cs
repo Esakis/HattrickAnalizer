@@ -1,49 +1,47 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using HattrickAnalizer.Services;
-using HattrickAnalizer.Models;
 
 namespace HattrickAnalizer.Controllers;
-
-public record CheckAndSaveRequest(List<Player> Players, int TeamId);
 
 [ApiController]
 [Route("api/[controller]")]
 public class PlayerHistoryController : ControllerBase
 {
-    private readonly PlayerHistoryService _historyService;
+    private readonly PlayerHistoryService _history;
+    private readonly HattrickApiService _api;
+    private readonly TokenStore _tokens;
 
-    public PlayerHistoryController(PlayerHistoryService historyService)
+    public PlayerHistoryController(PlayerHistoryService history, HattrickApiService api, TokenStore tokens)
     {
-        _historyService = historyService;
+        _history = history; _api = api; _tokens = tokens;
     }
 
-    [HttpGet("{playerId}")]
+    private int OwnTeamId => _api.MockMode ? 1001 : _tokens.Get(Request.Cookies["ht_session"] ?? "")?.OwnTeamId ?? 0;
+
+    [HttpGet("{playerId:int}")]
     public async Task<IActionResult> GetHistory(int playerId)
     {
-        try
-        {
-            var history = await _historyService.GetPlayerHistoryAsync(playerId);
-            return Ok(history);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[PlayerHistoryController] Błąd: {ex.Message}");
-            return StatusCode(500, new { error = ex.Message });
-        }
+        var teamId = OwnTeamId;
+        if (teamId <= 0) return Unauthorized(new { error = "No authenticated own team." });
+        return Ok(await _history.GetPlayerHistoryAsync(playerId, teamId));
     }
 
-    [HttpPost("check-and-save")]
-    public async Task<IActionResult> CheckAndSave([FromBody] CheckAndSaveRequest request)
+    [HttpGet("recent")]
+    public async Task<IActionResult> Recent([FromQuery] int count = 30)
     {
-        try
-        {
-            var results = await _historyService.CheckAndSaveChangesAsync(request.Players, request.TeamId);
-            return Ok(results);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[PlayerHistoryController] Błąd check-and-save: {ex.Message}");
-            return StatusCode(500, new { error = ex.Message });
-        }
+        var teamId = OwnTeamId;
+        if (teamId <= 0) return Unauthorized(new { error = "No authenticated own team." });
+        return Ok(await _history.GetRecentChangesAsync(teamId, count));
+    }
+
+    [HttpPost("sync")]
+    [HttpPost("check-and-save")]
+    public async Task<IActionResult> Sync()
+    {
+        var teamId = OwnTeamId;
+        if (teamId <= 0) return Unauthorized(new { error = "No authenticated own team." });
+        // Body data and arbitrary team ids are deliberately never used as historical observations.
+        var players = await _api.GetTeamPlayersAsync(teamId);
+        return Ok(await _history.CheckAndSaveChangesAsync(players, teamId));
     }
 }

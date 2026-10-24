@@ -14,8 +14,10 @@ namespace Backend.Tests;
 
 public class CalibrationReplayTests
 {
-    [Fact]
-    public async Task Complete_pre_kickoff_snapshot_replays_through_mocked_CHPP_fixtures()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Complete_pre_kickoff_snapshot_replays_through_mocked_CHPP_fixtures(bool savedForecast)
     {
         var storage = Path.Combine(Path.GetTempPath(), "hattrick-calibration-replay", Guid.NewGuid().ToString("N"));
         try
@@ -29,6 +31,12 @@ public class CalibrationReplayTests
             }).Build();
             var snapshotStore = new CalibrationSnapshotStore(configuration, new TestEnvironment(storage));
             var snapshot = CreateSnapshot(kickoff);
+            if (savedForecast)
+            {
+                snapshot.PredictedRatings = new LineupRatings { Midfield = 99, RightDefense = 98, CentralDefense = 97, LeftDefense = 96, RightAttack = 95, CentralAttack = 94, LeftAttack = 93 };
+                snapshot.ModelVersion = "frozen-test-model";
+                snapshot.PredictionSource = "captured-before-match";
+            }
             Assert.True(snapshot.Context.IsComplete);
             await snapshotStore.SaveAsync(snapshot);
             var storedSnapshot = Assert.Single(await snapshotStore.GetAsync(55));
@@ -39,7 +47,7 @@ public class CalibrationReplayTests
             using var httpClient = new HttpClient(handler);
             var oauth = new OAuthService(configuration, httpClient);
             var tokenStore = new TokenStore(configuration, new EphemeralDataProtectionProvider(), NullLogger<TokenStore>.Instance);
-            tokenStore.Save("replay-session", new StoredToken { AccessToken = "replay-test-token", AccessTokenSecret = "test-token-secret", OwnTeamId = 55 });
+            tokenStore.Save("replay-session", new StoredToken { AccessToken = $"replay-test-token-{savedForecast}", AccessTokenSecret = "test-token-secret", OwnTeamId = 55 });
             var accessor = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
             accessor.HttpContext!.Request.Headers.Cookie = "ht_session=replay-session";
             var api = new HattrickApiService(httpClient, configuration, oauth, tokenStore, accessor, NullLogger<HattrickApiService>.Instance);
@@ -69,7 +77,10 @@ public class CalibrationReplayTests
                 snapshot.Context.Attitude!, snapshot.Context.CoachType!, AdvancedLineupOptimizer.ComputeDisorderRisk(snapshot.Context.FormationExperience!.Value),
                 snapshot.Context.TeamSpiritLevel, snapshot.Context.ConfidenceLevel, applyHomeAdvantage: true);
             new RatingEngine().ApplyTactic(expectedRatings, snapshot.Context.Tactic!);
-            AssertSevenSectorsEqual(expectedRatings, match.Predicted);
+            AssertSevenSectorsEqual(snapshot.PredictedRatings ?? expectedRatings, match.Predicted);
+            Assert.Equal(savedForecast ? "frozen-test-model" : MatchPredictionModel.Version, match.ModelVersion);
+            Assert.Equal(savedForecast ? "captured-before-match" : "replayed-current-model", match.PredictionSource);
+            Assert.Single(await snapshotStore.GetAsync(55)); // GET report never creates an empty roster snapshot.
             var awayRatings = new RatingEngine().ComputeContextualRatings(snapshotLineup, snapshot.Context.WeatherId!.Value,
                 snapshot.Context.Attitude!, snapshot.Context.CoachType!, AdvancedLineupOptimizer.ComputeDisorderRisk(snapshot.Context.FormationExperience!.Value),
                 snapshot.Context.TeamSpiritLevel, snapshot.Context.ConfidenceLevel, applyHomeAdvantage: false);
@@ -96,7 +107,7 @@ public class CalibrationReplayTests
                 snapshot.Context.TeamSpiritLevel, snapshot.Context.ConfidenceLevel, applyHomeAdvantage: true);
             new RatingEngine().ApplyTactic(currentRosterRatings, snapshot.Context.Tactic!);
             Assert.NotEqual(currentRosterRatings.Midfield, match.Predicted.Midfield);
-            Assert.Contains("players", handler.RequestedFiles);
+            Assert.DoesNotContain("players", handler.RequestedFiles);
             Assert.Contains("matches", handler.RequestedFiles);
             Assert.Contains("matchdetails", handler.RequestedFiles);
             Assert.Contains("matchlineup", handler.RequestedFiles);

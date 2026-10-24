@@ -58,8 +58,20 @@ export class HattrickApiService {
     return this.http.get<NextOpponent>(`${this.apiUrl}/team/next-opponent`);
   }
 
+  getUpcomingMatches(): Observable<NextOpponent[]> {
+    return this.http.get<NextOpponent[]>(`${this.apiUrl}/team/upcoming-matches`);
+  }
+
   optimizeLineup(request: OptimizerRequest): Observable<OptimizerResponse> {
     return this.http.post<OptimizerResponse>(`${this.apiUrl}/optimizer/optimize`, request);
+  }
+
+  evaluateLineup(context: OptimizerRequest, positions: { [slot: string]: { playerId: number; behaviour: string } }, tactic: string): Observable<OptimizerResponse> {
+    return this.http.post<OptimizerResponse>(`${this.apiUrl}/optimizer/evaluate`, { context, positions, tactic });
+  }
+
+  captureForecast(context: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/calibration/snapshots/capture`, context);
   }
 
   getMyTeams(): Observable<{ currentTeamId: number; teams: AccountTeam[] }> {
@@ -77,6 +89,10 @@ export class HattrickApiService {
 
   sendMatchOrders(request: any): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/matchorders`, request);
+  }
+
+  previewMatchOrders(request: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/matchorders/preview`, request);
   }
 
   completeOAuthFlow(sessionId: string, verifier: string): Observable<any> {

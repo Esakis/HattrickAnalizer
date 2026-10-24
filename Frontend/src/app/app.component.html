@@ -5,11 +5,13 @@
       <span class="brand__name">Hattrick Analizer</span>
     </a>
     <nav class="main-nav">
-      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">{{ 'navigation.optimizer' | translate }}</a>
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">{{ 'workspaceNav.week' | translate }}</a>
+      <a routerLink="/optimizer" routerLinkActive="active">{{ 'workspaceNav.prepare' | translate }}</a>
       <a routerLink="/players" routerLinkActive="active">{{ 'navigation.players' | translate }}</a>
       <a routerLink="/scout" routerLinkActive="active">{{ 'navigation.scout' | translate }}</a>
       <a routerLink="/league" routerLinkActive="active">{{ 'navigation.league' | translate }}</a>
       <a routerLink="/training" routerLinkActive="active">{{ 'navigation.training' | translate }}</a>
+      <a routerLink="/review" routerLinkActive="active">{{ 'workspaceNav.review' | translate }}</a>
       <a routerLink="/oauth-setup" routerLinkActive="active">{{ 'navigation.oauth' | translate }}</a>
     </nav>
     <div class="team-switcher" *ngIf="accountTeams.length > 1">
@@ -41,6 +43,7 @@
   </header>
   <div class="app-body">
     <main class="app-content">
+      <div class="sync-bar"><details><summary>{{ 'workspaceNav.sync' | translate }} <span *ngIf="lastSyncedAt">· {{ lastSyncedAt | date:'HH:mm' }}</span></summary><app-load-status-sidebar></app-load-status-sidebar></details><button (click)="runStartupLoad()" [disabled]="syncing">{{ (syncing ? 'workspaceNav.syncing' : 'workspaceNav.refresh') | translate }}</button></div>
       <div *ngIf="showMockBanner" class="auth-banner mock-banner">
         <span>{{ 'loadStatus.mockMode' | translate }}</span>
       </div>
@@ -52,6 +55,5 @@
       </div>
       <router-outlet></router-outlet>
     </main>
-    <app-load-status-sidebar class="app-sidebar"></app-load-status-sidebar>
   </div>
 </div>

@@ -36,7 +36,7 @@ public class LeagueSimulationService
     public async Task<LeagueSimulationReport> SimulateAsync(int ownTeamId, bool fromFirstRound = false)
     {
         var leagueUnitId = await GetLeagueUnitIdAsync(ownTeamId);
-        var cacheKey = $"{leagueUnitId}:{fromFirstRound}";
+        var cacheKey = $"{_api.MockMode}:{ownTeamId}:{leagueUnitId}:{fromFirstRound}";
         if (Cache.TryGetValue(cacheKey, out var cached) && DateTime.UtcNow - cached.At < CacheTtl)
         {
             return cached.Report;

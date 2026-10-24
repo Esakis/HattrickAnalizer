@@ -5,6 +5,8 @@ export interface Team {
   teamName: string;
   players: Player[];
   ratings?: TeamRatings;
+  teamSpiritLevel?: number | null;
+  confidenceLevel?: number | null;
 }
 
 export interface TeamRatings {

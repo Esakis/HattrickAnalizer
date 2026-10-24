@@ -1,0 +1,47 @@
+﻿<section class="review-page">
+  <header class="page-heading">
+    <div><p class="eyebrow">{{ 'review.eyebrow' | translate }}</p><h1>{{ 'review.title' | translate }}</h1><p>{{ 'review.description' | translate }}</p></div>
+    <button (click)="load()" [disabled]="loading || loadingSnapshots">{{ 'review.refresh' | translate }}</button>
+  </header>
+  <p *ngIf="loading" role="status">{{ 'review.loading' | translate }}</p>
+  <p *ngIf="reportError" role="alert" class="error">{{ 'review.error' | translate }}</p>
+  <ng-container *ngIf="report as result">
+    <div class="summary-grid">
+      <div class="metric"><strong>{{ result.matches.length }}</strong><span>{{ 'review.evaluated' | translate }}</span></div>
+      <div class="metric"><strong>{{ result.savedForecastCount }}</strong><span>{{ 'review.savedForecasts' | translate }}</span></div>
+      <div class="metric"><strong>{{ result.heldOutSampleCount }}</strong><span>{{ 'review.holdout' | translate }}</span></div>
+      <div class="metric"><strong>{{ result.excludedMatches }}</strong><span>{{ 'review.excluded' | translate }}</span></div>
+    </div>
+    <div *ngIf="!result.matches.length" class="card empty">
+      <h2>{{ 'review.emptyTitle' | translate }}</h2><p>{{ 'review.emptyHint' | translate }}</p><a routerLink="/optimizer">{{ 'review.prepare' | translate }} →</a>
+    </div>
+    <section class="card" *ngIf="result.matches.length">
+      <h2>{{ 'review.accuracy' | translate }}</h2><p>{{ 'review.holdoutHint' | translate }}</p>
+      <p *ngIf="result.replayedForecastCount > 0" class="notice">{{ 'review.replayHint' | translate:{count: result.replayedForecastCount} }}</p>
+      <p *ngIf="result.modelVersions.length > 1" class="notice">{{ 'review.mixedVersions' | translate }}</p>
+      <div class="table-scroll"><table><thead><tr><th>{{ 'review.sector' | translate }}</th><th>{{ 'review.trainingMae' | translate }}</th><th>{{ 'review.trainingCount' | translate }}</th><th>{{ 'review.holdoutMae' | translate }}</th><th>{{ 'review.holdoutCount' | translate }}</th></tr></thead>
+        <tbody><tr *ngFor="let sector of sectors"><td>{{ 'review.sectors.' + sector | translate }}</td><td>{{ result.meanAbsoluteError ? (result.meanAbsoluteError[sector] | number:'1.2-2') : '—' }}</td><td>{{ result.trainingSectorSampleCounts[sector] || 0 }}</td><td>{{ result.heldOutMeanAbsoluteError ? (result.heldOutMeanAbsoluteError[sector] | number:'1.2-2') : '—' }}</td><td>{{ result.heldOutSectorSampleCounts[sector] || 0 }}</td></tr></tbody>
+      </table></div>
+    </section>
+    <article *ngFor="let match of result.matches" class="card">
+      <div class="match-heading"><h2>{{ 'review.match' | translate }} #{{ match.matchId }}</h2><span>{{ match.matchDate | date:'dd.MM.yyyy HH:mm' }} · {{ (match.isHomeMatch ? 'review.home' : 'review.away') | translate }}</span></div>
+      <p><span class="badge">{{ sourceKey(match.predictionSource) | translate }}</span> {{ match.modelVersion }} · {{ 'review.recorded' | translate }} {{ match.recordedAt | date:'dd.MM.yyyy HH:mm' }}</p>
+      <div class="table-scroll"><table><thead><tr><th>{{ 'review.sector' | translate }}</th><th>{{ 'review.predicted' | translate }}</th><th>{{ 'review.actual' | translate }}</th><th>{{ 'review.difference' | translate }}</th></tr></thead>
+        <tbody><tr *ngFor="let sector of sectors"><td>{{ 'review.sectors.' + sector | translate }}</td><td>{{ match.predicted[sector] | number:'1.2-2' }}</td><td>{{ match.actual[sector] | number:'1.2-2' }}</td><td [class.positive]="match.actual[sector] > match.predicted[sector]" [class.negative]="match.actual[sector] < match.predicted[sector]">{{ match.actual[sector] - match.predicted[sector] | number:'1.2-2' }}</td></tr></tbody>
+      </table></div>
+    </article>
+    <details *ngIf="result.exclusionReasons.length" class="card"><summary>{{ 'review.exclusionReasons' | translate }} ({{ result.excludedMatches }})</summary><p>{{ 'review.exclusionHint' | translate }}</p><ul><li *ngFor="let reason of result.exclusionReasons">{{ reason }}</li></ul></details>
+  </ng-container>
+  <section class="card">
+    <h2>{{ 'review.upcoming' | translate }}</h2>
+    <p *ngIf="loadingSnapshots">{{ 'review.loading' | translate }}</p><p *ngIf="snapshotsError" class="error" role="alert">{{ 'review.snapshotsError' | translate }}</p>
+    <p *ngIf="!loadingSnapshots && !upcomingSnapshots.length">{{ 'review.noUpcoming' | translate }}</p>
+    <article *ngFor="let snapshot of upcomingSnapshots" class="snapshot">
+      <strong>{{ 'review.match' | translate }} #{{ snapshot.context.matchId || '—' }}</strong> · {{ snapshot.context.matchDate | date:'dd.MM.yyyy HH:mm' }}
+      <p><span class="badge" [class.incomplete]="!snapshot.isComplete">{{ (snapshot.isComplete ? 'review.complete' : 'review.incomplete') | translate }}</span> {{ 'review.recorded' | translate }} {{ snapshot.recordedAt | date:'dd.MM.yyyy HH:mm' }}</p>
+      <p *ngIf="snapshot.missingFields.length">{{ 'review.missing' | translate }}: <span *ngFor="let field of snapshot.missingFields; let last = last">{{ 'review.context.' + field | translate }}{{ last ? '' : ', ' }}</span></p>
+      <p *ngIf="snapshot.isComplete && !snapshot.predictedRatings" class="notice">{{ 'review.legacyHint' | translate }}</p>
+    </article>
+    <p class="muted" *ngIf="historicalSnapshotCount">{{ 'review.archived' | translate:{count: historicalSnapshotCount} }}</p>
+  </section>
+</section>

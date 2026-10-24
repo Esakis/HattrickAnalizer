@@ -42,6 +42,7 @@ public class TeamController : ControllerBase
     [HttpGet("next-opponent")]
     public async Task<IActionResult> GetNextOpponent()
     {
+        if (_hattrickApi.MockMode) return Ok(await _hattrickApi.GetNextOpponentAsync(MockChppData.TeamId));
         var sessionId = Request.Cookies["ht_session"] ?? "";
         var stored = _tokenStore.Get(sessionId);
         if (stored == null || stored.OwnTeamId == 0)
@@ -54,6 +55,15 @@ public class TeamController : ControllerBase
             return NotFound(new { error = "Brak nadchodzących meczów." });
         }
         return Ok(info);
+    }
+
+    [HttpGet("upcoming-matches")]
+    public async Task<IActionResult> GetUpcomingMatches()
+    {
+        var teamId = _hattrickApi.MockMode ? MockChppData.TeamId
+            : _tokenStore.Get(Request.Cookies["ht_session"] ?? "")?.OwnTeamId ?? 0;
+        if (teamId <= 0) return Unauthorized(new { error = "Authorize your Hattrick team first." });
+        return Ok(await _hattrickApi.GetUpcomingMatchesAsync(teamId));
     }
 
     // Raport skauta: agregacja ostatnich meczów dowolnej drużyny (formacja, taktyka,

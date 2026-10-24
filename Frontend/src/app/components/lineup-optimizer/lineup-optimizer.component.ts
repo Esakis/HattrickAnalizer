@@ -1,4 +1,5 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, Optional } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { Subject, Subscription } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { HattrickApiService } from '../../services/hattrick-api.service';
@@ -7,6 +8,9 @@ import { TranslateService } from '@ngx-translate/core';
 import { DataCacheService } from '../../services/data-cache.service';
 import { Player } from '../../models/player.model';
 import { OpponentScoutReport, ScoutLikelyStarter } from '../../models/opponent-scout.model';
+import { MatchPlanService, rosterFingerprint, teamContextFingerprint } from '../../services/match-plan.service';
+import { NextOpponent } from '../../services/data-cache.service';
+import { trainingMatchKind } from '../../services/weekly-plan.service';
 
 @Component({
   selector: 'app-lineup-optimizer',
@@ -38,6 +42,30 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   private resultTeamContext = '';
 
   result: OptimizerResponse | null = null;
+  referenceResult: OptimizerResponse | null = null;
+  requiredPlayerIds: number[] = [];
+  excludedPlayerIds: number[] = [];
+  lockedPositions: { [slot: string]: number } = {};
+  readonly lockSlots = ['GK','RWB','RCD','CD','LCD','LWB','RW','RIM','IM','LIM','LW','RFW','FW','LFW'];
+  private queryOpponentId = 0;
+  private restoredPlanKey = '';
+  private lastObservedTeamContext = '';
+  get teamContextKey(): string { return teamContextFingerprint(this.cache.ownTeam$.value); }
+  storageWarning = false;
+  upcomingMatches: NextOpponent[] = [];
+  selectedMatchId = 0;
+  private queryTrainingMatch = '';
+  private queryMatchId = 0;
+  private queryMatchDate = '';
+  private upcomingLoadedFor = 0;
+  get nextMatch(): NextOpponent | null {
+    if (this.cache.matchSelectionExplicit) return this.cache.selectedMatch$.value;
+    if (this.cache.selectedMatch$.value) return this.cache.selectedMatch$.value;
+    if (this.queryTrainingMatch || this.queryMatchId) return null;
+    return this.cache.nextOpponent$.value;
+  }
+  get isTrainingDraft(): boolean { return !!this.queryTrainingMatch && !this.nextMatch; }
+  get mockMode(): boolean { return !!this.cache.auth$.value.mockMode; }
   loading: boolean = false;
   error: string | null = null;
 
@@ -109,19 +137,39 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   constructor(
     private hattrickApi: HattrickApiService,
     private translate: TranslateService,
-    private cache: DataCacheService
+    private cache: DataCacheService,
+    private plans: MatchPlanService = new MatchPlanService(),
+    @Optional() private route: ActivatedRoute = null!
   ) {}
 
   ngOnInit(): void {
     this.initializeTranslations();
     this.translate.onLangChange.pipe(takeUntil(this.destroy$)).subscribe(() => {
       this.initializeTranslations();
-      this.onOptimizerInputChange();
     });
     this.translate.onTranslationChange.pipe(takeUntil(this.destroy$)).subscribe(() => this.initializeTranslations());
 
     this.restoreFromCache();
-    this.cache.optimizerResult$.next(null);
+    const query = this.route?.snapshot.queryParamMap;
+    this.queryOpponentId = Number(query?.get('opponentId')) || 0;
+    this.queryTrainingMatch = query?.get('trainingMatch') ?? '';
+    this.queryMatchId = Number(query?.get('matchId')) || 0;
+    this.queryMatchDate = query?.get('trainingMatchDate') ?? '';
+    if (this.queryTrainingMatch || this.queryMatchId || (this.queryOpponentId && this.cache.selectedMatch$.value?.opponentTeamId !== this.queryOpponentId)) {
+      this.cache.selectedMatch$.next(null); this.cache.matchSelectionExplicit = false;
+    }
+    if (this.queryOpponentId) this.opponentTeamId = this.queryOpponentId;
+    if (query?.has('traineeIds')) this.requiredPlayerIds = (query.get('traineeIds') ?? '').split(',').map(Number).filter(id => id > 0);
+    try { this.lockedPositions = JSON.parse(query?.get('lockedPositions') || '{}'); } catch { this.lockedPositions = {}; }
+    this.cache.ownTeam$.pipe(takeUntil(this.destroy$)).subscribe(team => {
+      if (!team || team.teamId !== this.myTeamId) return;
+      const changed = this.myTeamPlayers.length && rosterFingerprint(team.players) !== rosterFingerprint(this.myTeamPlayers);
+      const contextChanged = !!this.lastObservedTeamContext && this.lastObservedTeamContext !== teamContextFingerprint(team);
+      this.lastObservedTeamContext = teamContextFingerprint(team);
+      this.myTeamPlayers = team.players;
+      if (contextChanged) { this.teamSpiritLevel = team.teamSpiritLevel ?? null; this.confidenceLevel = team.confidenceLevel ?? null; }
+      if (changed || contextChanged) this.onOptimizerInputChange();
+    });
 
     this.cache.auth$.pipe(takeUntil(this.destroy$)).subscribe(auth => {
       if (auth.authorized && auth.ownTeamId) {
@@ -137,6 +185,8 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
         }
         this.loadMyTeam();
         this.loadMyTeamStats();
+        this.loadUpcomingMatches();
+        this.tryRestorePlan();
       }
     });
     this.cache.nextOpponent$.pipe(takeUntil(this.destroy$)).subscribe(opp => {
@@ -144,7 +194,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       if (this.lastNextOpponentContext && opponentContext !== this.lastNextOpponentContext) this.invalidateTeamContext();
       this.lastNextOpponentContext = opponentContext;
       const cachedOpponentId = this.cache.opponentTeam$.value?.teamId;
-      if (opp?.opponentTeamId && this.opponentTeamId !== opp.opponentTeamId
+      if (!this.queryOpponentId && !this.queryTrainingMatch && !this.cache.selectedMatch$.value && opp?.opponentTeamId && this.opponentTeamId !== opp.opponentTeamId
         && (!this.opponentTeamId || this.opponentTeamId === this.lastLoadedOpponentId || this.opponentTeamId === cachedOpponentId)) {
         this.opponentTeamId = opp.opponentTeamId;
         this.lastLoadedOpponentId = null;
@@ -156,12 +206,13 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
         this.cache.opponentTeamStats$.next(null);
         this.cache.opponentOptimalLineup$.next(null);
       }
-      if (this.opponentTeamId && opp?.opponentTeamId !== this.opponentTeamId) this.invalidateTeamContext();
+      if (!this.cache.selectedMatch$.value && !this.queryTrainingMatch && this.opponentTeamId && opp?.opponentTeamId !== this.opponentTeamId) this.invalidateTeamContext();
       if (opp?.opponentTeamId) {
         if (!this.opponentTeamId) this.opponentTeamId = opp.opponentTeamId;
         this.loadOpponentTeam();
         this.loadOpponentTeamStats();
         this.loadOpponentScout();
+        this.tryRestorePlan();
       }
     });
   }
@@ -169,6 +220,123 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  private loadUpcomingMatches(): void {
+    if (!this.myTeamId || this.upcomingLoadedFor === this.myTeamId) return;
+    this.upcomingLoadedFor = this.myTeamId;
+    this.hattrickApi.getUpcomingMatches().pipe(takeUntil(this.destroy$)).subscribe({
+      next: matches => {
+        this.upcomingMatches = matches;
+        const chosen = this.queryMatchId ? matches.find(m => m.matchId === this.queryMatchId)
+          : this.queryTrainingMatch ? matches.find(m => trainingMatchKind(m.matchType) === this.queryTrainingMatch
+            && !!m.matchDate && !!this.queryMatchDate && Math.abs(Date.parse(m.matchDate) - Date.parse(this.queryMatchDate)) < 60000)
+          : this.cache.matchSelectionExplicit ? matches.find(m => m.matchId === this.cache.selectedMatch$.value?.matchId)
+          : matches.find(m => !this.queryOpponentId || m.opponentTeamId === this.queryOpponentId);
+        if (chosen) this.selectUpcomingMatch(chosen.matchId);
+        else if (this.queryTrainingMatch || this.queryMatchId) { this.selectedMatchId = 0; this.cache.selectedMatch$.next(null); this.onOptimizerInputChange(); }
+      },
+      error: () => { this.upcomingLoadedFor = 0; }
+    });
+  }
+
+  selectUpcomingMatch(matchId: number): void {
+    const selected = this.upcomingMatches.find(m => m.matchId === Number(matchId)) ?? null;
+    const previous = this.nextMatch;
+    this.selectedMatchId = selected?.matchId ?? 0;
+    this.cache.matchSelectionExplicit = true;
+    this.cache.selectedMatch$.next(selected);
+    if (!selected) { this.onOptimizerInputChange(); return; }
+    const changed = previous?.matchId !== selected.matchId || this.opponentTeamId !== selected.opponentTeamId
+      || previous?.matchDate !== selected.matchDate || previous?.isHomeMatch !== selected.isHomeMatch;
+    if (changed) { this.result = null; this.referenceResult = null; this.restoredPlanKey = ''; this.onOptimizerInputChange(); }
+    if (this.opponentTeamId !== selected.opponentTeamId) {
+      this.opponentTeamId = selected.opponentTeamId;
+      this.lastLoadedOpponentId = null; this.opponentScout = null; this.opponentTeamStats = null;
+      this.opponentTeamPlayers = [];
+      this.cache.opponentTeam$.next(null); this.cache.opponentPlayers$.next(null); this.cache.opponentScout$.next(null);
+      this.cache.opponentTeamStats$.next(null);
+    }
+    this.loadOpponentTeam(); this.loadOpponentTeamStats(); this.loadOpponentScout(); this.tryRestorePlan();
+  }
+
+  private tryRestorePlan(): void {
+    if (this.result || !this.myTeamPlayers.length || !this.opponentTeamId) return;
+    const next = this.nextMatch;
+    const matchId = next?.opponentTeamId === this.opponentTeamId ? next.matchId : 0;
+    const key = `${this.myTeamId}:${matchId}:${this.opponentTeamId}`;
+    if (this.restoredPlanKey === key) return;
+    const plan = this.plans.getPlan(this.myTeamId, matchId, this.opponentTeamId);
+    if (!plan?.result.inputSnapshot) return;
+    this.restoredPlanKey = key;
+    const input = plan.result.inputSnapshot;
+    this.selectedMyFormation = input.preferredFormation ?? 'Auto';
+    this.selectedMyTactic = input.preferredTactic;
+    this.teamAttitude = input.teamAttitude;
+    this.coachType = input.coachType;
+    this.assistantManagerLevel = input.assistantManagerLevel;
+    const contextMatches = plan.teamContextKey === this.teamContextKey;
+    this.teamSpiritLevel = contextMatches ? input.teamSpiritLevel ?? null : this.cache.ownTeam$.value?.teamSpiritLevel ?? null;
+    this.confidenceLevel = contextMatches ? input.confidenceLevel ?? null : this.cache.ownTeam$.value?.confidenceLevel ?? null;
+    this.objective = input.objective;
+    this.formationExperience = this.sanitizeFormationExperience(input.formationExperience);
+    if (!this.route?.snapshot.queryParamMap.has('traineeIds')) this.requiredPlayerIds = input.requiredPlayerIds ?? [];
+    this.excludedPlayerIds = (input.excludedPlayerIds ?? []).filter(id => !this.requiredPlayerIds.includes(id) && !Object.values(this.lockedPositions).includes(id));
+    if (!this.route?.snapshot.queryParamMap.has('lockedPositions')) this.lockedPositions = input.lockedPositions ?? {};
+    this.result = plan.result;
+    this.referenceResult = plan.referenceResult ?? plan.result;
+    this.selectedAlternative = Math.min(plan.selectedAlternative, Math.max(0, plan.result.alternatives.length - 1));
+    this.resultGeneratedAt = plan.result.generatedAt ?? plan.savedAt;
+    this.resultTeamContext = this.currentTeamContext();
+    this.resultStale = plan.rosterFingerprint !== rosterFingerprint(this.myTeamPlayers)
+      || plan.teamContextKey !== this.teamContextKey
+      || !!(matchId && (Date.parse(input.matchDate ?? '') !== Date.parse(next?.matchDate ?? '') || input.isHomeMatch !== next?.isHomeMatch))
+      || !!(plan.matchDate && new Date(plan.matchDate).getTime() <= Date.now())
+      || !!this.route?.snapshot.queryParamMap.has('traineeIds');
+    this.resultStaleReason = this.resultStale ? this.translate.instant('workbench.restoredStale') : null;
+    this.cache.optimizerResult$.next(this.resultStale ? null : this.result);
+  }
+
+  togglePlayer(id: number, kind: 'required' | 'excluded', checked: boolean): void {
+    const values = kind === 'required' ? this.requiredPlayerIds : this.excludedPlayerIds;
+    const updated = checked ? [...new Set([...values, id])] : values.filter(x => x !== id);
+    if (kind === 'required') {
+      this.requiredPlayerIds = updated;
+      if (checked) this.excludedPlayerIds = this.excludedPlayerIds.filter(x => x !== id);
+    } else {
+      this.excludedPlayerIds = updated;
+      if (checked) {
+        this.requiredPlayerIds = this.requiredPlayerIds.filter(x => x !== id);
+        for (const slot of Object.keys(this.lockedPositions)) if (this.lockedPositions[slot] === id) delete this.lockedPositions[slot];
+      }
+    }
+    this.onOptimizerInputChange();
+  }
+
+  lockPlayer(slot: string, id: number): void {
+    if (id) this.lockedPositions[slot] = Number(id); else delete this.lockedPositions[slot];
+    this.onOptimizerInputChange();
+  }
+
+  applyManualResponse(response: OptimizerResponse): void {
+    this.referenceResult ??= this.result;
+    this.result = response;
+    this.selectedAlternative = 0;
+    this.resultStale = false;
+    this.resultGeneratedAt = response.generatedAt ?? new Date().toISOString();
+    this.resultTeamContext = this.currentTeamContext();
+    this.cache.optimizerResult$.next(response);
+    this.saveDraft();
+  }
+
+  private saveDraft(): void {
+    if (!this.result?.inputSnapshot || this.resultStale) return;
+    const input = this.result.inputSnapshot;
+    const previous = this.plans.getPlan(this.myTeamId, input.matchId ?? 0, this.opponentTeamId);
+    this.storageWarning = !this.plans.save({ teamId: this.myTeamId, matchId: input.matchId ?? 0,
+      opponentTeamId: this.opponentTeamId, matchDate: input.matchDate, savedAt: new Date().toISOString(),
+      label: this.myTeamName, result: this.result, selectedAlternative: this.selectedAlternative,
+      rosterFingerprint: rosterFingerprint(this.myTeamPlayers), teamContextKey: this.teamContextKey, status: 'draft', referenceResult: this.referenceResult ?? this.result, orders: previous?.orders });
   }
 
   private restoreFromCache(): void {
@@ -192,6 +360,8 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       this.myTeamName = cachedOwn.teamName;
       this.myTeamPlayers = cachedOwn.players;
       this.lastLoadedMyTeamId = cachedOwn.teamId;
+      this.teamSpiritLevel = cachedOwn.teamSpiritLevel ?? null;
+      this.confidenceLevel = cachedOwn.confidenceLevel ?? null;
     }
 
     const cachedOpponentTeam = this.cache.opponentTeam$.value;
@@ -199,7 +369,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       this.opponentTeamId = cachedOpponentTeam.teamId;
       this.opponentTeamName = cachedOpponentTeam.teamName;
     } else {
-      const nextOpp = this.cache.nextOpponent$.value;
+      const nextOpp = this.nextMatch;
       if (nextOpp?.opponentTeamId) {
         this.opponentTeamId = nextOpp.opponentTeamId;
         this.opponentTeamName = nextOpp.opponentTeamName;
@@ -345,6 +515,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       next: (response) => {
         if (requestId !== this.optimizeSequence || !this.sameContext(request, this.createRequestSnapshot())) return;
         this.result = response;
+        this.referenceResult = response;
         this.selectedAlternative = 0;
         this.loading = false;
         this.resultStale = false;
@@ -353,10 +524,11 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
         this.resultTeamContext = this.currentTeamContext();
         this.cache.optimizerResult$.next(response);
         this.persistUiState();
+        this.saveDraft();
       },
       error: (err) => {
         if (requestId !== this.optimizeSequence) return;
-        this.error = this.translate.instant('optimizer.errorOptimizing') + err.message;
+        this.error = this.translate.instant('optimizer.errorOptimizing') + (err?.error?.error ?? err.message);
         this.loading = false;
       }
     });
@@ -457,7 +629,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     return [...new Set(warnings)].map(w => {
       const entry = translations.find(([prefix]) => w.startsWith(prefix));
       return entry ? this.translate.instant(`optimizer.warnings.${entry[1]}`)
-        : this.translate.currentLang === 'pl' ? this.translate.instant('optimizer.warnings.additional') : w;
+        : w;
     });
   }
 
@@ -491,7 +663,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   }
 
   private createRequestSnapshot(): OptimizerRequest {
-    const nextOpp = this.cache.nextOpponent$.value;
+    const nextOpp = this.nextMatch;
     const isNextOpponent = nextOpp?.opponentTeamId === this.opponentTeamId;
     return {
       myTeamId: Number(this.myTeamId), opponentTeamId: Number(this.opponentTeamId),
@@ -499,6 +671,8 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       coachType: this.coachType, assistantManagerLevel: this.assistantManagerLevel,
       teamSpiritLevel: this.teamSpiritLevel, confidenceLevel: this.confidenceLevel, objective: this.objective,
       formationExperience: this.sanitizeFormationExperience(this.formationExperience), preferredFormation: this.selectedMyFormation,
+      requiredPlayerIds: [...this.requiredPlayerIds], excludedPlayerIds: [...this.excludedPlayerIds],
+      lockedPositions: { ...this.lockedPositions },
       language: this.translate.currentLang || 'pl', matchId: isNextOpponent ? nextOpp!.matchId : 0,
       isHomeMatch: isNextOpponent ? !!nextOpp!.isHomeMatch : false,
       matchDate: isNextOpponent ? nextOpp!.matchDate : undefined
@@ -506,7 +680,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   }
 
   private sameContext(a: OptimizerRequest, b: OptimizerRequest): boolean {
-    return JSON.stringify(a) === JSON.stringify(b);
+    return JSON.stringify({ ...a, language: '' }) === JSON.stringify({ ...b, language: '' });
   }
 
   onOptimizerInputChange(): void {
@@ -524,7 +698,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   private currentTeamContext(): string {
     const own = this.myTeamPlayers.map(p => p.playerId).sort((a, b) => a - b).join(',');
     const scout = this.opponentScout?.likelyStarters.map(s => `${s.playerId}:${s.slot}:${s.appearances}`).sort().join(',') ?? '';
-    const next = this.cache.nextOpponent$.value;
+    const next = this.nextMatch;
     return `${this.myTeamId}|${this.opponentTeamId}|${own}|${scout}|${next?.matchId ?? 0}|${next?.isHomeMatch ?? false}`;
   }
 
@@ -582,6 +756,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   selectAlternative(index: number): void {
     this.selectedAlternative = index;
     this.persistUiState();
+    this.saveDraft();
   }
 
   getPositionLabel(position: string): string {
@@ -614,6 +789,10 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       'DF': this.translate.instant('optimizer.positions.DF') || 'DF'
     };
     return labels[position] || position;
+  }
+
+  getBehaviourLabel(behaviour: string, slot: string): string {
+    return this.translate.instant('workbench.behaviours.' + (behaviour === slot ? 'normal' : behaviour));
   }
 
   getPositionDescription(position: string): string {
@@ -662,6 +841,8 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
         if (teamId !== Number(this.myTeamId)) return;
         this.myTeamPlayers = team.players;
         this.myTeamName = team.teamName;
+        this.teamSpiritLevel = team.teamSpiritLevel ?? null;
+        this.confidenceLevel = team.confidenceLevel ?? null;
         this.lastLoadedMyTeamId = this.myTeamId;
         this.loadingMyTeam = false;
         this.cache.ownTeam$.next(team);
@@ -670,6 +851,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
         this.generatePlayerStats();
         // Pobierz doświadczenie formacji
         this.loadFormationExperience();
+        this.tryRestorePlan();
       },
       error: () => {
         if (teamId !== Number(this.myTeamId)) return;
@@ -836,7 +1018,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   ordersError: string | null = null;
 
   get canSendOrders(): boolean {
-    const nextOpp = this.cache.nextOpponent$.value;
+    const nextOpp = this.nextMatch;
     return !this.resultStale && !!this.displayedLineup?.positions
       && !!nextOpp?.matchId
       && nextOpp.opponentTeamId === this.opponentTeamId
@@ -844,7 +1026,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   }
 
   sendLineupToHattrick(): void {
-    const nextOpp = this.cache.nextOpponent$.value;
+    const nextOpp = this.nextMatch;
     if (!this.canSendOrders || !nextOpp) return;
     const lineup = this.displayedLineup;
     if (!lineup) return;

@@ -3,11 +3,10 @@ import { BrowserModule } from '@angular/platform-browser';
 import { HttpClientModule, HttpClient, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
-import { Observable } from 'rxjs';
+import { Observable, forkJoin, map } from 'rxjs';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
-import { LineupOptimizerComponent } from './components/lineup-optimizer/lineup-optimizer.component';
 import { LoadStatusSidebarComponent } from './components/load-status-sidebar/load-status-sidebar.component';
 import { CredentialsInterceptor } from './interceptors/credentials.interceptor';
 import { ErrorInterceptor } from './interceptors/error.interceptor';
@@ -16,7 +15,12 @@ export class CustomTranslateLoader implements TranslateLoader {
   constructor(private http: HttpClient) {}
 
   getTranslation(lang: string): Observable<any> {
-    return this.http.get(`/assets/i18nCS/${lang}.json`);
+    return forkJoin([
+      this.http.get(`/assets/i18nCS/${lang}.json`),
+      this.http.get(`/assets/i18nCS/workbench.${lang}.json`),
+      this.http.get(`/assets/i18nCS/planning.${lang}.json`),
+      this.http.get(`/assets/i18nCS/history.${lang}.json`)
+    ]).pipe(map(parts => Object.assign({}, ...parts)));
   }
 }
 
@@ -27,7 +31,6 @@ export function HttpLoaderFactory(http: HttpClient) {
 @NgModule({
   declarations: [
     AppComponent,
-    LineupOptimizerComponent,
     LoadStatusSidebarComponent,
   ],
   imports: [

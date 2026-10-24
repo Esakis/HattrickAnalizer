@@ -1,247 +1,201 @@
+﻿using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using HattrickAnalizer.Models;
 
 namespace HattrickAnalizer.Services;
 
-public record PlayerChangeResult(int PlayerId, string PlayerName, bool Changed, List<string> ChangedFields);
+public record PlayerFieldChange(string Field, double Previous, double Current);
+public record PlayerChangeResult(int PlayerId, string PlayerName, bool Changed, List<string> ChangedFields)
+{
+    public int TeamId { get; init; }
+    public DateTimeOffset RecordedAt { get; init; }
+    public bool FirstSnapshot { get; init; }
+    public List<PlayerFieldChange> Fields { get; init; } = new();
+    public List<string> Warnings { get; init; } = new();
+}
 
+/// <summary>Atomic per-team durable history; existing SQL rows are imported when available.</summary>
 public class PlayerHistoryService
 {
-    private readonly string _connectionString;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
+    private readonly string _root;
+    private readonly string? _connectionString;
+    private readonly ILogger<PlayerHistoryService> _logger;
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly HashSet<int> _importedTeams = new();
+    private DateTimeOffset _sqlRetryAfter;
 
-    public PlayerHistoryService(IConfiguration configuration)
+    public PlayerHistoryService(IConfiguration configuration, IWebHostEnvironment environment, ILogger<PlayerHistoryService> logger)
     {
-        _connectionString = configuration.GetConnectionString("HattrickDb")
-            ?? throw new InvalidOperationException(
-                "Brak connection stringa 'HattrickDb' w konfiguracji (ConnectionStrings:HattrickDb) — historia zawodników wymaga bazy SQL.");
-    }
-
-    private async Task<PlayerSkillHistory?> GetLastSnapshotAsync(SqlConnection conn, int playerId)
-    {
-        const string sql = """
-            SELECT TOP 1
-                Id, PlayerId, TeamId, RecordedDate,
-                Keeper, Defending, Playmaking, Winger, Passing, Scoring, SetPieces,
-                Form, Stamina, Age, TSI, Experience, Loyalty, Leadership, InjuryLevel,
-                TotalMatches, Goals, Assists, YellowCards, RedCards, AverageRating, AverageForm, MinutesPlayed
-            FROM PlayerSkillHistory
-            WHERE PlayerId = @pid
-            ORDER BY RecordedDate DESC
-            """;
-
-        await using var cmd = new SqlCommand(sql, conn);
-        cmd.Parameters.AddWithValue("@pid", playerId);
-        await using var r = await cmd.ExecuteReaderAsync();
-        if (!await r.ReadAsync()) return null;
-
-        return new PlayerSkillHistory
+        _connectionString = configuration.GetConnectionString("HattrickDb");
+        _logger = logger;
+        var configured = configuration["PlayerHistory:StoragePath"];
+        _root = Path.GetFullPath(string.IsNullOrWhiteSpace(configured)
+            ? Path.Combine(environment.ContentRootPath, "App_Data", "player-history")
+            : Path.IsPathRooted(configured) ? configured : Path.Combine(environment.ContentRootPath, configured));
+        if (configuration.GetValue<bool>("UseMockData"))
         {
-            Id           = r.GetInt32(0),
-            PlayerId     = r.GetInt32(1),
-            TeamId       = r.GetInt32(2),
-            RecordedDate = r.GetDateTime(3),
-            Keeper       = r.GetInt32(4),
-            Defending    = r.GetInt32(5),
-            Playmaking   = r.GetInt32(6),
-            Winger       = r.GetInt32(7),
-            Passing      = r.GetInt32(8),
-            Scoring      = r.GetInt32(9),
-            SetPieces    = r.GetInt32(10),
-            Form         = r.GetInt32(11),
-            Stamina      = r.GetInt32(12),
-            Age          = r.GetInt32(13),
-            TSI          = r.GetInt32(14),
-            Experience   = r.GetInt32(15),
-            Loyalty      = r.GetInt32(16),
-            Leadership   = r.GetInt32(17),
-            InjuryLevel  = r.GetInt32(18),
-            TotalMatches = r.GetInt32(19),
-            Goals        = r.GetInt32(20),
-            Assists      = r.GetInt32(21),
-            YellowCards  = r.GetInt32(22),
-            RedCards     = r.GetInt32(23),
-            AverageRating = r.GetDouble(24),
-            AverageForm  = r.GetDouble(25),
-            MinutesPlayed = r.GetInt32(26)
-        };
-    }
-
-    private static List<string> FindChanges(PlayerSkillHistory last, Player p)
-    {
-        var c = new List<string>();
-        var s = p.Skills;
-        var m = p.MatchStats;
-
-        if (last.Keeper      != s.Keeper)      c.Add($"Bramkarz: {last.Keeper}→{s.Keeper}");
-        if (last.Defending   != s.Defending)   c.Add($"Obrona: {last.Defending}→{s.Defending}");
-        if (last.Playmaking  != s.Playmaking)  c.Add($"Rozgrywanie: {last.Playmaking}→{s.Playmaking}");
-        if (last.Winger      != s.Winger)      c.Add($"Skrzydło: {last.Winger}→{s.Winger}");
-        if (last.Passing     != s.Passing)     c.Add($"Podania: {last.Passing}→{s.Passing}");
-        if (last.Scoring     != s.Scoring)     c.Add($"Skuteczność: {last.Scoring}→{s.Scoring}");
-        if (last.SetPieces   != s.SetPieces)   c.Add($"Stałe fr.: {last.SetPieces}→{s.SetPieces}");
-        if (last.Form        != p.Form)        c.Add($"Forma: {last.Form}→{p.Form}");
-        if (last.Stamina     != p.Stamina)     c.Add($"Kondycja: {last.Stamina}→{p.Stamina}");
-        if (last.Age         != p.Age)         c.Add($"Wiek: {last.Age}→{p.Age}");
-        if (last.TSI         != p.TSI)         c.Add($"TSI: {last.TSI}→{p.TSI}");
-        if (last.Experience  != p.Experience)  c.Add($"Doświadczenie: {last.Experience}→{p.Experience}");
-        if (last.Loyalty     != p.Loyalty)     c.Add($"Lojalność: {last.Loyalty}→{p.Loyalty}");
-        if (last.Leadership  != p.Leadership)  c.Add($"Przywództwo: {last.Leadership}→{p.Leadership}");
-        if (last.InjuryLevel != p.InjuryLevel) c.Add($"Kontuzja: {last.InjuryLevel}→{p.InjuryLevel}");
-
-        if (m != null)
-        {
-            if (last.TotalMatches  != m.TotalMatches)  c.Add($"Mecze: {last.TotalMatches}→{m.TotalMatches}");
-            if (last.Goals         != m.Goals)         c.Add($"Gole: {last.Goals}→{m.Goals}");
-            if (last.Assists       != m.Assists)       c.Add($"Asysty: {last.Assists}→{m.Assists}");
-            if (last.YellowCards   != m.YellowCards)   c.Add($"Żółte kartki: {last.YellowCards}→{m.YellowCards}");
-            if (last.RedCards      != m.RedCards)      c.Add($"Czerwone kartki: {last.RedCards}→{m.RedCards}");
-            if (Math.Abs(last.AverageRating - m.AverageRating) > 0.01) c.Add($"Śr. ocena: {last.AverageRating:F2}→{m.AverageRating:F2}");
-            if (Math.Abs(last.AverageForm   - m.AverageForm)   > 0.01) c.Add($"Śr. forma: {last.AverageForm:F2}→{m.AverageForm:F2}");
-            if (last.MinutesPlayed != m.MinutesPlayed) c.Add($"Minuty: {last.MinutesPlayed}→{m.MinutesPlayed}");
+            _root = Path.Combine(_root, "demo");
+            _connectionString = null;
         }
-
-        return c;
-    }
-
-    private async Task InsertSnapshotAsync(SqlConnection conn, Player p, int teamId)
-    {
-        var m = p.MatchStats;
-        const string sql = """
-            INSERT INTO PlayerSkillHistory (
-                PlayerId, TeamId, RecordedDate,
-                Keeper, Defending, Playmaking, Winger, Passing, Scoring, SetPieces,
-                Form, Stamina, Age, TSI, Experience, Loyalty, Leadership, InjuryLevel,
-                TotalMatches, Goals, Assists, YellowCards, RedCards, AverageRating, AverageForm, MinutesPlayed
-            ) VALUES (
-                @pid, @tid, @date,
-                @keeper, @defending, @playmaking, @winger, @passing, @scoring, @setPieces,
-                @form, @stamina, @age, @tsi, @experience, @loyalty, @leadership, @injuryLevel,
-                @totalMatches, @goals, @assists, @yellowCards, @redCards, @averageRating, @averageForm, @minutesPlayed
-            )
-            """;
-
-        await using var cmd = new SqlCommand(sql, conn);
-        cmd.Parameters.AddWithValue("@pid",           p.PlayerId);
-        cmd.Parameters.AddWithValue("@tid",           teamId);
-        cmd.Parameters.AddWithValue("@date",          DateTime.UtcNow.Date);
-        cmd.Parameters.AddWithValue("@keeper",        p.Skills.Keeper);
-        cmd.Parameters.AddWithValue("@defending",     p.Skills.Defending);
-        cmd.Parameters.AddWithValue("@playmaking",    p.Skills.Playmaking);
-        cmd.Parameters.AddWithValue("@winger",        p.Skills.Winger);
-        cmd.Parameters.AddWithValue("@passing",       p.Skills.Passing);
-        cmd.Parameters.AddWithValue("@scoring",       p.Skills.Scoring);
-        cmd.Parameters.AddWithValue("@setPieces",     p.Skills.SetPieces);
-        cmd.Parameters.AddWithValue("@form",          p.Form);
-        cmd.Parameters.AddWithValue("@stamina",       p.Stamina);
-        cmd.Parameters.AddWithValue("@age",           p.Age);
-        cmd.Parameters.AddWithValue("@tsi",           p.TSI);
-        cmd.Parameters.AddWithValue("@experience",    p.Experience);
-        cmd.Parameters.AddWithValue("@loyalty",       p.Loyalty);
-        cmd.Parameters.AddWithValue("@leadership",    p.Leadership);
-        cmd.Parameters.AddWithValue("@injuryLevel",   p.InjuryLevel);
-        cmd.Parameters.AddWithValue("@totalMatches",  m?.TotalMatches  ?? 0);
-        cmd.Parameters.AddWithValue("@goals",         m?.Goals         ?? 0);
-        cmd.Parameters.AddWithValue("@assists",       m?.Assists       ?? 0);
-        cmd.Parameters.AddWithValue("@yellowCards",   m?.YellowCards   ?? 0);
-        cmd.Parameters.AddWithValue("@redCards",      m?.RedCards      ?? 0);
-        cmd.Parameters.AddWithValue("@averageRating", m?.AverageRating ?? 0.0);
-        cmd.Parameters.AddWithValue("@averageForm",   m?.AverageForm   ?? 0.0);
-        cmd.Parameters.AddWithValue("@minutesPlayed", m?.MinutesPlayed ?? 0);
-        await cmd.ExecuteNonQueryAsync();
     }
 
     public async Task<List<PlayerChangeResult>> CheckAndSaveChangesAsync(List<Player> players, int teamId)
     {
-        var results = new List<PlayerChangeResult>();
-        await using var conn = new SqlConnection(_connectionString);
-        await conn.OpenAsync();
+        ValidateTeam(teamId);
+        if (players.Any(p => p.PlayerId <= 0) || players.Select(p => p.PlayerId).Distinct().Count() != players.Count)
+            throw new ArgumentException("Player ids must be positive and unique.");
+        await _gate.WaitAsync();
+        try
+        {
+            var data = await LoadAsync(teamId);
+            var results = new List<PlayerChangeResult>();
+            var recordedAt = DateTimeOffset.UtcNow;
+            foreach (var player in players)
+            {
+                var name = $"{player.FirstName} {player.LastName}".Trim();
+                if (!player.SkillsAvailable)
+                {
+                    results.Add(new(player.PlayerId, name, false, new())
+                    {
+                        TeamId = teamId, RecordedAt = recordedAt,
+                        Warnings = new() { "Private skills are incomplete; no snapshot was saved." }
+                    });
+                    continue;
+                }
+                var last = data.Snapshots.Where(s => s.PlayerId == player.PlayerId).OrderByDescending(s => s.RecordedDate).FirstOrDefault();
+                var snapshot = Snapshot(player, teamId, recordedAt.UtcDateTime, last);
+                var fields = last == null ? new List<PlayerFieldChange>() : Differences(last, snapshot);
+                var gainedAvailability = last != null && ((!last.InjuryStatusKnown && snapshot.InjuryStatusKnown)
+                    || (!last.MatchStatsAvailable && snapshot.MatchStatsAvailable));
+                var result = new PlayerChangeResult(player.PlayerId, name, last == null || fields.Count > 0 || gainedAvailability,
+                    fields.Select(f => $"{f.Field}: {f.Previous} → {f.Current}").ToList())
+                {
+                    TeamId = teamId, RecordedAt = recordedAt, FirstSnapshot = last == null, Fields = fields
+                };
+                results.Add(result);
+                if (!result.Changed) continue;
+                snapshot.Id = data.Snapshots.Count == 0 ? 1 : data.Snapshots.Max(s => s.Id) + 1;
+                data.Snapshots.Add(snapshot);
+                data.Changes.Add(result);
+            }
+            await SaveAsync(teamId, data);
+            return results;
+        }
+        finally { _gate.Release(); }
+    }
 
-        foreach (var player in players)
+    public async Task<List<PlayerSkillHistory>> GetPlayerHistoryAsync(int playerId, int teamId)
+    {
+        ValidateTeam(teamId);
+        if (playerId <= 0) throw new ArgumentException("A positive player id is required.");
+        await _gate.WaitAsync();
+        try { return (await LoadAsync(teamId)).Snapshots.Where(s => s.PlayerId == playerId).OrderBy(s => s.RecordedDate).ToList(); }
+        finally { _gate.Release(); }
+    }
+
+    public async Task<List<PlayerChangeResult>> GetRecentChangesAsync(int teamId, int count = 30)
+    {
+        ValidateTeam(teamId);
+        await _gate.WaitAsync();
+        try { return (await LoadAsync(teamId)).Changes.OrderByDescending(c => c.RecordedAt).Take(Math.Clamp(count, 1, 100)).ToList(); }
+        finally { _gate.Release(); }
+    }
+
+    private async Task<HistoryData> LoadAsync(int teamId)
+    {
+        var path = TeamPath(teamId);
+        var data = new HistoryData();
+        if (File.Exists(path))
+        {
+            await using var stream = File.OpenRead(path);
+            data = await JsonSerializer.DeserializeAsync<HistoryData>(stream, JsonOptions) ?? new();
+        }
+        // Do not leak old or manually misfiled records across teams.
+        data.Snapshots.RemoveAll(s => s.TeamId != teamId);
+        data.Changes.RemoveAll(s => s.TeamId != teamId);
+        if (!string.IsNullOrWhiteSpace(_connectionString) && !_importedTeams.Contains(teamId) && DateTimeOffset.UtcNow >= _sqlRetryAfter)
         {
             try
             {
-                var last = await GetLastSnapshotAsync(conn, player.PlayerId);
-                var name = $"{player.FirstName} {player.LastName}";
-
-                if (last == null)
+                var builder = new SqlConnectionStringBuilder(_connectionString) { ConnectTimeout = 2 };
+                await using var connection = new SqlConnection(builder.ConnectionString);
+                await connection.OpenAsync();
+                await using var command = new SqlCommand("SELECT * FROM PlayerSkillHistory WHERE TeamId = @team ORDER BY RecordedDate", connection) { CommandTimeout = 3 };
+                command.Parameters.AddWithValue("@team", teamId);
+                await using var reader = await command.ExecuteReaderAsync();
+                var properties = typeof(PlayerSkillHistory).GetProperties().Where(p => p.CanWrite).ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
+                while (await reader.ReadAsync())
                 {
-                    await InsertSnapshotAsync(conn, player, teamId);
-                    results.Add(new PlayerChangeResult(player.PlayerId, name, true, ["Pierwsze zapisanie zawodnika"]));
-                    continue;
+                    var row = new PlayerSkillHistory();
+                    for (var i = 0; i < reader.FieldCount; i++)
+                    {
+                        if (reader.IsDBNull(i) || !properties.TryGetValue(reader.GetName(i), out var property)) continue;
+                        property.SetValue(row, Convert.ChangeType(reader.GetValue(i), property.PropertyType));
+                    }
+                    row.RecordedDate = DateTime.SpecifyKind(row.RecordedDate, DateTimeKind.Utc);
+                    if (!data.Snapshots.Any(s => s.PlayerId == row.PlayerId && s.RecordedDate == row.RecordedDate)) data.Snapshots.Add(row);
                 }
-
-                var changes = FindChanges(last, player);
-                if (changes.Count > 0)
-                {
-                    await InsertSnapshotAsync(conn, player, teamId);
-                    results.Add(new PlayerChangeResult(player.PlayerId, name, true, changes));
-                }
-                else
-                {
-                    results.Add(new PlayerChangeResult(player.PlayerId, name, false, []));
-                }
+                _importedTeams.Add(teamId);
+                await SaveAsync(teamId, data);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is SqlException or ArgumentException or InvalidOperationException)
             {
-                Console.WriteLine($"[PlayerHistory] Błąd dla zawodnika {player.PlayerId}: {ex.Message}");
+                _sqlRetryAfter = DateTimeOffset.UtcNow.AddMinutes(5);
+                _logger.LogWarning("Legacy SQL history unavailable; durable local history remains active ({ErrorType}).", ex.GetType().Name);
             }
         }
-
-        return results;
+        return data;
     }
 
-    public async Task<List<PlayerSkillHistory>> GetPlayerHistoryAsync(int playerId)
+    private async Task SaveAsync(int teamId, HistoryData data)
     {
-        const string sql = """
-            SELECT
-                Id, PlayerId, TeamId, RecordedDate,
-                Keeper, Defending, Playmaking, Winger, Passing, Scoring, SetPieces,
-                Form, Stamina, Age, TSI, Experience, Loyalty, Leadership, InjuryLevel,
-                TotalMatches, Goals, Assists, YellowCards, RedCards, AverageRating, AverageForm, MinutesPlayed
-            FROM PlayerSkillHistory
-            WHERE PlayerId = @pid
-            ORDER BY RecordedDate ASC
-            """;
-
-        var result = new List<PlayerSkillHistory>();
-        await using var conn = new SqlConnection(_connectionString);
-        await conn.OpenAsync();
-        await using var cmd = new SqlCommand(sql, conn);
-        cmd.Parameters.AddWithValue("@pid", playerId);
-        await using var r = await cmd.ExecuteReaderAsync();
-        while (await r.ReadAsync())
+        Directory.CreateDirectory(_root);
+        var path = TeamPath(teamId);
+        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
         {
-            result.Add(new PlayerSkillHistory
-            {
-                Id            = r.GetInt32(0),
-                PlayerId      = r.GetInt32(1),
-                TeamId        = r.GetInt32(2),
-                RecordedDate  = r.GetDateTime(3),
-                Keeper        = r.GetInt32(4),
-                Defending     = r.GetInt32(5),
-                Playmaking    = r.GetInt32(6),
-                Winger        = r.GetInt32(7),
-                Passing       = r.GetInt32(8),
-                Scoring       = r.GetInt32(9),
-                SetPieces     = r.GetInt32(10),
-                Form          = r.GetInt32(11),
-                Stamina       = r.GetInt32(12),
-                Age           = r.GetInt32(13),
-                TSI           = r.GetInt32(14),
-                Experience    = r.GetInt32(15),
-                Loyalty       = r.GetInt32(16),
-                Leadership    = r.GetInt32(17),
-                InjuryLevel   = r.GetInt32(18),
-                TotalMatches  = r.GetInt32(19),
-                Goals         = r.GetInt32(20),
-                Assists       = r.GetInt32(21),
-                YellowCards   = r.GetInt32(22),
-                RedCards      = r.GetInt32(23),
-                AverageRating = r.GetDouble(24),
-                AverageForm   = r.GetDouble(25),
-                MinutesPlayed = r.GetInt32(26)
-            });
+            await using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.WriteThrough))
+                await JsonSerializer.SerializeAsync(stream, data, JsonOptions);
+            File.Move(temporary, path, true);
         }
-        return result;
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
+
+    private string TeamPath(int teamId) => Path.Combine(_root, $"team-{teamId}.json");
+    private static void ValidateTeam(int teamId) { if (teamId <= 0) throw new ArgumentException("A positive own team id is required."); }
+
+    private static PlayerSkillHistory Snapshot(Player p, int teamId, DateTime recordedAt, PlayerSkillHistory? last) => new()
+    {
+        PlayerId = p.PlayerId, TeamId = teamId, RecordedDate = recordedAt,
+        Keeper = p.Skills.Keeper, Defending = p.Skills.Defending, Playmaking = p.Skills.Playmaking,
+        Winger = p.Skills.Winger, Passing = p.Skills.Passing, Scoring = p.Skills.Scoring, SetPieces = p.Skills.SetPieces,
+        Form = p.Form, Stamina = p.Stamina, Age = p.Age, TSI = p.TSI, Experience = p.Experience,
+        Loyalty = p.Loyalty, Leadership = p.Leadership, InjuryLevel = p.InjuryStatusKnown ? p.InjuryLevel : last?.InjuryLevel ?? -1,
+        InjuryStatusKnown = p.InjuryStatusKnown, MatchStatsAvailable = p.MatchStats != null,
+        TotalMatches = p.MatchStats?.TotalMatches ?? last?.TotalMatches ?? 0,
+        Goals = p.MatchStats?.Goals ?? last?.Goals ?? 0, Assists = p.MatchStats?.Assists ?? last?.Assists ?? 0,
+        YellowCards = p.MatchStats?.YellowCards ?? last?.YellowCards ?? 0, RedCards = p.MatchStats?.RedCards ?? last?.RedCards ?? 0,
+        AverageRating = p.MatchStats?.AverageRating ?? last?.AverageRating ?? 0,
+        AverageForm = p.MatchStats?.AverageForm ?? last?.AverageForm ?? 0,
+        MinutesPlayed = p.MatchStats?.MinutesPlayed ?? last?.MinutesPlayed ?? 0
+    };
+
+    private static List<PlayerFieldChange> Differences(PlayerSkillHistory last, PlayerSkillHistory current)
+    {
+        var fields = new[] { "Keeper", "Defending", "Playmaking", "Winger", "Passing", "Scoring", "SetPieces", "Form", "Stamina", "Age", "TSI", "Experience", "Loyalty", "Leadership" }.ToList();
+        if (last.InjuryStatusKnown && current.InjuryStatusKnown) fields.Add("InjuryLevel");
+        if (last.MatchStatsAvailable && current.MatchStatsAvailable)
+            fields.AddRange(new[] { "TotalMatches", "Goals", "Assists", "YellowCards", "RedCards", "AverageRating", "AverageForm", "MinutesPlayed" });
+        return fields.Select(field => {
+            var property = typeof(PlayerSkillHistory).GetProperty(field)!;
+            return new PlayerFieldChange(field == "TSI" ? "tsi" : char.ToLowerInvariant(field[0]) + field[1..], Convert.ToDouble(property.GetValue(last)), Convert.ToDouble(property.GetValue(current)));
+        }).Where(change => Math.Abs(change.Previous - change.Current) > 0.001).ToList();
+    }
+
+    private sealed class HistoryData
+    {
+        public List<PlayerSkillHistory> Snapshots { get; set; } = new();
+        public List<PlayerChangeResult> Changes { get; set; } = new();
     }
 }

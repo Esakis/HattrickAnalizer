@@ -32,6 +32,8 @@ public class AdvancedLineupOptimizer
     public async Task<OptimizerResponse> OptimizeLineupAsync(OptimizerRequest request)
     {
         ValidateRequest(request);
+        if (request.OpponentRatingScale != 1)
+            throw new ArgumentException("OpponentRatingScale is supported only by manual sensitivity evaluation.");
         var myTeam = await _hattrickApi.GetTeamDetailsAsync(request.MyTeamId);
         // An explicit scenario is fully caller-supplied; otherwise use weighted scout ratings.
         var opponentResult = request.OpponentScenario?.Ratings is { } scenarioRatings
@@ -56,10 +58,84 @@ public class AdvancedLineupOptimizer
     }
 
     /// <summary>Pure roster-to-lineup optimization entry point for deterministic replay and benchmarks.</summary>
+    public async Task<OptimizerResponse> EvaluateLineupAsync(EvaluateLineupRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ValidateRequest(request.Context);
+        var team = await _hattrickApi.GetTeamDetailsAsync(request.Context.MyTeamId);
+        var opponent = request.Context.OpponentScenario?.Ratings is { } ratings
+            ? new OpponentRatingsResult { Ratings = ratings, Source = "explicit scenario ratings" }
+            : await _scout.GetWeightedRatingsAsync(request.Context.OpponentTeamId);
+        MatchWeather? weather = null;
+        if (request.Context.MatchId > 0)
+        {
+            try
+            {
+                weather = await _hattrickApi.GetMatchWeatherAsync(request.Context.IsHomeMatch
+                    ? request.Context.MyTeamId : request.Context.OpponentTeamId, request.Context.MatchDate);
+            }
+            catch (Exception)
+            {
+                // Match the optimizer's policy: unavailable weather stays explicitly unknown.
+            }
+        }
+        return EvaluateRoster(team, opponent, request, weather);
+    }
+
+    /// <summary>Evaluates the caller's exact XI using authoritative roster data, without any search or repair.</summary>
+    public OptimizerResponse EvaluateRoster(Team team, OpponentRatingsResult opponent,
+        EvaluateLineupRequest evaluation, MatchWeather? weather = null)
+    {
+        ArgumentNullException.ThrowIfNull(evaluation);
+        var request = evaluation.Context;
+        ValidateRequest(request);
+        if (!AllTactics.Contains(evaluation.Tactic)) throw new ArgumentException("Tactic is invalid.");
+        var available = GetConstrainedRoster(team, request).ToDictionary(p => p.PlayerId);
+        if (evaluation.Positions is null || evaluation.Positions.Count != 11
+            || evaluation.Positions.Values.Any(p => p is null || !available.ContainsKey(p.PlayerId))
+            || evaluation.Positions.Values.Select(p => p.PlayerId).Distinct().Count() != 11)
+            throw new ArgumentException("Select eleven distinct, available players belonging to your team.");
+        var formation = FormationData.Formations.Values.FirstOrDefault(f => f.Positions.ToHashSet().SetEquals(evaluation.Positions.Keys))
+            ?? throw new ArgumentException("Positions do not form a legal formation.");
+        if (request.PreferredFormation is { Length: > 0 } preferred && preferred != "Auto" && preferred != formation.Name)
+            throw new ArgumentException("The submitted XI does not match the selected formation.");
+        if (evaluation.Positions.Any(p => !BehavioursFor(p.Key).Contains(p.Value.Behaviour)))
+            throw new ArgumentException("A player behaviour is invalid for its position.");
+        var assigned = new AssignedLineup
+        {
+            Formation = formation,
+            Slots = evaluation.Positions.ToDictionary(kv => kv.Key, kv => new AssignedSlot
+            {
+                SlotId = kv.Key, Player = available[kv.Value.PlayerId], Behaviour = kv.Value.Behaviour
+            })
+        };
+        AttachConstraints(assigned, request);
+        if (!WithinAssistantBehaviorLimit(assigned, request.AssistantManagerLevel))
+            throw new ArgumentException("The submitted XI violates a player constraint or the individual-order limit.");
+        var ratings = ScaleOpponentRatings(request.OpponentScenario?.Ratings ?? opponent.Ratings, request.OpponentRatingScale);
+        var context = new MatchContext
+        {
+            IsHomeMatch = request.IsHomeMatch, WeatherId = weather?.WeatherId ?? RatingEngine.WeatherUnknown,
+            TeamSpiritLevel = request.TeamSpiritLevel ?? team.TeamSpiritLevel,
+            ConfidenceLevel = request.ConfidenceLevel ?? team.ConfidenceLevel,
+            OpponentIspAtt = ratings.IndirectSetPiecesAttRating, OpponentIspDef = ratings.IndirectSetPiecesDefRating,
+            OpponentTactic = request.OpponentScenario?.Tactic ?? "Normal", Objective = request.Objective,
+            OpponentRatingsAreObserved = request.OpponentScenario is null && opponent.Source is "scout" or "lastMatch",
+            OpponentHomeBonusAlreadyPresent = request.OpponentScenario is null && opponent.Source == "lastMatch"
+        };
+        var candidate = EvaluateCandidate(formation, evaluation.Tactic, request.TeamAttitude, request.CoachType,
+            assigned, ratings, context, ComputeDisorderRisk(request.FormationExperience.GetValueOrDefault(formation.Name, 5)));
+        var response = BuildResponse(team, opponent, request, weather, context, candidate, new() { candidate }, ratings);
+        response.ModelWarnings.Add("This is the exact manually selected lineup; no players, behaviours or tactics were optimized.");
+        return response;
+    }
+
     public OptimizerResponse OptimizeRoster(Team myTeam, OpponentRatingsResult opponentResult,
         OptimizerRequest request, MatchWeather? weather = null)
     {
         ValidateRequest(request);
+        if (request.OpponentRatingScale != 1)
+            throw new ArgumentException("OpponentRatingScale is supported only by manual sensitivity evaluation.");
         ArgumentNullException.ThrowIfNull(myTeam);
         ArgumentNullException.ThrowIfNull(opponentResult);
         var opponentRatings = request.OpponentScenario?.Ratings ?? opponentResult.Ratings;
@@ -70,7 +146,7 @@ public class AdvancedLineupOptimizer
             OpponentIspAtt = opponentRatings.IndirectSetPiecesAttRating,
             OpponentIspDef = opponentRatings.IndirectSetPiecesDefRating
         };
-        var available = myTeam.Players.Where(p => p.CanOptimize).ToList();
+        var available = GetConstrainedRoster(myTeam, request);
         if (available.Count < 11)
         {
             throw new InvalidOperationException($"Zbyt malo zdrowych graczy ({available.Count}) zeby ulozyc sklad.");
@@ -89,7 +165,9 @@ public class AdvancedLineupOptimizer
 
         OptimizationCandidate? best = null;
         var allCandidates = new List<OptimizationCandidate>();
-        var formationsToTry = ResolveFormationCandidates(request.PreferredFormation);
+        var formationsToTry = ResolveFormationCandidates(request.PreferredFormation)
+            .Where(f => request.LockedPositions.Keys.All(f.Positions.Contains)).ToList();
+        if (formationsToTry.Count == 0) throw new ArgumentException("Locked positions do not fit the selected formation.");
         foreach (var formation in formationsToTry)
         {
             int formExp = request.FormationExperience.GetValueOrDefault(formation.Name, 5);
@@ -101,6 +179,7 @@ public class AdvancedLineupOptimizer
             {
                 var baseLineup = BuildInitialLineup(formation, available.OrderBy(p => p.PlayerId).ToList(), keeperId);
                 if (baseLineup == null) continue;
+                ApplySeedConstraints(baseLineup, available, request);
                 EnforceAssistantBehaviorLimit(baseLineup, request.AssistantManagerLevel);
                 foreach (var tactic in tactics)
                 {
@@ -118,6 +197,7 @@ public class AdvancedLineupOptimizer
                 var incumbent = bestForFormation;
                 var distinctStarts = BuildOpponentAwareSeeds(formation, available, opponentRatings,
                         request.AssistantManagerLevel)
+                    .Select(seed => { var constrained = CloneLineup(seed); ApplySeedConstraints(constrained, available, request); return constrained; })
                     .SelectMany(seed => tactics.Select(tactic => EvaluateCandidate(formation, tactic, attitude, coach,
                         seed, opponentRatings, context, disorderRisk)))
                     .GroupBy(c => AssignmentKey(c.Lineup), StringComparer.Ordinal)
@@ -152,8 +232,17 @@ public class AdvancedLineupOptimizer
             throw new InvalidOperationException("Nie udalo sie zbudowac zadnego skladu.");
         }
 
+        return BuildResponse(myTeam, opponentResult, request, weather, context, best, allCandidates);
+    }
+
+    private OptimizerResponse BuildResponse(Team myTeam, OpponentRatingsResult opponentResult,
+        OptimizerRequest request, MatchWeather? weather, MatchContext context, OptimizationCandidate best,
+        List<OptimizationCandidate> allCandidates, TeamRatings? resolvedOpponentRatings = null)
+    {
+        var opponentRatings = resolvedOpponentRatings ?? request.OpponentScenario?.Ratings ?? opponentResult.Ratings;
         var lineup = BuildFinalLineup(best);
         var returnedEleven = AssignedFromReturnedLineup(lineup, requireEligiblePlayers: true);
+        AttachConstraints(returnedEleven, request);
         if (!WithinAssistantBehaviorLimit(returnedEleven, request.AssistantManagerLevel))
             throw new InvalidOperationException("The optimizer returned an XI above the assistant custom-order limit.");
         var returnedFormation = FormationData.Formations[lineup.Formation!];
@@ -235,13 +324,16 @@ public class AdvancedLineupOptimizer
         ValidateRequest(request);
         ArgumentNullException.ThrowIfNull(team);
         ArgumentNullException.ThrowIfNull(opponentRatings);
-        var available = team.Players.Where(p => p.CanOptimize).OrderBy(p => p.PlayerId).ToList();
+        var available = GetConstrainedRoster(team, request).OrderBy(p => p.PlayerId).ToList();
         if (available.Count < 11) throw new InvalidOperationException("At least eleven eligible players are required.");
-        var formation = ResolveFormationCandidates(request.PreferredFormation).First();
+        var formation = ResolveFormationCandidates(request.PreferredFormation)
+            .FirstOrDefault(f => request.LockedPositions.Keys.All(f.Positions.Contains))
+            ?? throw new ArgumentException("Locked positions do not fit the selected formation.");
         var keeperId = available.OrderByDescending(p => EffectiveSkill(p, p.Skills.Keeper))
             .ThenBy(p => p.PlayerId).Take(2).Select(p => p.PlayerId).First();
         var assigned = BuildInitialLineup(formation, available, keeperId)
             ?? throw new InvalidOperationException("Could not build the legal greedy seed.");
+        ApplySeedConstraints(assigned, available, request);
         EnforceAssistantBehaviorLimit(assigned, request.AssistantManagerLevel);
         var tactic = ResolveTacticCandidates(request.PreferredTactic).First();
         var context = new MatchContext
@@ -266,12 +358,26 @@ public class AdvancedLineupOptimizer
         if (request.AssistantManagerLevel is < 0 or > 5) throw new ArgumentException("AssistantManagerLevel must be 0..5.");
         if (request.TeamSpiritLevel is < 0 or > 10 || request.ConfidenceLevel is < 0 or > 10) throw new ArgumentException("TeamSpiritLevel and ConfidenceLevel must be 0..10.");
         if (request.Objective is not ("ExpectedPoints" or "Win" or "Draw")) throw new ArgumentException("Objective must be ExpectedPoints, Win, or Draw.");
+        if (!double.IsFinite(request.OpponentRatingScale) || request.OpponentRatingScale is < 0.5 or > 1.5)
+            throw new ArgumentException("OpponentRatingScale must be finite and within 0.5..1.5.");
         if (request.TeamAttitude is not ("Normal" or "PIC" or "MOTS")) throw new ArgumentException("TeamAttitude must be Normal, PIC, or MOTS.");
         if (request.CoachType is not ("Neutral" or "Offensive" or "Defensive")) throw new ArgumentException("CoachType must be Neutral, Offensive, or Defensive.");
         if (!string.IsNullOrWhiteSpace(request.PreferredTactic) && request.PreferredTactic != "Auto" && !AllTactics.Contains(request.PreferredTactic)) throw new ArgumentException("PreferredTactic is invalid.");
         if (!string.IsNullOrWhiteSpace(request.PreferredFormation) && request.PreferredFormation != "Auto" && !FormationData.Formations.ContainsKey(request.PreferredFormation)) throw new ArgumentException("PreferredFormation is invalid.");
         if (request.FormationExperience is null || request.FormationExperience.Values.Any(level => level is < 3 or > 10)) throw new ArgumentException("FormationExperience levels must be 3..10.");
         if (request.FocusAreas is null) throw new ArgumentException("FocusAreas must not be null.");
+        if (request.RequiredPlayerIds is null || request.ExcludedPlayerIds is null || request.LockedPositions is null)
+            throw new ArgumentException("Player constraints must not be null.");
+        if (request.RequiredPlayerIds.Concat(request.ExcludedPlayerIds).Concat(request.LockedPositions.Values).Any(id => id <= 0)
+            || request.RequiredPlayerIds.Distinct().Count() != request.RequiredPlayerIds.Count
+            || request.ExcludedPlayerIds.Distinct().Count() != request.ExcludedPlayerIds.Count
+            || request.LockedPositions.Values.Distinct().Count() != request.LockedPositions.Count)
+            throw new ArgumentException("Player constraints must contain positive, unique player IDs.");
+        var required = request.RequiredPlayerIds.Concat(request.LockedPositions.Values).ToHashSet();
+        if (required.Count > 11 || required.Overlaps(request.ExcludedPlayerIds))
+            throw new ArgumentException("Required and excluded players conflict, or more than eleven players are required.");
+        if (request.LockedPositions.Keys.Any(slot => !FormationData.SlotBehaviourOptions.ContainsKey(slot)))
+            throw new ArgumentException("A locked position is unknown.");
         if (request.OpponentScenario is { Ratings: null }) throw new ArgumentException("OpponentScenario requires explicit Ratings.");
         if (request.OpponentScenario?.Ratings is { } ratings)
         {
@@ -290,8 +396,11 @@ public class AdvancedLineupOptimizer
         MyTeamId = request.MyTeamId, OpponentTeamId = request.OpponentTeamId,
         PreferredTactic = request.PreferredTactic, TeamAttitude = request.TeamAttitude,
         FocusAreas = request.FocusAreas.ToList(), CoachType = request.CoachType,
+        RequiredPlayerIds = request.RequiredPlayerIds.ToList(), ExcludedPlayerIds = request.ExcludedPlayerIds.ToList(),
+        LockedPositions = new Dictionary<string, int>(request.LockedPositions),
         AssistantManagerLevel = request.AssistantManagerLevel, TeamSpiritLevel = request.TeamSpiritLevel,
         ConfidenceLevel = request.ConfidenceLevel, Objective = request.Objective,
+        OpponentRatingScale = request.OpponentRatingScale,
         OpponentScenario = request.OpponentScenario is null ? null : new OpponentScenario
         {
             Tactic = request.OpponentScenario.Tactic,
@@ -415,6 +524,57 @@ public class AdvancedLineupOptimizer
     }
 
     // ======================= Assignment =======================
+
+    private static List<Player> GetConstrainedRoster(Team team, OptimizerRequest request)
+    {
+        var rosterIds = team.Players.Select(p => p.PlayerId).ToHashSet();
+        if (request.RequiredPlayerIds.Concat(request.ExcludedPlayerIds).Concat(request.LockedPositions.Values)
+            .Any(id => !rosterIds.Contains(id)))
+            throw new ArgumentException("A constrained player does not belong to this team's roster.");
+        var available = team.Players.Where(p => p.CanOptimize && !request.ExcludedPlayerIds.Contains(p.PlayerId)).ToList();
+        if (request.RequiredPlayerIds.Concat(request.LockedPositions.Values).Any(id => available.All(p => p.PlayerId != id)))
+            throw new ArgumentException("A required or locked player is injured, suspended or has unavailable data.");
+        if (available.Count < 11) throw new ArgumentException("At least eleven available, non-excluded players are required.");
+        return available;
+    }
+
+    private static TeamRatings ScaleOpponentRatings(TeamRatings source, double scale) => new()
+    {
+        MidfieldRating = source.MidfieldRating * scale,
+        RightDefenseRating = source.RightDefenseRating * scale, CentralDefenseRating = source.CentralDefenseRating * scale,
+        LeftDefenseRating = source.LeftDefenseRating * scale, RightAttackRating = source.RightAttackRating * scale,
+        CentralAttackRating = source.CentralAttackRating * scale, LeftAttackRating = source.LeftAttackRating * scale,
+        IndirectSetPiecesAttRating = source.IndirectSetPiecesAttRating * scale,
+        IndirectSetPiecesDefRating = source.IndirectSetPiecesDefRating * scale
+    };
+
+    private static void AttachConstraints(AssignedLineup lineup, OptimizerRequest request)
+    {
+        lineup.RequiredPlayerIds = request.RequiredPlayerIds.Concat(request.LockedPositions.Values).ToHashSet();
+        lineup.LockedPositions = new Dictionary<string, int>(request.LockedPositions);
+    }
+
+    private static void ApplySeedConstraints(AssignedLineup lineup, List<Player> available, OptimizerRequest request)
+    {
+        AttachConstraints(lineup, request);
+        foreach (var (slot, playerId) in request.LockedPositions.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+        {
+            if (!lineup.Slots.ContainsKey(slot)) throw new ArgumentException("A locked slot is absent from this formation.");
+            var existingSlot = lineup.Slots.Values.FirstOrDefault(s => s.Player.PlayerId == playerId);
+            var displaced = lineup.Slots[slot].Player;
+            lineup.Slots[slot].Player = available.Single(p => p.PlayerId == playerId);
+            if (existingSlot != null && existingSlot.SlotId != slot) existingSlot.Player = displaced;
+        }
+        foreach (var playerId in lineup.RequiredPlayerIds.OrderBy(id => id))
+        {
+            if (lineup.Slots.Values.Any(s => s.Player.PlayerId == playerId)) continue;
+            var slot = lineup.Slots.Values.Where(s => !request.LockedPositions.ContainsKey(s.SlotId)
+                    && !lineup.RequiredPlayerIds.Contains(s.Player.PlayerId))
+                .OrderBy(s => EffectiveSkill(s.Player, s.Player.Skills.Playmaking))
+                .ThenBy(s => s.SlotId, StringComparer.Ordinal).First();
+            slot.Player = available.Single(p => p.PlayerId == playerId);
+        }
+    }
 
     private AssignedLineup? BuildInitialLineup(FormationDefinition formation, List<Player> available,
         int? keeperId = null, RatingWeights? weights = null, int slotOrderVariant = 0)
@@ -892,7 +1052,7 @@ public class AdvancedLineupOptimizer
         for (var kick = 0; kick < 3 && budget.Remaining > 0; kick++)
         {
             var shaken = CreateEscapeCandidate(bestSoFar, available, assistantManagerLevel, kick);
-            if (shaken == null) continue;
+            if (shaken == null || !WithinAssistantBehaviorLimit(shaken, assistantManagerLevel)) continue;
             var kicked = EvaluateCandidate(shaken.Formation, bestSoFar.Tactic, bestSoFar.Attitude, bestSoFar.Coach,
                 shaken, opponent, context, disorderRisk);
             budget.Use();
@@ -1045,6 +1205,7 @@ public class AdvancedLineupOptimizer
     private static AssignedLineup CopyLineup(AssignedLineup source) => new()
     {
         Formation = source.Formation,
+        RequiredPlayerIds = source.RequiredPlayerIds, LockedPositions = source.LockedPositions,
         Slots = source.Slots.ToDictionary(kv => kv.Key, kv => new AssignedSlot
         {
             SlotId = kv.Value.SlotId, Player = kv.Value.Player, Behaviour = kv.Value.Behaviour
@@ -1090,7 +1251,9 @@ public class AdvancedLineupOptimizer
     }
 
     private static bool WithinAssistantBehaviorLimit(AssignedLineup lineup, int assistantManagerLevel) =>
-        lineup.Slots.Values.Count(s => s.Behaviour != s.SlotId) <= 5 + assistantManagerLevel;
+        lineup.Slots.Values.Count(s => s.Behaviour != s.SlotId) <= 5 + assistantManagerLevel
+        && lineup.RequiredPlayerIds.All(id => lineup.Slots.Values.Any(s => s.Player.PlayerId == id))
+        && lineup.LockedPositions.All(kv => lineup.Slots.TryGetValue(kv.Key, out var slot) && slot.Player.PlayerId == kv.Value);
     private static double ObjectiveScore(double win, double draw, string objective) => objective switch
     {
         "Win" => win,
@@ -1156,6 +1319,7 @@ public class AdvancedLineupOptimizer
     private static AssignedLineup CloneLineup(AssignedLineup source) => new()
     {
         Formation = source.Formation,
+        RequiredPlayerIds = source.RequiredPlayerIds, LockedPositions = source.LockedPositions,
         Slots = source.Slots.ToDictionary(kv => kv.Key, kv => new AssignedSlot
         {
             SlotId = kv.Value.SlotId,
@@ -1398,6 +1562,8 @@ internal class MatchContext
 
 internal class AssignedLineup
 {
+    public HashSet<int> RequiredPlayerIds { get; set; } = new();
+    public IReadOnlyDictionary<string, int> LockedPositions { get; set; } = new Dictionary<string, int>();
     public FormationDefinition Formation { get; set; } = null!;
     public Dictionary<string, AssignedSlot> Slots { get; set; } = new();
 }

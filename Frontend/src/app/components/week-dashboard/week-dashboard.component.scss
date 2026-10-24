@@ -1,0 +1,31 @@
+:host { display: block; }
+.week-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+.week-card { background: #fff; border: 1px solid #d6e2da; border-radius: 12px; padding: 1.5rem; box-shadow: 0 3px 12px #163c2508; min-width: 0; }
+.card-eyebrow { color: #567663; font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+h2 { font-size: 1.5rem; margin: 1rem 0 .6rem; color: #193e29; }
+h2 small { color: #7d9185; font-size: 1rem; }
+.match-time, .saved-at { color: #6b7c71; font-size: .88rem; }
+.plan-status { padding: .85rem; background: #f2f5f3; border-left: 3px solid #9cafa2; margin-top: 1.4rem; border-radius: 4px; }
+.needs-attention { background: #fff8eb; border-color: #c89538; color: #755315; }
+.status-ready { background: #eaf4ed; border-color: #47845a; color: #245138; }
+.card-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 1.4rem; }
+.action-button { background: #28613f; color: #fff; text-decoration: none; padding: .75rem 1rem; border-radius: 7px; font-size: .9rem; font-weight: 600; }
+.action-button:hover { background: #1d4b30; }
+.text-link, .text-button { color: #28613f; font-size: .9rem; text-underline-offset: 3px; }
+.text-button { border: 1px solid #cbdccf; background: #fff; border-radius: 6px; padding: .5rem .8rem; cursor: pointer; }
+.text-button:disabled { opacity: .5; cursor: wait; }
+.empty-state { color: #6c7d72; line-height: 1.6; margin: 1rem 0; }
+.error-text { color: #9b5035; font-size: .9rem; }
+.coverage-list, .changes-list { list-style: none; padding: 0; margin: 1rem 0; }
+.coverage-list { max-height: 180px; overflow: auto; }
+.coverage-list li { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid #edf0ee; padding: .5rem 0; font-size: .87rem; }
+.coverage-list strong { color: #9a6e27; white-space: nowrap; }
+.card-heading { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+.card-heading h2 { font-size: 1.1rem; margin-top: .5rem; }
+.changes-list li { display: flex; justify-content: space-between; gap: 1rem; padding: .8rem 0; border-bottom: 1px solid #e7eee9; }
+.changes-list strong, .changes-list span { display: block; }
+.changes-list strong { color: #264534; font-size: .9rem; }
+.changes-list span { color: #64766b; font-size: .82rem; line-height: 1.6; margin-top: .3rem; }
+.changes-list time { color: #798c7f; font-size: .78rem; white-space: nowrap; }
+@media (max-width: 950px) { .week-grid { grid-template-columns: 1fr; } }
+@media (max-width: 550px) { .week-card { padding: 1rem; } .changes-list li { flex-direction: column; gap: .3rem; } }

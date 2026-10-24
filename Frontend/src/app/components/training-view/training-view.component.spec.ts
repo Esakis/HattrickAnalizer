@@ -3,6 +3,10 @@ import { TranslateService } from '@ngx-translate/core';
 import { HattrickApiService } from '../../services/hattrick-api.service';
 import { TrainingPlayerEntry } from '../../models/training.model';
 import { TrainingViewComponent } from './training-view.component';
+import { DataCacheService } from '../../services/data-cache.service';
+import { WeeklyPlanService } from '../../services/weekly-plan.service';
+import { Router } from '@angular/router';
+import { Player } from '../../models/player.model';
 
 describe('TrainingViewComponent', () => {
   function component(language: 'en' | 'pl' = 'en'): TrainingViewComponent {
@@ -10,7 +14,8 @@ describe('TrainingViewComponent', () => {
       currentLang: language,
       instant: (key: string) => key
     } as TranslateService;
-    return new TrainingViewComponent({ getTrainingSummary: () => of(null) } as unknown as HattrickApiService, translate);
+    return new TrainingViewComponent({ getTrainingSummary: () => of(null) } as unknown as HattrickApiService, translate,
+      new DataCacheService(), new WeeklyPlanService(), { navigate: jasmine.createSpy('navigate') } as unknown as Router);
   }
 
   it('localizes unsupported training type codes and shows the original code', () => {
@@ -49,5 +54,43 @@ describe('TrainingViewComponent', () => {
 
     expect(translateWarning('Match 1: official lineup timeline is ambiguous.')).toBe('training.warnings.timelineUnknown');
     expect(translateWarning('CHPP stafflist TrainerSkillLevel was missing or outside 1..5.')).toBe('training.warnings.coachSkillMalformed');
+  });
+
+  it('hands the friendly date, opponent and starter constraints to the optimizer instead of the league fixture', () => {
+    const view = component();
+    view.summary = {
+      teamId: 55, trainingTypeCode: 8, trainingTypeKnown: true, trainingTypeName: 'Playmaking', trainedSkill: 'Playmaking',
+      trainingLevel: 100, staminaTrainingPart: 10, trainerName: '', lastMatchId: 0, lastMatchDate: null,
+      weekStart: '2026-10-15T20:00:00Z', weekEnd: '2026-10-16T12:00:00Z',
+      players: [{ playerId: 1, observedFullMinutes: 0, observedHalfMinutes: 0 } as TrainingPlayerEntry]
+    };
+    view.roster = [{ playerId: 1, injuryLevel: -1, injuryStatusKnown: true, suspensionStatusKnown: true } as Player];
+    view.plan = {
+      version: 1, teamId: 55, weekStart: view.summary.weekStart!, selectedPlayerIds: [1], updatedAt: '',
+      matchDates: { league: '2026-10-17T14:00:00Z', friendly: '2026-10-20T14:00:00Z' },
+      assignments: [{ playerId: 1, match: 'friendly', slot: 'IM', startMinute: 0, minutes: 90 }]
+    };
+    view.upcomingMatches = [
+      { matchId: 10, opponentTeamId: 101, opponentTeamName: 'League', matchType: '1', matchDate: view.plan.matchDates.league },
+      { matchId: 20, opponentTeamId: 202, opponentTeamName: 'Friendly', matchType: '8', matchDate: view.plan.matchDates.friendly }
+    ];
+    view.recalculate();
+    view.prepareMatch('friendly');
+    expect((view as any).router.navigate).toHaveBeenCalledWith(['/optimizer'], { queryParams: {
+      traineeIds: '1', lockedPositions: '{"IM":1}', trainingMatch: 'friendly', trainingWeek: view.plan.weekStart,
+      trainingMatchDate: '2026-10-20T14:00:00.000Z', opponentId: 202, matchId: 20
+    } });
+    for (const unavailable of [{ isSuspended: true }, { canOptimize: false }]) {
+      const original = view.roster[0];
+      view.roster = [{ ...original, ...unavailable }];
+      view.recalculate();
+      (view as any).router.navigate.calls.reset();
+      view.prepareMatch('friendly');
+      expect(view.canPrepare('friendly')).toBeFalse();
+      expect((view as any).router.navigate).not.toHaveBeenCalled();
+      view.roster = [original];
+    }
+    view.plan.matchDates.friendly = '2026-10-21T14:00:00Z';
+    expect(view.fixtureForPlan('friendly')).toBeUndefined();
   });
 });

@@ -98,6 +98,34 @@ export class ScoutViewComponent implements OnInit, OnDestroy {
       .join(', ');
   }
 
+  get commonFormation(): [string, number] | null {
+    return this.report ? Object.entries(this.report.formationCounts).sort((a, b) => b[1] - a[1])[0] ?? null : null;
+  }
+
+  get commonTactic(): [string, number] | null {
+    return this.report ? Object.entries(this.report.tacticCounts).sort((a, b) => b[1] - a[1])[0] ?? null : null;
+  }
+
+  get weakestDefense(): { side: string; rating: number } | null {
+    const ratings = this.report?.weightedRatings;
+    if (!ratings) return null;
+    return [
+      { side: 'left', rating: ratings.leftDefenseRating },
+      { side: 'central', rating: ratings.centralDefenseRating },
+      { side: 'right', rating: ratings.rightDefenseRating }
+    ].filter(item => Number.isFinite(item.rating)).sort((a, b) => a.rating - b.rating)[0] ?? null;
+  }
+
+  get strongestAttack(): { side: string; rating: number } | null {
+    const ratings = this.report?.weightedRatings;
+    if (!ratings) return null;
+    return [
+      { side: 'left', rating: ratings.leftAttackRating },
+      { side: 'central', rating: ratings.centralAttackRating },
+      { side: 'right', rating: ratings.rightAttackRating }
+    ].filter(item => Number.isFinite(item.rating)).sort((a, b) => b.rating - a.rating)[0] ?? null;
+  }
+
   // Sektory do siatki ocen ważonych.
   get ratingRows(): { label: string; value: number }[] {
     const r = this.report?.weightedRatings;

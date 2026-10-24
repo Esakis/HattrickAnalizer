@@ -9,6 +9,14 @@
   <div class="league-body">
     <div *ngIf="error" class="error-message">{{ error }}</div>
 
+    <section *ngIf="evidence as forecast" class="forecast-evidence" aria-label="Forecast evidence">
+      <h3>{{ 'leagueEvidence.title' | translate }}</h3>
+      <p><strong>{{ 'leagueEvidence.confidence' | translate }}: {{ confidenceKey(forecast.modelConfidence) | translate }}</strong><span *ngIf="forecast.modelVersion"> · {{ 'leagueEvidence.version' | translate }} {{ forecast.modelVersion }}</span></p>
+      <p *ngIf="forecast.modelConfidence === 'unvalidated-low'">{{ 'leagueEvidence.unvalidated' | translate }}</p>
+      <p *ngIf="hasDefaultRatings" class="fallback-warning">{{ 'leagueEvidence.fallback' | translate }}</p>
+      <details *ngIf="forecast.modelWarnings?.length"><summary>{{ 'leagueEvidence.details' | translate }}</summary><ul><li *ngFor="let warning of forecast.modelWarnings">{{ warning }}</li></ul></details>
+    </section>
+
     <div class="league-columns">
       <!-- LEWA KOLUMNA: aktualna sytuacja w lidze -->
       <div class="league-card current-table-card">
@@ -27,7 +35,7 @@
           <tbody>
             <tr *ngFor="let t of report.teams" [class.own-team]="t.isOwnTeam">
               <td>{{ t.currentPosition }}</td>
-              <td class="team-col">{{ t.teamName }}</td>
+              <td class="team-col">{{ t.teamName }}<small class="rating-source" [class.default-source]="t.ratingsSource === 'default'">{{ sourceKey(t.ratingsSource) | translate }}</small></td>
               <td>{{ t.matches }}</td>
               <td>{{ t.goalsFor }}:{{ t.goalsAgainst }}</td>
               <td><strong>{{ t.points }}</strong></td>
@@ -78,7 +86,7 @@
               </thead>
               <tbody>
                 <tr *ngFor="let t of simReport.teams" [class.own-team]="t.isOwnTeam">
-                  <td class="team-col">{{ t.teamName }}</td>
+                  <td class="team-col">{{ t.teamName }}<small class="rating-source" [class.default-source]="t.ratingsSource === 'default'">{{ sourceKey(t.ratingsSource) | translate }}</small></td>
                   <td>{{ t.expectedPoints }}</td>
                   <td>{{ t.expectedPosition }}</td>
                   <td *ngFor="let pos of positions" class="pos-col"

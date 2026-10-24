@@ -1,0 +1,50 @@
+<section class="week-dashboard">
+  <div class="page-header"><div class="header-content"><h1>{{ 'week.title' | translate }}<span *ngIf="team"> · {{ team.teamName }}</span></h1><p class="subtitle">{{ 'week.subtitle' | translate }}</p></div></div>
+  <p *ngIf="!team" class="empty-state">{{ 'week.loading' | translate }}</p>
+  <ng-container *ngIf="team">
+    <div class="week-grid">
+      <section class="week-card match-card">
+        <span class="card-eyebrow">01 · {{ 'week.nextMatch' | translate }}</span>
+        <ng-container *ngIf="nextMatch; else noMatch">
+          <h2>{{ nextMatch.opponentTeamName }}</h2>
+          <p class="match-time">{{ nextMatch.matchDate | date:'dd.MM HH:mm' }}<span *ngIf="nextMatch.isHomeMatch !== undefined"> · {{ (nextMatch.isHomeMatch ? 'week.home' : 'week.away') | translate }}</span></p>
+          <p class="plan-status" [class.needs-attention]="stalePlan || !savedPlan" [class.status-ready]="savedPlan && !stalePlan && savedPlan.status !== 'draft'">{{ planStatusKey | translate }}</p>
+          <p class="saved-at" *ngIf="savedPlan">{{ savedPlan.label }} · {{ savedPlan.savedAt | date:'dd.MM HH:mm' }}</p>
+          <div class="card-actions"><a class="action-button" routerLink="/optimizer" [queryParams]="nextMatchQuery">{{ 'week.prepare' | translate }}</a><a class="text-link" routerLink="/scout">{{ 'week.scout' | translate }} →</a></div>
+        </ng-container>
+        <ng-template #noMatch><p class="empty-state">{{ 'week.noMatch' | translate }}</p><a class="text-link" routerLink="/optimizer">{{ 'week.prepare' | translate }} →</a></ng-template>
+      </section>
+
+      <section class="week-card training-card">
+        <span class="card-eyebrow">02 · {{ 'week.training' | translate }}</span>
+        <p *ngIf="trainingLoading" class="empty-state">{{ 'common.loading' | translate }}</p>
+        <p *ngIf="trainingError" class="empty-state error-text">{{ 'week.trainingError' | translate }}</p>
+        <ng-container *ngIf="!trainingLoading && !trainingError && trainingAssessment as assessment">
+          <ng-container *ngIf="assessment.players.length; else chooseTrainees">
+            <h2>{{ trainingNeeds }} <small>/ {{ assessment.players.length }}</small></h2>
+            <p>{{ (assessment.ready ? 'week.trainingReady' : 'week.trainingNeeds') | translate }}</p>
+            <ul class="coverage-list" *ngIf="!assessment.ready">
+              <ng-container *ngFor="let coverage of assessment.players">
+                <li *ngIf="coverage.missing !== 0"><span>{{ playerName(coverage.playerId) }}</span><strong>{{ coverage.missing === null ? ('planning.unknown' | translate) : coverage.missing + ' min' }}</strong></li>
+              </ng-container>
+            </ul>
+            <p *ngIf="!assessment.ready && trainingNeeds === 0" class="error-text">{{ 'planning.coveragePending' | translate }}</p>
+          </ng-container>
+          <ng-template #chooseTrainees><p class="empty-state">{{ 'week.noTrainees' | translate }}</p></ng-template>
+        </ng-container>
+        <div class="card-actions"><a class="action-button" routerLink="/training">{{ 'week.trainingAction' | translate }}</a></div>
+      </section>
+    </div>
+
+    <section class="week-card changes-card">
+      <div class="card-heading"><div><span class="card-eyebrow">03 · {{ 'week.changes' | translate }}</span><h2>{{ 'week.recent' | translate }}</h2></div><button type="button" class="text-button" (click)="loadChanges()" [disabled]="changesLoading">{{ 'planning.refresh' | translate }}</button></div>
+      <p *ngIf="changesLoading" class="empty-state">{{ 'common.loading' | translate }}</p>
+      <p *ngIf="changesError" class="error-text">{{ 'week.changesError' | translate }}</p>
+      <p *ngIf="!changesLoading && !changesError && !changes.length" class="empty-state">{{ 'week.noChanges' | translate }}</p>
+      <ul *ngIf="!changesLoading && changes.length" class="changes-list">
+        <li *ngFor="let change of changes"><div><strong>{{ change.playerName }}</strong><span *ngFor="let field of change.fields">{{ 'history.fields.' + field.field | translate }}: {{ field.previous | number:'1.0-2' }} → {{ field.current | number:'1.0-2' }}</span></div><time>{{ change.recordedAt | date:'dd.MM HH:mm' }}</time></li>
+      </ul>
+      <a class="text-link" routerLink="/players">{{ 'week.changesAction' | translate }} →</a>
+    </section>
+  </ng-container>
+</section>

@@ -1,190 +1,346 @@
+// Szerokość treści — nagłówek, nawigacja i zakładki wyrównują się do tej samej kolumny.
 .app-container {
+  --page-max: 1440px;
+  --page-pad: 1.5rem;
+  --page-inline: max(var(--page-pad), calc((100% - var(--page-max)) / 2 + var(--page-pad)));
+
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
+// ==================== GÓRNY PASEK ====================
+
 .app-header {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: linear-gradient(90deg, var(--ht-green-900) 0%, var(--ht-green-800) 100%);
-  padding: 0 1.2rem;
-  min-height: 56px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   display: flex;
   align-items: center;
-  gap: 1.2rem;
+  justify-content: space-between;
   flex-wrap: wrap;
+  gap: 0.6rem 1.25rem;
+  min-height: 56px;
+  padding: 0.55rem var(--page-inline);
+  background: var(--ht-green-800);
+  color: #fff;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   color: #fff;
-  text-decoration: none;
-  font-weight: 700;
   font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-decoration: none;
   white-space: nowrap;
 
-  &__icon {
-    font-size: 1.3rem;
-  }
-}
-
-.main-nav {
-  display: flex;
-  align-self: stretch;
-  gap: 0.2rem;
-  overflow-x: auto;
-
-  a {
-    display: flex;
-    align-items: center;
-    padding: 0 0.85rem;
-    color: rgba(255, 255, 255, 0.78);
-    text-decoration: none;
-    font-weight: 600;
-    font-size: 0.9rem;
-    white-space: nowrap;
-    border-bottom: 3px solid transparent;
-    transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
-
-    &:hover {
-      color: #fff;
-      background-color: rgba(255, 255, 255, 0.08);
-    }
-
-    &.active {
-      color: #fff;
-      border-bottom-color: #ffd54f;
-    }
-  }
-}
-
-// Wspólny wygląd przycisków-pigułek w nagłówku (drużyny, języki).
-%header-pill {
-  padding: 0.3rem 0.7rem;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background-color: transparent;
-  color: rgba(255, 255, 255, 0.85);
-  font-weight: 600;
-  font-size: 0.8rem;
-  cursor: pointer;
-  border-radius: 999px;
-  transition: background-color 0.15s ease, color 0.15s ease;
-
-  &:hover:not(:disabled) {
-    background-color: rgba(255, 255, 255, 0.15);
+  &:hover {
     color: #fff;
   }
 
-  &.active {
-    background-color: #fff;
-    border-color: #fff;
-    color: var(--ht-green-900);
+  &__logo {
+    width: 30px;
+    height: 30px;
+    flex: none;
+    fill: none;
+    stroke: #fff;
+    stroke-width: 1.8;
   }
 
-  &:disabled {
-    opacity: 0.6;
-    cursor: default;
+  &__logo-bg {
+    fill: rgba(255, 255, 255, 0.14);
+    stroke: none;
+  }
+}
+
+.header-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-left: auto;
+}
+
+// Segmenty na ciemnym tle (drużyny, języki).
+.header-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9px;
+
+  button {
+    padding: 0.3rem 0.7rem;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: var(--ht-fs-xs);
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+
+    &:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    &.active,
+    &.active:hover:not(:disabled) {
+      background: #fff;
+      color: var(--ht-green-800);
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.6;
+    }
   }
 }
 
 .team-switcher {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-  margin-left: auto;
+  gap: 0.5rem;
 
-  .team-switcher-label {
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 0.8rem;
+  &-label {
+    color: rgba(255, 255, 255, 0.65);
+    font-size: var(--ht-fs-xs);
     font-weight: 600;
-    margin-right: 0.2rem;
-  }
-
-  .team-btn {
-    @extend %header-pill;
   }
 }
 
-// Gdy nie ma przełącznika drużyn, języki lądują po prawej.
-.language-switcher {
+// ==================== STATUS SYNCHRONIZACJI ====================
+
+.sync-status {
   display: flex;
-  gap: 0.3rem;
-  margin-left: auto;
+  align-items: center;
+  gap: 2px;
 }
 
-.team-switcher + .language-switcher {
-  margin-left: 0;
-}
+.sync-details {
+  position: relative;
 
-.lang-btn {
-  @extend %header-pill;
-}
+  > summary {
+    gap: 0.45rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: var(--ht-fs-xs);
+    font-weight: 600;
+    transition: background-color 0.15s ease;
 
-.app-body {
-  flex: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1rem;
-  padding: 1rem 1.2rem;
-  align-items: start;
+    &::before {
+      display: none;
+    }
 
-  @media (max-width: 960px) {
-    grid-template-columns: 1fr;
+    &::after {
+      content: '';
+      width: 0.32rem;
+      height: 0.32rem;
+      margin: 0 0.05rem 0.15rem;
+      border-right: 1.5px solid currentColor;
+      border-bottom: 1.5px solid currentColor;
+      transform: rotate(45deg);
+      opacity: 0.75;
+    }
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+  }
+
+  &[open] > summary {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
   }
 }
 
-.sync-bar { display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:.7rem;font-size:.85rem;color:#526657; }
-.sync-bar summary { cursor:pointer;padding:.4rem 0; }
-.sync-bar button { border:1px solid #bfd0c3;background:#fff;color:#225a32;padding:.4rem .7rem;border-radius:5px;cursor:pointer; }
-.sync-bar details { flex:1; }
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: #6fdc9b;
+  box-shadow: 0 0 0 3px rgba(111, 220, 155, 0.2);
+
+  &.is-syncing {
+    background: #f5c451;
+    box-shadow: 0 0 0 3px rgba(245, 196, 81, 0.25);
+    animation: sync-pulse 1.2s ease-in-out infinite;
+  }
+}
+
+.sync-time {
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.sync-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: 300px;
+  max-width: calc(100vw - 2rem);
+  padding: 0.75rem;
+  background: var(--ht-surface);
+  border: 1px solid var(--ht-border);
+  border-radius: var(--ht-radius-lg);
+  box-shadow: var(--ht-shadow-lg);
+  color: var(--ht-text);
+}
+
+.sync-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+
+  svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+
+  &.is-syncing svg {
+    animation: sync-spin 0.9s linear infinite;
+  }
+}
+
+@keyframes sync-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// ==================== NAWIGACJA ====================
+
+.main-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding: 0 var(--page-inline);
+  background: rgba(255, 255, 255, 0.94);
+  border-bottom: 1px solid var(--ht-border);
+  box-shadow: var(--ht-shadow-xs);
+  backdrop-filter: saturate(1.4) blur(8px);
+
+  &__inner {
+    display: flex;
+    gap: 0.15rem;
+    margin: 0 -0.75rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  a {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 0.85rem 0.75rem;
+    color: var(--ht-text-muted);
+    font-size: var(--ht-fs-sm);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: color 0.15s ease;
+
+    &:hover {
+      color: var(--ht-text-strong);
+    }
+
+    &.active {
+      color: var(--ht-primary-text);
+
+      &::after {
+        content: '';
+        position: absolute;
+        right: 0.75rem;
+        bottom: 0;
+        left: 0.75rem;
+        height: 2px;
+        border-radius: 2px 2px 0 0;
+        background: var(--ht-primary);
+      }
+    }
+  }
+}
+
+// ==================== TREŚĆ ====================
 
 .app-content {
-  min-width: 0;
-}
-
-.app-sidebar {
-  position: sticky;
-  top: calc(56px + 1rem);
+  flex: 1;
+  width: 100%;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 1.5rem var(--page-pad) 3rem;
 }
 
 .auth-banner {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
-  padding: 0.6rem 0.9rem;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
   margin-bottom: 1rem;
-  background: #fff8e1;
-  border: 1px solid #ffe082;
-  border-left: 4px solid #ffb300;
-  color: #6d4c00;
-  font-size: 0.9em;
-  border-radius: var(--ht-radius);
+  font-weight: 600;
 
   &__btn {
     margin-left: auto;
-    padding: 0.35rem 0.8rem;
-    background: var(--ht-green-800);
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.85em;
-    font-weight: 600;
-
-    &:hover { background: var(--ht-green-900); }
   }
 }
 
-.mock-banner {
-  background: #fdecea;
-  border-color: #f5c2c7;
-  border-left-color: #d32f2f;
-  color: #842029;
-  font-weight: 600;
+@media (max-width: 720px) {
+  .app-container {
+    --page-pad: 1rem;
+  }
+
+  .app-content {
+    padding-top: 1rem;
+  }
+
+  .header-tools {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .team-switcher-label,
+  .sync-label {
+    display: none;
+  }
 }

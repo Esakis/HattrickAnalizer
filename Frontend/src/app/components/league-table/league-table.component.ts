@@ -78,10 +78,13 @@ export class LeagueTableComponent implements OnInit {
     return value && keys[value] ? `optimizer.confidenceLevels.${keys[value]}` : 'planning.unknown';
   }
 
-  // Intensywność tła komórki heatmapy proporcjonalna do prawdopodobieństwa.
+  // Intensywność tła komórki heatmapy proporcjonalna do prawdopodobieństwa;
+  // na ciemnym tle tekst przechodzi na biały, żeby pozostał czytelny.
   probabilityStyle(p: number): { [k: string]: string } {
     const alpha = Math.min(1, Math.max(0, p));
-    return { 'background-color': `rgba(76, 175, 80, ${alpha.toFixed(2)})` };
+    const style: { [k: string]: string } = { 'background-color': `rgba(47, 134, 86, ${(alpha * 0.9).toFixed(2)})` };
+    if (alpha > 0.45) style['color'] = '#fff';
+    return style;
   }
 
   formatProbability(p: number): string {

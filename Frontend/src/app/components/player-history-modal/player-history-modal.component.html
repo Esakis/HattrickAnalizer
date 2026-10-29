@@ -6,18 +6,18 @@
     </div>
     <div class="modal-body">
       <div *ngIf="loading" class="modal-loading">{{ 'history.loading' | translate }}</div>
-      <div *ngIf="error" class="modal-error" role="alert">{{ error }}</div>
+      <div *ngIf="error" class="error-message modal-error" role="alert">{{ error }}</div>
       <div *ngIf="!loading && !error && !history.length" class="modal-empty">
         {{ 'history.empty' | translate }}<br><small>{{ 'history.autoSyncHint' | translate }}</small>
       </div>
       <ng-container *ngIf="!loading && history.length">
-        <div class="tabs">
+        <div class="segmented tabs">
           <button *ngFor="let tab of tabs" [class.active]="activeTab === tab" (click)="setTab(tab)">{{ 'history.tabs.' + tab | translate }}</button>
         </div>
-        <p *ngIf="history.length === 1">{{ 'history.firstOnly' | translate }}</p>
+        <p *ngIf="history.length === 1" class="hint">{{ 'history.firstOnly' | translate }}</p>
         <div class="chart-wrapper"><canvas #chartCanvas></canvas></div>
-        <div class="history-table-wrapper">
-          <table class="history-table">
+        <div class="table-wrap history-table-wrapper">
+          <table class="data-table history-table">
             <thead><tr><th>{{ 'history.date' | translate }}</th><th *ngFor="let key of columns[activeTab]">{{ 'history.fields.' + key | translate }}</th></tr></thead>
             <tbody>
               <tr *ngFor="let row of history; let i = index">

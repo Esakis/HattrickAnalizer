@@ -1,4 +1,5 @@
 using System.Xml.Linq;
+using System.Net;
 using Microsoft.AspNetCore.Mvc;
 using HattrickAnalizer.Services;
 
@@ -12,20 +13,28 @@ public class OAuthController : ControllerBase
     private readonly TokenStore _tokenStore;
     private readonly ILogger<OAuthController> _logger;
     private readonly bool _mockMode;
+    private readonly bool _development;
 
-    public OAuthController(OAuthService oauthService, TokenStore tokenStore, ILogger<OAuthController> logger, IConfiguration configuration)
+    public OAuthController(OAuthService oauthService, TokenStore tokenStore, ILogger<OAuthController> logger, IConfiguration configuration,
+        IHostEnvironment environment)
     {
         _oauthService = oauthService;
         _tokenStore = tokenStore;
         _logger = logger;
         _mockMode = configuration.GetValue<bool>("UseMockData");
+        _development = environment.IsDevelopment();
     }
 
-    private static readonly CookieOptions SessionCookieOptions = new()
+    private bool LocalHttp => _development && !Request.IsHttps
+        && (string.Equals(Request.Host.Host, "localhost", StringComparison.OrdinalIgnoreCase)
+            || (IPAddress.TryParse(Request.Host.Host, out var ip) && IPAddress.IsLoopback(ip)));
+
+    private CookieOptions SessionCookieOptions => new()
     {
         HttpOnly = true,
-        Secure = true,
-        SameSite = SameSiteMode.None,
+        Secure = !LocalHttp,
+        SameSite = LocalHttp ? SameSiteMode.Lax : SameSiteMode.None,
+        Path = "/",
         MaxAge = TimeSpan.FromDays(30)
     };
 
@@ -132,6 +141,7 @@ public class OAuthController : ControllerBase
         {
             return Ok(new { authorized = false, mockMode = _mockMode });
         }
+        Response.Cookies.Append("ht_session", sessionId, SessionCookieOptions);
         return Ok(new
         {
             authorized = true,
@@ -229,12 +239,7 @@ public class OAuthController : ControllerBase
         var sessionId = Request.Cookies["ht_session"] ?? "";
         _tokenStore.Clear(sessionId);
         // Usunięcie cross-site cookie wymaga tych samych opcji, z którymi było ustawione.
-        Response.Cookies.Delete("ht_session", new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.None
-        });
+        Response.Cookies.Delete("ht_session", SessionCookieOptions);
         return Ok(new { success = true });
     }
 

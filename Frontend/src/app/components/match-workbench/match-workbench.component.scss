@@ -1,1 +1,197 @@
-:host{display:block;margin:1rem 0}.workbench{padding:1.25rem;border:1px solid #b7cbb9;border-radius:12px;background:#fff}.workbench-heading{display:flex;justify-content:space-between;gap:1rem;align-items:center}h2{margin:0;color:#194e2b}h3{font-size:1rem}p{line-height:1.5}button{border:0;border-radius:6px;padding:.65rem 1rem;background:#246c38;color:white;cursor:pointer;font-weight:600}button:disabled{opacity:.5;cursor:default}.secondary{background:#edf3ee;color:#194e2b;border:1px solid #a7bead}.comparison-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}.field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.8rem;margin:1rem 0}label{display:flex;flex-direction:column;gap:.35rem}select,input{padding:.55rem;border:1px solid #b7cbb9;border-radius:5px;background:#fff;max-width:100%;font:inherit}table{width:100%;border-collapse:collapse}th,td{padding:.5rem;text-align:left;border-bottom:1px solid #e4ebe5}td{font-variant-numeric:tabular-nums}thead{background:#f2f6f2}.table-scroll{overflow:auto}.positive{color:#176833}.negative{color:#ad342d}.warning{background:#fff4dc;color:#754c05;padding:.7rem;border-radius:5px}.success{background:#e6f5e9;padding:.7rem}.muted{font-size:.85rem;color:#5e6c63}details{margin-top:1rem;border-top:1px solid #e1e9e2;padding-top:1rem}summary{font-weight:600;cursor:pointer;padding:.3rem 0}.sub-row{display:grid;grid-template-columns:2fr 2fr 80px 2fr auto;gap:.6rem;align-items:end;margin:1rem 0}.preview{border:2px solid #6b9d74;padding:1rem;margin-top:1rem;border-radius:8px}.preview ol{columns:2}@media(max-width:900px){.comparison-grid{grid-template-columns:1fr}.sub-row{grid-template-columns:1fr 1fr}.workbench-heading{flex-direction:column;align-items:stretch}}@media(max-width:500px){.preview ol{columns:1}.workbench{padding:.75rem}}
+// Plan meczowy: porównanie z propozycją, ręczna edycja składu i zlecenia meczowe.
+:host {
+  display: block;
+}
+
+.workbench-heading {
+  margin-bottom: 0.75rem;
+}
+
+.workbench > .alert {
+  margin-bottom: 0.75rem;
+}
+
+.section-title {
+  margin: 0 0 0.6rem;
+  color: var(--ht-text-strong);
+  font-size: var(--ht-fs-sm);
+  font-weight: 600;
+}
+
+.hint {
+  margin: 0.6rem 0 0;
+}
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem 2rem;
+  margin-top: 0.5rem;
+}
+
+.changes-column {
+  > .btn-secondary {
+    margin-top: 0.85rem;
+  }
+
+  > .table-wrap {
+    margin-top: 0.85rem;
+  }
+}
+
+.change-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: var(--ht-fs-sm);
+
+  li + li {
+    margin-top: 0.3rem;
+  }
+}
+
+.changes-column .muted {
+  font-size: var(--ht-fs-sm);
+}
+
+// Rozwijane panele: edycja składu i zlecenia meczowe.
+.sub-panel {
+  margin-top: 1rem;
+  background: var(--ht-surface-muted);
+  border: 1px solid var(--ht-border);
+  border-radius: var(--ht-radius);
+
+  > summary {
+    padding: 0.8rem 1rem;
+    font-size: var(--ht-fs-sm);
+  }
+
+  &[open] > summary {
+    border-bottom: 1px solid var(--ht-border);
+  }
+
+  &__body {
+    padding: 1rem;
+  }
+
+  .section-title {
+    margin-top: 1.25rem;
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  color: var(--ht-text-muted);
+  font-size: var(--ht-fs-xs);
+  font-weight: 600;
+
+  select,
+  input {
+    width: 100%;
+  }
+}
+
+.tactic-field {
+  max-width: 280px;
+  margin-bottom: 1rem;
+}
+
+.editor-table td {
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+
+  select {
+    width: 100%;
+    min-width: 160px;
+  }
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.sub-row {
+  display: grid;
+  grid-template-columns: 2fr 2fr 90px 2fr auto;
+  align-items: end;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+}
+
+.penalties {
+  margin-top: 1rem;
+
+  > summary {
+    font-size: var(--ht-fs-sm);
+  }
+
+  .field-grid {
+    margin-top: 0.75rem;
+  }
+}
+
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.sub-panel__body > .alert {
+  margin-top: 1rem;
+}
+
+.preview {
+  margin-top: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--ht-surface);
+  border: 1px solid var(--ht-green-200);
+  border-left: 3px solid var(--ht-primary);
+  border-radius: var(--ht-radius);
+  font-size: var(--ht-fs-sm);
+
+  .section-title {
+    margin-top: 0;
+  }
+
+  .preview-match {
+    margin-top: 0.75rem;
+    color: var(--ht-text-strong);
+    font-weight: 600;
+  }
+
+  ol {
+    columns: 2;
+    column-gap: 2rem;
+  }
+
+  h4 {
+    margin: 0.75rem 0 0.35rem;
+    font-size: var(--ht-fs-sm);
+  }
+
+  .alert {
+    margin-top: 0.75rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .comparison-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sub-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 500px) {
+  .preview ol {
+    columns: 1;
+  }
+}

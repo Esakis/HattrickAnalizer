@@ -69,4 +69,21 @@ export class DataCacheService {
   readonly optimizerResult$ = new BehaviorSubject<OptimizerResponse | null>(null);
   readonly opponentOptimalLineup$ = new BehaviorSubject<Lineup | null>(null);
   readonly optimizerUi$ = new BehaviorSubject<OptimizerUiState>({ ...DEFAULT_OPTIMIZER_UI });
+
+  clear(): void {
+    this.auth$.next({ authorized: false });
+    this.ownTeam$.next(null);
+    this.nextOpponent$.next(null);
+    this.selectedMatch$.next(null);
+    this.matchSelectionExplicit = false;
+    this.opponentTeam$.next(null);
+    this.opponentPlayers$.next(null);
+    this.myTeamStats$.next(null);
+    this.opponentTeamStats$.next(null);
+    this.opponentScout$.next(null);
+    this.formationExperience$.next(null);
+    this.optimizerResult$.next(null);
+    this.opponentOptimalLineup$.next(null);
+    this.optimizerUi$.next({ ...DEFAULT_OPTIMIZER_UI });
+  }
 }

@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, Subject, tap } from 'rxjs';
 import { Team } from '../models/team.model';
 import { Player } from '../models/player.model';
 import { OptimizerRequest, OptimizerResponse } from '../models/lineup.model';
@@ -23,6 +23,7 @@ import { environment } from '../../environments/environment';
 })
 export class HattrickApiService {
   private apiUrl = environment.apiUrl;
+  readonly sessionChanged$ = new Subject<void>();
 
   constructor(private http: HttpClient) { }
 
@@ -96,7 +97,9 @@ export class HattrickApiService {
   }
 
   completeOAuthFlow(sessionId: string, verifier: string): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/oauth/complete`, { sessionId, verifier });
+    return this.http.post<any>(`${this.apiUrl}/oauth/complete`, { sessionId, verifier }).pipe(
+      tap(() => this.sessionChanged$.next())
+    );
   }
 
   getCurrentOAuth(): Observable<AuthInfo> {
@@ -104,6 +107,8 @@ export class HattrickApiService {
   }
 
   logoutOAuth(): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/oauth/logout`, {});
+    return this.http.post<any>(`${this.apiUrl}/oauth/logout`, {}).pipe(
+      tap(() => this.sessionChanged$.next())
+    );
   }
 }

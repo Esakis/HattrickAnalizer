@@ -55,11 +55,14 @@ export class WeekDashboardComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.cache.ownTeam$.pipe(takeUntil(this.destroy$)).subscribe(team => {
-      const changedTeam = this.team?.teamId !== team?.teamId;
       this.team = team;
       this.updateMatchPlan();
-      if (team && changedTeam) { this.loadTraining(); this.loadChanges(); }
-      else this.updateTrainingPlan();
+      if (team) { this.loadTraining(); this.loadChanges(); }
+      else {
+        this.training = null;
+        this.trainingAssessment = null;
+        this.changes = [];
+      }
     });
     this.cache.nextOpponent$.pipe(takeUntil(this.destroy$)).subscribe(next => {
       this.nextMatch = next; this.updateMatchPlan();

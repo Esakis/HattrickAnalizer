@@ -85,7 +85,7 @@ export class PlayerHistoryModalComponent implements OnChanges, OnDestroy {
   drawChart(): void {
     if (!this.chartCanvas?.nativeElement || !this.history.length) return;
     this.chart?.destroy();
-    const colors = ['#06b6d4', '#8b5cf6', '#f59e0b', '#22c55e', '#ec4899', '#3b82f6', '#f97316', '#64748b'];
+    const colors = ['#2f8656', '#3b74b5', '#c98a12', '#8b5cf6', '#c53939', '#0e9aa7', '#56677b', '#b5651d'];
     const metrics = this.columns[this.activeTab].filter(key => key !== 'age' && key !== 'injuryLevel');
     const secondary = this.activeTab === 'basic' ? 'tsi' : this.activeTab === 'matches' ? 'minutesPlayed' : null;
     const labels = this.history.map(h => new Date(h.recordedDate).toLocaleString(this.translate.currentLang === 'en' ? 'en-GB' : 'pl-PL'));

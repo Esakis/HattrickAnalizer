@@ -15,10 +15,7 @@ export class ErrorInterceptor implements HttpInterceptor {
     return next.handle(req).pipe(
       catchError((err: HttpErrorResponse) => {
         if (err.status === 401 && !req.url.includes('/oauth/')) {
-          this.cache.auth$.next({ authorized: false });
-          this.cache.ownTeam$.next(null);
-          this.cache.nextOpponent$.next(null);
-          this.cache.opponentTeam$.next(null);
+          this.cache.clear();
           this.router.navigateByUrl('/oauth-setup');
         }
         return throwError(() => err);

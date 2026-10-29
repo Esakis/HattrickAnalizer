@@ -1,147 +1,125 @@
-// Styl spójny z resztą aplikacji: białe karty na jasnym tle (nagłówek strony w styles.scss).
-.league-container {
-  width: 100%;
-  margin: 0;
-  padding: 0;
+// Liga: aktualna tabela i symulacja sezonu (heatmapa prawdopodobieństw miejsc).
+.title-league {
+  color: var(--ht-primary-text);
 }
 
 .league-body {
-  padding: 0 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-gap);
+}
+
+.forecast-evidence {
+  h3 {
+    margin: 0 0 0.4rem;
+    color: inherit;
+    font-size: var(--ht-fs-sm);
+  }
+
+  p {
+    margin: 0.3rem 0 0;
+  }
+
+  details {
+    margin-top: 0.6rem;
+  }
+
+  summary {
+    color: inherit;
+    font-size: var(--ht-fs-sm);
+  }
+
+  ul {
+    margin: 0.5rem 0 0;
+  }
+
+  li + li {
+    margin-top: 0.3rem;
+  }
+}
+
+.fallback-warning {
+  font-weight: 600;
 }
 
 .league-columns {
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) 2fr;
-  gap: 15px;
+  grid-template-columns: minmax(340px, 1fr) minmax(0, 2fr);
   align-items: start;
-
-  @media (max-width: 1100px) {
-    grid-template-columns: 1fr;
-  }
+  gap: var(--ht-gap);
 }
 
-.league-card {
-  background: white;
-  padding: 15px 20px;
-  border-radius: 10px;
-  box-shadow: 0 4px 15px rgba(46, 125, 50, 0.15);
-  border: 2px solid #a5d6a7;
-
-  h3 {
-    color: #1b5e20;
-    font-size: 1.1em;
-    font-weight: 600;
-    margin: 0 0 12px 0;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #e8f5e9;
-  }
+.card > .card-title {
+  margin-bottom: 0.85rem;
 }
 
-.sim-buttons {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-
-  .btn-sim {
-    padding: 8px 16px;
-    border: 2px solid #2e7d32;
-    border-radius: 6px;
-    background: white;
-    color: #2e7d32;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-
-    &:hover:not(:disabled) {
-      background: #e8f5e9;
-    }
-
-    &.active {
-      background: #2e7d32;
-      color: white;
-    }
-
-    &:disabled {
-      opacity: 0.6;
-      cursor: default;
-    }
-  }
-}
-
-.league-meta {
-  color: #555;
-  font-size: 0.9em;
-}
-
-.league-note {
-  color: #8d6e63;
-  font-style: italic;
-}
-
-.league-table-wrap {
-  overflow-x: auto;
+.simulation-card .card-header {
+  align-items: center;
 }
 
 .league-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9em;
-
-  th, td {
-    padding: 8px 10px;
-    text-align: center;
-    border-bottom: 1px solid #e8f5e9;
-    white-space: nowrap;
-  }
-
-  th {
-    background: #2e7d32;
-    color: white;
-    font-weight: 600;
-  }
-
   .team-col {
-    text-align: left;
-    min-width: 140px;
+    min-width: 150px;
+  }
+
+  .position-cell {
+    width: 2.5rem;
+    color: var(--ht-text-muted);
   }
 
   .pos-col {
-    min-width: 42px;
-    font-size: 0.85em;
+    min-width: 44px;
+    padding-left: 0.35rem;
+    padding-right: 0.35rem;
+    font-size: var(--ht-fs-xs);
+    text-align: center;
   }
 
-  .own-team {
-    font-weight: 700;
-    background: #fffde7;
+  // Własna drużyna: delikatne tło i znacznik przy pierwszej komórce.
+  tbody tr.own-team > * {
+    background: var(--ht-green-50);
+    color: var(--ht-text-strong);
+    font-weight: 600;
   }
+
+  tbody tr.own-team > :first-child {
+    box-shadow: inset 3px 0 0 var(--ht-primary);
+  }
+}
+
+.rating-source {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--ht-text-subtle);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  white-space: normal;
+}
+
+.default-source {
+  color: var(--ht-warning-text);
+}
+
+.league-meta {
+  margin: 0.85rem 0 0;
+  color: var(--ht-text-muted);
+  font-size: var(--ht-fs-sm);
+}
+
+.sim-result .league-meta {
+  margin: 0 0 0.85rem;
+}
+
+.sim-result .info-message {
+  margin-bottom: 0.85rem;
 }
 
 .league-hint {
-  margin-top: 10px;
-  color: #777;
-  font-size: 0.85em;
+  margin-top: 0.75rem;
 }
 
-.loading-indicator {
-  text-align: center;
-  padding: 20px;
-  color: #43a047;
-  font-style: italic;
+@media (max-width: 1100px) {
+  .league-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
-
-.error-message {
-  padding: 12px;
-  margin-bottom: 12px;
-  background: #ffebee;
-  color: #c62828;
-  border-radius: 6px;
-}
-.forecast-evidence { padding: 1rem 1.2rem; margin-bottom: 1rem; background: #fff9eb; border: 1px solid #e6c983; border-radius: 9px; color: #654d17; }
-.forecast-evidence h3 { margin: 0 0 .5rem; font-size: 1rem; }
-.forecast-evidence p { margin: .4rem 0; font-size: .88rem; }
-.forecast-evidence summary { margin-top: .75rem; cursor: pointer; font-size: .85rem; }
-.forecast-evidence li { font-size: .82rem; margin-top: .4rem; }
-.fallback-warning { font-weight: 600; }
-.rating-source { display: block; font-size: .7rem; font-weight: 400; color: #637a6c; margin-top: .2rem; white-space: normal; }
-.default-source { color: #965a0a; }

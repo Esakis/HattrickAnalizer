@@ -1,16 +1,16 @@
-<div class="scout-container">
+<div class="scout-container page">
   <div class="page-header">
     <div class="header-content">
-      <h1>🔎 {{ 'scout.title' | translate }}</h1>
+      <h1>{{ 'scout.title' | translate }}</h1>
       <p class="subtitle">{{ 'scout.subtitle' | translate }}</p>
     </div>
   </div>
 
   <div class="scout-body">
-    <div class="scout-card scout-controls">
+    <section class="card scout-controls">
       <div class="control-row">
-        <label>{{ 'scout.teamIdLabel' | translate }}</label>
-        <input type="number" [(ngModel)]="teamId" class="team-input">
+        <label for="scoutTeamId">{{ 'scout.teamIdLabel' | translate }}</label>
+        <input id="scoutTeamId" type="number" [(ngModel)]="teamId" class="team-input">
         <button class="btn-primary" (click)="loadScout()" [disabled]="loading || !teamId">
           {{ 'scout.analyze' | translate }}
         </button>
@@ -18,25 +18,25 @@
           {{ 'scout.nextOpponent' | translate }}<span *ngIf="nextOpponentName"> ({{ nextOpponentName }})</span>
         </button>
       </div>
-    </div>
+    </section>
 
-    <div *ngIf="loading" class="loading-indicator">{{ 'common.loading' | translate }}...</div>
+    <div *ngIf="loading" class="card loading-indicator">{{ 'common.loading' | translate }}</div>
     <div *ngIf="error" class="error-message">{{ error }}</div>
 
     <ng-container *ngIf="!loading && report && report.matchesAnalyzed > 0">
-      <section class="scout-card observations">
-        <div class="observations-header"><h3>{{ 'scoutEvidence.title' | translate }}</h3><a class="prepare-opponent" routerLink="/optimizer" [queryParams]="{ opponentId: report.teamId }">{{ 'scoutEvidence.prepare' | translate }}</a></div>
+      <section class="card observations">
+        <div class="card-header observations-header"><h2 class="card-title">{{ 'scoutEvidence.title' | translate }}</h2><a class="btn-primary prepare-opponent" routerLink="/optimizer" [queryParams]="{ opponentId: report.teamId }">{{ 'scoutEvidence.prepare' | translate }}</a></div>
         <div class="observation-grid">
           <div *ngIf="commonFormation as formation"><span>{{ 'scoutEvidence.formation' | translate }}</span><strong>{{ formation[0] }}</strong><small>{{ 'scoutEvidence.sample' | translate:{ count: formation[1], total: report.matchesAnalyzed } }}</small></div>
           <div *ngIf="commonTactic as tactic"><span>{{ 'scoutEvidence.tactic' | translate }}</span><strong>{{ getTacticLabel(tactic[0]) }}</strong><small>{{ 'scoutEvidence.sample' | translate:{ count: tactic[1], total: report.matchesAnalyzed } }}</small></div>
           <div *ngIf="weakestDefense as sector"><span>{{ 'scoutEvidence.weakestDefense' | translate }}</span><strong>{{ ('scoutEvidence.' + sector.side) | translate }}</strong><small>{{ sector.rating | number:'1.1-2' }}</small></div>
           <div *ngIf="strongestAttack as sector"><span>{{ 'scoutEvidence.strongestAttack' | translate }}</span><strong>{{ ('scoutEvidence.' + sector.side) | translate }}</strong><small>{{ sector.rating | number:'1.1-2' }}</small></div>
         </div>
-        <p class="observation-note">{{ 'scoutEvidence.caution' | translate }}</p>
+        <p class="hint observation-note">{{ 'scoutEvidence.caution' | translate }}</p>
       </section>
       <div class="scout-columns">
-        <div class="scout-card">
-          <h3>📊 {{ 'scout.summaryHeader' | translate }} ({{ 'scout.matchesAnalyzed' | translate }}: {{ report.matchesAnalyzed }})</h3>
+        <section class="card">
+          <h3 class="card-title">{{ 'scout.summaryHeader' | translate }} <span class="muted">({{ 'scout.matchesAnalyzed' | translate }}: {{ report.matchesAnalyzed }})</span></h3>
           <div class="stat-item">
             <span class="stat-label">{{ 'scout.formations' | translate }}:</span>
             <span class="stat-value stat-highlight">{{ formationSummary }}</span>
@@ -45,70 +45,72 @@
             <span class="stat-label">{{ 'scout.mostCommonTactic' | translate }}:</span>
             <span class="stat-value">{{ tacticSummary }}</span>
           </div>
-          <h3 class="ratings-header">⚖️ {{ 'scout.weightedRatings' | translate }}</h3>
+          <h3 class="section-title ratings-header">{{ 'scout.weightedRatings' | translate }}</h3>
           <div class="ratings-grid">
             <div class="rating-cell" *ngFor="let row of ratingRows">
               <span class="rating-label">{{ row.label | translate }}</span>
               <span class="rating-value">{{ row.value | number:'1.1-2' }}</span>
             </div>
           </div>
-        </div>
+        </section>
 
-        <div class="scout-card" *ngIf="report.likelyStarters.length > 0">
-          <h3>👥 {{ 'scout.likelyStarters' | translate }}</h3>
-          <table class="scout-table">
-            <thead>
-              <tr>
-                <th>{{ 'scout.slot' | translate }}</th>
-                <th class="team-col">{{ 'scout.player' | translate }}</th>
-                <th>{{ 'scout.appearances' | translate }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let s of report.likelyStarters">
-                <td><strong>{{ s.slot }}</strong></td>
-                <td class="team-col">{{ s.playerName }}</td>
-                <td>{{ s.appearances }}/{{ report.matchesAnalyzed }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <section class="card" *ngIf="report.likelyStarters.length > 0">
+          <h3 class="card-title">{{ 'scout.likelyStarters' | translate }}</h3>
+          <div class="table-wrap">
+            <table class="data-table scout-table">
+              <thead>
+                <tr>
+                  <th>{{ 'scout.slot' | translate }}</th>
+                  <th class="team-col">{{ 'scout.player' | translate }}</th>
+                  <th class="num">{{ 'scout.appearances' | translate }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let s of report.likelyStarters">
+                  <td><span class="badge">{{ s.slot }}</span></td>
+                  <td class="team-col">{{ s.playerName }}</td>
+                  <td class="num">{{ s.appearances }}/{{ report.matchesAnalyzed }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
 
-      <div class="scout-card">
-        <h3>📅 {{ 'scout.lastMatches' | translate }}</h3>
-        <div class="scout-table-wrap">
-          <table class="scout-table">
+      <section class="card">
+        <h3 class="card-title">{{ 'scout.lastMatches' | translate }}</h3>
+        <div class="table-wrap scout-table-wrap">
+          <table class="data-table scout-table">
             <thead>
               <tr>
                 <th>{{ 'scout.date' | translate }}</th>
                 <th class="team-col">{{ 'scout.opponent' | translate }}</th>
-                <th>{{ 'scout.result' | translate }}</th>
-                <th>{{ 'scout.formation' | translate }}</th>
+                <th class="center">{{ 'scout.result' | translate }}</th>
+                <th class="center">{{ 'scout.formation' | translate }}</th>
                 <th>{{ 'scout.tactic' | translate }}</th>
-                <th>{{ 'optimizer.comparison.midfield' | translate }}</th>
-                <th>{{ 'scout.defense' | translate }} (L/C/P)</th>
-                <th>{{ 'scout.attack' | translate }} (L/C/P)</th>
+                <th class="center">{{ 'optimizer.comparison.midfield' | translate }}</th>
+                <th class="center">{{ 'scout.defense' | translate }} (L/C/P)</th>
+                <th class="center">{{ 'scout.attack' | translate }} (L/C/P)</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let m of report.matches">
                 <td>{{ m.matchDate | date:'dd.MM' }}</td>
                 <td class="team-col">{{ m.opponent }} {{ m.isHomeMatch ? '(D)' : '(W)' }}</td>
-                <td><strong>{{ m.goalsFor }}-{{ m.goalsAgainst }}</strong></td>
-                <td>{{ m.formation }}</td>
+                <td class="center"><strong>{{ m.goalsFor }}-{{ m.goalsAgainst }}</strong></td>
+                <td class="center">{{ m.formation }}</td>
                 <td>{{ getTacticLabel(m.tactic) }}</td>
-                <td>{{ m.ratings.midfieldRating | number:'1.1-2' }}</td>
-                <td>{{ m.ratings.leftDefenseRating | number:'1.1-2' }}/{{ m.ratings.centralDefenseRating | number:'1.1-2' }}/{{ m.ratings.rightDefenseRating | number:'1.1-2' }}</td>
-                <td>{{ m.ratings.leftAttackRating | number:'1.1-2' }}/{{ m.ratings.centralAttackRating | number:'1.1-2' }}/{{ m.ratings.rightAttackRating | number:'1.1-2' }}</td>
+                <td class="center">{{ m.ratings.midfieldRating | number:'1.1-2' }}</td>
+                <td class="center">{{ m.ratings.leftDefenseRating | number:'1.1-2' }}/{{ m.ratings.centralDefenseRating | number:'1.1-2' }}/{{ m.ratings.rightDefenseRating | number:'1.1-2' }}</td>
+                <td class="center">{{ m.ratings.leftAttackRating | number:'1.1-2' }}/{{ m.ratings.centralAttackRating | number:'1.1-2' }}/{{ m.ratings.rightAttackRating | number:'1.1-2' }}</td>
               </tr>
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
     </ng-container>
 
-    <div *ngIf="!loading && report && report.matchesAnalyzed === 0" class="scout-card">
+    <div *ngIf="!loading && report && report.matchesAnalyzed === 0" class="card empty-state">
       <p>{{ 'scout.noMatches' | translate }}</p>
     </div>
   </div>

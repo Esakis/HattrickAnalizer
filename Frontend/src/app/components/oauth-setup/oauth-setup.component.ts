@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { HattrickApiService } from '../../services/hattrick-api.service';
 import { TranslateService } from '@ngx-translate/core';
@@ -8,7 +8,7 @@ import { TranslateService } from '@ngx-translate/core';
   templateUrl: './oauth-setup.component.html',
   styleUrls: ['./oauth-setup.component.scss']
 })
-export class OAuthSetupComponent {
+export class OAuthSetupComponent implements OnInit {
   step: number = 1;
   sessionId: string = '';
   authorizationUrl: string = '';
@@ -16,10 +16,29 @@ export class OAuthSetupComponent {
   loading: boolean = false;
   error: string | null = null;
   success: boolean = false;
+  checkingSession = true;
+  teamName = '';
+  mockMode = false;
   // Uprawnienie set_matchorder — pozwala wysyłać ustawienie meczowe do Hattricka.
   withMatchOrders: boolean = false;
 
   constructor(private hattrickApi: HattrickApiService, private translate: TranslateService) {}
+
+  async ngOnInit(): Promise<void> {
+    try {
+      const auth = await firstValueFrom(this.hattrickApi.getCurrentOAuth());
+      this.mockMode = !!auth.mockMode;
+      if (auth.authorized) {
+        this.teamName = auth.ownTeamName ?? '';
+        this.success = true;
+        this.step = 3;
+      }
+    } catch (err: any) {
+      this.error = err?.error?.error ?? err.message;
+    } finally {
+      this.checkingSession = false;
+    }
+  }
 
   async startAuthorization(): Promise<void> {
     this.loading = true;
@@ -33,7 +52,7 @@ export class OAuthSetupComponent {
       this.authorizationUrl = response.authorizationUrl;
       this.step = 2;
     } catch (err: any) {
-      this.error = this.translate.instant('oauth.errorInit') + err.message;
+      this.error = this.translate.instant('oauth.errorInit') + (err?.error?.error ?? err.message);
     } finally {
       this.loading = false;
     }
@@ -44,7 +63,7 @@ export class OAuthSetupComponent {
   }
 
   async completeAuthorization(): Promise<void> {
-    if (!this.verifier) {
+    if (!this.verifier.trim()) {
       this.error = this.translate.instant('oauth.errorPin');
       return;
     }
@@ -53,12 +72,13 @@ export class OAuthSetupComponent {
     this.error = null;
 
     try {
-      await firstValueFrom(this.hattrickApi.completeOAuthFlow(this.sessionId, this.verifier));
+      const response = await firstValueFrom(this.hattrickApi.completeOAuthFlow(this.sessionId, this.verifier.trim()));
+      this.teamName = response.ownTeamName ?? '';
       this.success = true;
       this.step = 3;
       // Sesję trzyma cookie ht_session — nie duplikujemy jej w localStorage.
     } catch (err: any) {
-      this.error = this.translate.instant('oauth.errorFinalize') + err.message;
+      this.error = this.translate.instant('oauth.errorFinalize') + (err?.error?.error ?? err.message);
     } finally {
       this.loading = false;
     }
@@ -71,6 +91,20 @@ export class OAuthSetupComponent {
     this.verifier = '';
     this.error = null;
     this.success = false;
+  }
+
+  async logout(): Promise<void> {
+    this.loading = true;
+    this.error = null;
+    try {
+      await firstValueFrom(this.hattrickApi.logoutOAuth());
+      this.teamName = '';
+      this.reset();
+    } catch (err: any) {
+      this.error = err?.error?.error ?? err.message;
+    } finally {
+      this.loading = false;
+    }
   }
 
   copyToClipboard(text: string): void {

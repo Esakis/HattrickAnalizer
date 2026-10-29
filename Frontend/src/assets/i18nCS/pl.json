@@ -273,6 +273,9 @@
     "predictedOpponentLineup": "Przewidywany Skład Przeciwnika"
   },
   "oauth": {
+    "checkingSession": "Sprawdzanie zapisanego logowania…",
+    "remembered": "Logowanie jest zapamiętane w tej przeglądarce. Lokalny restart aplikacji nie wymaga ponownej autoryzacji. Sesja wygasa po 30 dniach bezczynności.",
+    "logout": "Wyloguj i usuń zapisane logowanie",
     "title": "Konfiguracja OAuth Hattrick",
     "step1": {
       "title": "Krok 1: Rozpocznij autoryzację",

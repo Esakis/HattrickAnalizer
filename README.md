@@ -34,6 +34,10 @@ The API listens on the URL printed by ASP.NET Core; the Angular dev server defau
 
 To run without CHPP credentials, set `UseMockData=true` in a local configuration override, or launch with `dotnet run --project Backend/HattrickAnalizer.csproj -- --UseMockData=true`. Mock mode is deterministic and makes no live CHPP calls.
 
+Local Development runs remember OAuth sessions in encrypted files under `Backend/App_Data/oauth`, independently of SQL availability. Keep using `http://localhost:4200` in the same browser profile: the browser keeps an HttpOnly session cookie, while the access token and secret stay on the backend. Restarting the API or browser preserves authorization; signing out removes that session, and 30 days of inactivity expires it. The OAuth page recognizes an existing sign-in and offers **Sign out and forget this sign-in**.
+
+`OAuth:StorageProvider` can explicitly select `File` or `Sql` (default: `File` in Development, `Sql` elsewhere). `OAuth:StoragePath` overrides the file directory, relative to the backend content root. File storage uses ASP.NET Core Data Protection; its key ring must survive restarts too. On this Windows development setup the default key ring is stored in `%LOCALAPPDATA%/ASP.NET/DataProtection-Keys` and protected for the Windows account. Do not delete the key ring or run the API under a different Windows user if you want to retain saved sign-ins. For deployed file storage, configure a persistent, protected Data Protection key ring and storage volume. Old credentials previously kept only in memory cannot be recovered after a restart; authorize once after this update.
+
 ## Build and test
 
 Run these commands from the repository root:

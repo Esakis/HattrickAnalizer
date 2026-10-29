@@ -1,112 +1,125 @@
+// Modal historii zawodnika: zakładki metryk, wykres i tabela obserwacji.
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.6);
   z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 1rem;
+  background: rgba(16, 28, 22, 0.45);
+  backdrop-filter: blur(2px);
 }
 
 .modal-box {
-  background: #1e2130;
-  border: 1px solid #3a3f5c;
-  border-radius: 12px;
-  width: 92vw;
-  max-width: 1000px;
-  max-height: 88vh;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 1000px;
+  max-height: 88vh;
   overflow: hidden;
+  background: var(--ht-surface);
+  border: 1px solid var(--ht-border);
+  border-radius: var(--ht-radius-lg);
+  box-shadow: var(--ht-shadow-lg);
 }
 
 .modal-header {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
-  border-bottom: 1px solid #3a3f5c;
-  flex-shrink: 0;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--ht-border);
 
-  h2 { margin: 0; font-size: 1.05rem; color: #e2e8f0; }
+  h2 {
+    margin: 0;
+    font-size: var(--ht-fs-lg);
+  }
 }
 
 .btn-close {
-  background: none; border: none; color: #94a3b8;
-  font-size: 1.2rem; cursor: pointer; padding: 4px 8px; border-radius: 4px;
-  &:hover { background: #2d3348; color: #e2e8f0; }
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--ht-gray-100);
+    color: var(--ht-text-strong);
+  }
 }
 
 .modal-body {
-  padding: 16px 20px;
-  overflow-y: auto;
-  flex: 1;
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 12px;
+  gap: 1rem;
+  padding: 1.25rem;
+  overflow-y: auto;
 }
 
-.modal-loading, .modal-empty {
-  text-align: center; color: #94a3b8; padding: 40px 0; font-size: .95rem;
+.modal-loading,
+.modal-empty {
+  padding: 2.5rem 0;
+  color: var(--ht-text-muted);
+  font-size: var(--ht-fs-sm);
+  text-align: center;
 }
-.modal-error { color: #f87171; text-align: center; padding: 20px; }
 
 .tabs {
-  display: flex;
-  gap: 4px;
-  border-bottom: 1px solid #3a3f5c;
-  padding-bottom: 8px;
-
-  button {
-    padding: 6px 16px;
-    background: none;
-    border: 1px solid #3a3f5c;
-    border-radius: 6px;
-    color: #94a3b8;
-    font-size: .85rem;
-    cursor: pointer;
-    transition: all .15s;
-
-    &:hover { background: #2d3348; color: #e2e8f0; }
-    &.active { background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 600; }
-  }
+  align-self: flex-start;
 }
 
 .chart-wrapper {
-  height: 260px;
   position: relative;
+  flex-shrink: 0;
+  height: 260px;
+}
+
+.history-table-wrapper {
   flex-shrink: 0;
 }
 
-.history-table-wrapper { overflow-x: auto; }
-
 .history-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: .82rem;
-  color: #cbd5e1;
-
-  th, td {
-    padding: 5px 8px;
+  th,
+  td {
+    padding: 0.45rem 0.65rem;
     text-align: center;
-    border-bottom: 1px solid #2d3348;
-    white-space: nowrap;
   }
 
-  th {
-    background: #2d3348;
-    color: #94a3b8;
-    font-weight: 600;
-    font-size: .75rem;
-    text-transform: uppercase;
+  thead th {
     position: sticky;
     top: 0;
   }
 
-  .date-cell { text-align: left; font-family: monospace; color: #94a3b8; }
+  .date-cell {
+    color: var(--ht-text-muted);
+    text-align: left;
+  }
 
-  td.ch { color: #fbbf24; font-weight: 700; }
-  td.injury { color: #f87171; }
+  td.ch {
+    background: var(--ht-warning-bg);
+    color: var(--ht-warning-text);
+    font-weight: 700;
+  }
+}
 
-  tr:hover td { background: #252b3b; }
+@media (max-width: 640px) {
+  .modal-backdrop {
+    padding: 0.5rem;
+  }
+
+  .modal-body {
+    padding: 1rem;
+  }
 }

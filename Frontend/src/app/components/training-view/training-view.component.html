@@ -1,27 +1,27 @@
-<div class="training-container">
+<div class="training-container page">
   <div class="page-header">
     <div class="header-content">
-      <h1>🏋️ {{ 'training.title' | translate }}</h1>
+      <h1>{{ 'training.title' | translate }}</h1>
       <p class="subtitle">{{ 'training.subtitle' | translate }}</p>
     </div>
   </div>
 
   <div class="training-body">
-  <div *ngIf="loading" class="loading-indicator">{{ 'common.loading' | translate }}...</div>
+  <div *ngIf="loading" class="card loading-indicator">{{ 'common.loading' | translate }}</div>
   <div *ngIf="error" class="error-message">{{ error }}</div>
 
-  <div *ngIf="!loading && summary">
-    <section class="training-card planner-intro">
+  <div *ngIf="!loading && summary" class="training-stack">
+    <section class="card training-card planner-intro">
       <div>
         <h2>{{ 'planning.title' | translate }}</h2>
         <p>{{ getTrainingTypeLabel() }} · {{ summary.weekStart | date:'dd.MM HH:mm' }} — <span *ngIf="summary.nextTrainingAt; else currentWeek">{{ summary.nextTrainingAt | date:'dd.MM HH:mm' }}</span><ng-template #currentWeek>{{ 'planning.currentWeek' | translate }}</ng-template></p>
         <p class="training-hint">{{ 'planning.explanation' | translate }}</p>
       </div>
-      <button type="button" class="plan-button secondary" (click)="loadSummary()">{{ 'planning.refresh' | translate }}</button>
+      <button type="button" class="btn-secondary plan-button" (click)="loadSummary()">{{ 'planning.refresh' | translate }}</button>
     </section>
 
     <ng-container *ngIf="plan">
-      <section class="training-card">
+      <section class="card training-card">
         <h3>1. {{ 'planning.selectTrainees' | translate }}</h3>
         <label class="roster-search">{{ 'planning.searchPlayer' | translate }}
           <input type="search" [(ngModel)]="search">
@@ -39,11 +39,11 @@
         <p *ngIf="!plan.selectedPlayerIds.length" class="training-hint">{{ 'planning.selectHint' | translate }}</p>
       </section>
 
-      <section class="training-card" *ngIf="assessment.players.length">
+      <section class="card training-card" *ngIf="assessment.players.length">
         <h3>{{ 'planning.coverageTitle' | translate }}</h3>
         <p class="coverage-status" [class.ready]="assessment.ready">{{ (assessment.ready ? 'planning.coverageReady' : 'planning.coveragePending') | translate }}</p>
-        <div class="training-table-wrap">
-          <table class="training-table coverage-table">
+        <div class="table-wrap training-table-wrap">
+          <table class="data-table training-table coverage-table">
             <thead><tr><th class="player-col">{{ 'training.player' | translate }}</th><th>{{ 'planning.recorded' | translate }}</th><th>{{ 'planning.projected' | translate }}</th><th>{{ 'planning.missing' | translate }}</th></tr></thead>
             <tbody>
               <tr *ngFor="let coverage of assessment.players" [class.full-training]="coverage.missing === 0">
@@ -58,11 +58,11 @@
         <p class="training-hint">{{ 'planning.coverageHint' | translate }}</p>
       </section>
 
-      <section class="training-card">
+      <section class="card training-card">
         <h3>2. {{ 'planning.allocateMatches' | translate }}</h3>
         <p class="training-hint">{{ 'planning.datesHint' | translate }}</p>
         <p *ngIf="fixturesError" class="training-hint">{{ 'planning.fixturesError' | translate }}</p>
-        <div class="plan-actions suggestion-actions"><button type="button" class="plan-button" (click)="suggestAssignments()" [disabled]="!selectedPlayers.length">{{ 'planning.suggest' | translate }}</button><span class="training-hint">{{ 'planning.suggestHint' | translate }}</span></div>
+        <div class="plan-actions suggestion-actions"><button type="button" class="btn-primary plan-button" (click)="suggestAssignments()" [disabled]="!selectedPlayers.length">{{ 'planning.suggest' | translate }}</button><span class="training-hint">{{ 'planning.suggestHint' | translate }}</span></div>
         <div *ngIf="suggestionMade" class="suggestion-result" aria-live="polite">
           <p *ngIf="unassignedNames.length">{{ 'planning.unassigned' | translate }} {{ unassignedNames.join(', ') }}</p>
           <p *ngIf="unknownNames.length">{{ 'planning.skippedUnknown' | translate }} {{ unknownNames.join(', ') }}</p>
@@ -88,11 +88,11 @@
               </label>
               <label>{{ 'planning.fromMinute' | translate }}<input type="number" min="0" max="89" step="1" [(ngModel)]="assignment.startMinute" (ngModelChange)="save()"></label>
               <label>{{ 'planning.minutes' | translate }}<input type="number" min="1" max="90" step="1" [(ngModel)]="assignment.minutes" (ngModelChange)="save()"></label>
-              <button type="button" class="plan-button remove" (click)="removeAssignment(assignment)">{{ 'planning.remove' | translate }}</button>
+              <button type="button" class="btn-danger btn-sm plan-button remove" (click)="removeAssignment(assignment)">{{ 'planning.remove' | translate }}</button>
             </div>
             <div class="plan-actions">
-              <button type="button" class="plan-button secondary" (click)="addAssignment(match)" [disabled]="!selectedPlayers.length">{{ 'planning.addAssignment' | translate }}</button>
-              <button type="button" class="plan-button" (click)="prepareMatch(match)" [disabled]="!canPrepare(match)">{{ 'planning.prepareLineup' | translate }}</button>
+              <button type="button" class="btn-secondary plan-button" (click)="addAssignment(match)" [disabled]="!selectedPlayers.length">{{ 'planning.addAssignment' | translate }}</button>
+              <button type="button" class="btn-primary plan-button" (click)="prepareMatch(match)" [disabled]="!canPrepare(match)">{{ 'planning.prepareLineup' | translate }}</button>
             </div>
           </article>
         </div>
@@ -108,7 +108,7 @@
       </section>
     </ng-container>
 
-    <details class="training-details">
+    <details class="card disclosure training-details">
       <summary>{{ 'planning.details' | translate }}</summary>
     <div class="training-summary-card">
       <div class="summary-item">
@@ -163,8 +163,8 @@
 
     <div class="training-card">
     <h3>{{ 'training.playersHeader' | translate }}</h3>
-    <div class="training-table-wrap">
-      <table class="training-table">
+    <div class="table-wrap training-table-wrap">
+      <table class="data-table training-table">
         <thead>
           <tr>
             <th class="player-col">{{ 'training.player' | translate }}</th>

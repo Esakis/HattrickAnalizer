@@ -1,123 +1,89 @@
+// Lista etapów ładowania danych — wyświetlana w rozwijanym panelu statusu w nagłówku.
 .load-sidebar {
-  background: var(--ht-surface);
-  color: var(--ht-text);
-  padding: 12px;
-  border-radius: var(--ht-radius);
-  min-width: 200px;
-  box-shadow: var(--ht-shadow);
-  font-size: 0.8rem;
+  font-size: var(--ht-fs-sm);
 
   &__title {
-    margin: 0 0 8px;
-    font-size: 0.85rem;
-    font-weight: 600;
+    margin: 0.15rem 0.35rem 0.6rem;
+    color: var(--ht-text-subtle);
+    font-size: var(--ht-fs-xs);
+    font-weight: 700;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--ht-green-900);
   }
 
   &__list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
   &__item {
     display: grid;
-    grid-template-columns: 18px 1fr;
-    column-gap: 6px;
+    grid-template-columns: 14px 1fr;
     align-items: center;
-    padding: 6px 8px;
-    background: #f6f8f5;
-    border-radius: 4px;
-    border-left: 2px solid transparent;
-    transition: border-color 120ms ease, background 120ms ease;
+    column-gap: 0.55rem;
+    padding: 0.45rem 0.5rem;
+    border-radius: var(--ht-radius-sm);
+    transition: background-color 0.12s ease;
 
-    &.is-loading { border-left-color: #f5b841; background: #fff8e6; }
-    &.is-success { border-left-color: #3ecf8e; }
-    &.is-error   { border-left-color: #ef5b5b; background: #fdeeee; }
+    &.is-loading {
+      background: var(--ht-warning-bg);
+    }
+
+    &.is-error {
+      background: var(--ht-danger-bg);
+    }
   }
 
   &__icon {
     display: flex;
-    justify-content: center;
     align-items: center;
-    
+    justify-content: center;
+
     .status-indicator {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      border: 1px solid #e0e0e0;
       position: relative;
-      transition: all 0.3s ease;
-      
-      &.empty {
-        border-color: #b0bab0;
-        background: transparent;
-      }
-      
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      border: 1.5px solid var(--ht-gray-400);
+
       &.loading {
-        border-color: #f5b841;
-        background: #f5b841;
-        
-        &::after {
-          content: '';
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          width: 0;
-          height: 0;
-          border-radius: 50%;
-          background: white;
-          transform: translate(-50%, -50%);
-          animation: pulse 1.5s ease-in-out infinite;
-        }
+        border-color: var(--ht-warning);
+        background: var(--ht-warning);
+        animation: status-pulse 1.2s ease-in-out infinite;
       }
-      
+
       &.error {
-        border-color: #ef5b5b;
-        background: #ef5b5b;
+        border-color: var(--ht-danger);
+        background: var(--ht-danger);
       }
-      
+
       &.success {
-        border-color: #3ecf8e;
-        background: #3ecf8e;
+        border-color: var(--ht-success);
+        background: var(--ht-success);
       }
     }
   }
 
   &__label {
+    color: var(--ht-text-strong);
     font-weight: 500;
   }
 
   &__msg {
     grid-column: 2;
-    margin-top: 3px;
-    font-size: 0.7rem;
-    color: #c62828;
+    margin-top: 0.15rem;
+    color: var(--ht-danger-text);
+    font-size: var(--ht-fs-xs);
     word-break: break-word;
   }
 }
 
-// ==================== ANIMATIONS ====================
-
-@keyframes pulse {
-  0% {
-    width: 0;
-    height: 0;
-    opacity: 1;
-  }
+@keyframes status-pulse {
   50% {
-    width: 4px;
-    height: 4px;
-    opacity: 0.8;
-  }
-  100% {
-    width: 6px;
-    height: 6px;
-    opacity: 0;
+    opacity: 0.4;
   }
 }

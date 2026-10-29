@@ -1,7 +1,9 @@
-import { isMatchPlanCurrent } from './week-dashboard.component';
+import { isMatchPlanCurrent, WeekDashboardComponent } from './week-dashboard.component';
 import { SavedMatchPlan, rosterFingerprint } from '../../services/match-plan.service';
 import { Team } from '../../models/team.model';
 import { NextOpponent } from '../../services/data-cache.service';
+import { DataCacheService } from '../../services/data-cache.service';
+import { of, Subject } from 'rxjs';
 
 describe('Dashboard match readiness', () => {
   const team: Team = { teamId: 1, teamName: 'Test', players: [] };
@@ -27,5 +29,24 @@ describe('Dashboard match readiness', () => {
     const mismatched = plan();
     mismatched.result.inputSnapshot!.opponentTeamId = 99;
     expect(isMatchPlanCurrent(mismatched, team, match, now)).toBeFalse();
+  });
+});
+
+describe('Dashboard refresh', () => {
+  it('refreshes training after synchronizing the same club again', () => {
+    const cache = new DataCacheService();
+    const api = { getTrainingSummary: jasmine.createSpy().and.returnValue(of({ teamId: 1, players: [] })) };
+    const component = new WeekDashboardComponent(cache, api as any,
+      { changed$: new Subject(), getPlan: () => undefined } as any,
+      { storageChanged$: new Subject(), getPlan: () => ({}), evaluate: () => ({ players: [] }) } as any,
+      { changed$: new Subject(), recent: () => of([]) } as any);
+    component.ngOnInit();
+    cache.ownTeam$.next({ teamId: 1, teamName: 'Team', players: [] });
+    cache.ownTeam$.next({ teamId: 1, teamName: 'Team', players: [] });
+    expect(api.getTrainingSummary).toHaveBeenCalledTimes(2);
+    cache.clear();
+    expect(component.training).toBeNull();
+    expect(component.trainingAssessment).toBeNull();
+    component.ngOnDestroy();
   });
 });

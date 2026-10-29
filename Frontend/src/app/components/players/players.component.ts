@@ -75,31 +75,23 @@ export class PlayersComponent implements OnInit, OnDestroy {
     this.loadRecentHistory();
     this.playerHistory.changed$.pipe(takeUntil(this.destroy$)).subscribe(() => this.loadRecentHistory());
 
-    const cachedTeam = this.cache.ownTeam$.value;
-    if (cachedTeam?.players?.length) {
-      this.teamId = cachedTeam.teamId;
-      this.players = cachedTeam.players;
-      return;
-    }
-
-    const auth = this.cache.auth$.value;
-    if (auth.authorized && auth.ownTeamId) {
-      this.teamId = auth.ownTeamId;
-      this.loading = true;
-    }
-
     this.cache.ownTeam$.pipe(takeUntil(this.destroy$)).subscribe(team => {
-      if (team?.players?.length) {
+      if (team) {
         this.teamId = team.teamId;
         this.players = team.players;
         this.loading = false;
+        this.error = null;
       }
     });
 
     this.cache.auth$.pipe(takeUntil(this.destroy$)).subscribe(a => {
-      if (a.authorized && a.ownTeamId && !this.teamId) {
+      if (a.authorized && a.ownTeamId && a.ownTeamId !== this.teamId) {
         this.teamId = a.ownTeamId;
         this.loadPlayers();
+      } else if (!a.authorized) {
+        this.teamId = null;
+        this.players = [];
+        this.loading = false;
       }
     });
   }
@@ -136,12 +128,15 @@ export class PlayersComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.error = null;
 
-    this.hattrickApi.getPlayers(this.teamId).subscribe({
+    const teamId = this.teamId;
+    this.hattrickApi.getPlayers(teamId).pipe(takeUntil(this.destroy$)).subscribe({
       next: (players) => {
+        if (this.teamId !== teamId) return;
         this.players = players;
         this.loading = false;
       },
       error: (err) => {
+        if (this.teamId !== teamId) return;
         this.error = this.translate.instant('players.errorLoadingPlayers') + err.message;
         this.loading = false;
       }

@@ -1,25 +1,34 @@
-<div class="players-container">
+<div class="players-container page">
   <div class="page-header">
     <div class="header-content">
-      <h1>👥 {{ 'players.title' | translate }}</h1>
+      <h1>{{ 'players.title' | translate }}</h1>
       <p class="subtitle">{{ 'players.subtitle' | translate }}</p>
+    </div>
+    <div class="page-actions debug-save-bar">
+      <div *ngIf="saveResultsVisible && saveResults" class="save-summary">
+        <span class="badge badge-success save-ok" *ngIf="saveChangedCount > 0">{{ 'history.saved' | translate:{count: saveChangedCount} }}</span>
+        <span class="badge save-none" *ngIf="saveChangedCount === 0">{{ 'history.unchanged' | translate }}</span>
+      </div>
+      <button class="btn-secondary btn-save-history" (click)="checkAndSaveHistory()" [disabled]="savingHistory">
+        {{ (savingHistory ? 'history.syncing' : 'history.sync') | translate }}
+      </button>
     </div>
   </div>
 
-  <div class="controls-section">
-    <div class="form-group">
+  <section class="card controls-section">
+    <div class="form-group team-field">
       <label for="teamId">{{ 'players.teamIdLabel' | translate }}</label>
       <div class="input-with-button">
-        <input 
-          type="number" 
-          id="teamId" 
-          [(ngModel)]="teamId" 
+        <input
+          type="number"
+          id="teamId"
+          [(ngModel)]="teamId"
           placeholder="{{ 'players.teamIdPlaceholder' | translate }}"
           (keyup.enter)="loadPlayers()">
-        <button 
-          (click)="loadPlayers()" 
+        <button
+          (click)="loadPlayers()"
           [disabled]="loading"
-          class="btn-load">
+          class="btn-primary btn-load">
           {{ loading ? ('players.optimizing' | translate) : ('players.showPlayers' | translate) }}
         </button>
       </div>
@@ -44,43 +53,43 @@
         </select>
       </div>
 
-      <div class="view-toggle">
-        <button class="btn-view" [class.active]="viewMode === 'table'" (click)="viewMode = 'table'">📋 Tabela</button>
-        <button class="btn-view" [class.active]="viewMode === 'cards'" (click)="viewMode = 'cards'">🃏 Karty</button>
+      <div class="segmented view-toggle">
+        <button class="btn-view" [class.active]="viewMode === 'table'" (click)="viewMode = 'table'">Tabela</button>
+        <button class="btn-view" [class.active]="viewMode === 'cards'" (click)="viewMode = 'cards'">Karty</button>
       </div>
     </div>
-  </div>
+  </section>
 
   <div *ngIf="error" class="error-message">
     {{ error }}
   </div>
 
-  <div *ngIf="loading" class="loading">
+  <div *ngIf="loading" class="card loading-indicator">
     {{ 'players.loadingPlayers' | translate }}
   </div>
 
   <div *ngIf="!loading && players.length > 0" class="players-section">
     <div class="players-stats">
-      <div class="stat-box">
+      <div class="stat-tile stat-box">
         <div class="stat-value">{{ filteredPlayers.length }}</div>
         <div class="stat-label">{{ 'players.playersCount' | translate }}</div>
       </div>
-      <div class="stat-box">
+      <div class="stat-tile stat-box">
         <div class="stat-value">{{ averageAge }}</div>
         <div class="stat-label">{{ 'players.averageAge' | translate }}</div>
       </div>
-      <div class="stat-box">
+      <div class="stat-tile stat-box">
         <div class="stat-value">{{ averageForm }}</div>
         <div class="stat-label">{{ 'players.averageForm' | translate }}</div>
       </div>
     </div>
 
     <!-- WIDOK TABELI -->
-    <div *ngIf="viewMode === 'table'" class="table-container">
-      <table class="players-table">
+    <div *ngIf="viewMode === 'table'" class="table-wrap table-container">
+      <table class="data-table is-interactive players-table">
         <thead>
           <tr>
-            <th (click)="sortTable('name')" class="sortable">
+            <th (click)="sortTable('name')" class="sortable player-name-cell">
               Imię i Nazwisko
               <span class="sort-icon" *ngIf="playerSortColumn === 'name'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
             </th>
@@ -163,7 +172,7 @@
             </td>
             <td>{{ getPositionLabel(getPlayerPosition(player)) }}</td>
             <td>{{ player.age }}</td>
-            <td [class]="'form-' + player.form">{{ player.form }}</td>
+            <td><span class="form-chip" [class]="'form-' + player.form">{{ player.form }}</span></td>
             <td>{{ player.stamina }}</td>
             <td>{{ isSkillAvailable(player, 'keeper') ? player.skills.keeper : '—' }}</td>
             <td>{{ isSkillAvailable(player, 'defending') ? player.skills.defending : '—' }}</td>
@@ -260,35 +269,26 @@
     </div>
   </div>
 
-  <div *ngIf="!loading && players.length === 0 && teamId" class="no-data">
-    <div class="no-data-icon">🤷‍♂️</div>
+  <div *ngIf="!loading && players.length === 0 && teamId" class="card no-data">
     <p>{{ 'players.noPlayersFound' | translate }}</p>
     <p class="hint">{{ 'players.checkTeamId' | translate }}</p>
   </div>
 
-  <div class="debug-save-bar">
-    <button class="btn-save-history" (click)="checkAndSaveHistory()" [disabled]="savingHistory">
-      {{ (savingHistory ? 'history.syncing' : 'history.sync') | translate }}
-    </button>
-    <div *ngIf="saveResultsVisible && saveResults" class="save-summary">
-      <span class="save-ok" *ngIf="saveChangedCount > 0">{{ 'history.saved' | translate:{count: saveChangedCount} }}</span>
-      <span class="save-none" *ngIf="saveChangedCount === 0">{{ 'history.unchanged' | translate }}</span>
+  <section class="card recent-history">
+    <h2 class="card-title">{{ 'history.recentTitle' | translate }}</h2>
+    <p class="card-subtitle">{{ 'history.autoSyncHint' | translate }}</p>
+    <p *ngIf="historyError" role="alert" class="error-message">{{ historyError }}</p>
+    <p *ngIf="!recentChanges.length" class="empty-state">{{ 'history.noChanges' | translate }}</p>
+    <div class="history-list" *ngIf="recentChanges.length">
+      <article *ngFor="let change of recentChanges" class="history-change">
+        <div class="history-change__head"><strong>{{ change.playerName }}</strong> <time>{{ change.recordedAt | date:'dd.MM.yyyy HH:mm' }}</time></div>
+        <span *ngIf="change.firstSnapshot" class="history-note">{{ 'history.firstSnapshot' | translate }}</span>
+        <span *ngFor="let field of change.fields" class="change-field">{{ 'history.fields.' + field.field | translate }}: {{ field.previous | number:'1.0-2' }} &rarr; {{ field.current | number:'1.0-2' }}</span>
+        <span *ngFor="let warning of change.warnings" class="history-warning">{{ warning }}</span>
+      </article>
     </div>
-  </div>
+  </section>
 </div>
-
-<section class="recent-history">
-  <h2>{{ 'history.recentTitle' | translate }}</h2>
-  <p>{{ 'history.autoSyncHint' | translate }}</p>
-  <p *ngIf="historyError" role="alert" class="error">{{ historyError }}</p>
-  <p *ngIf="!recentChanges.length">{{ 'history.noChanges' | translate }}</p>
-  <article *ngFor="let change of recentChanges" class="history-change">
-    <div><strong>{{ change.playerName }}</strong> <time>{{ change.recordedAt | date:'dd.MM.yyyy HH:mm' }}</time></div>
-    <span *ngIf="change.firstSnapshot">{{ 'history.firstSnapshot' | translate }}</span>
-    <span *ngFor="let field of change.fields" class="change-field">{{ 'history.fields.' + field.field | translate }}: {{ field.previous | number:'1.0-2' }} &rarr; {{ field.current | number:'1.0-2' }}</span>
-    <span *ngFor="let warning of change.warnings">{{ warning }}</span>
-  </article>
-</section>
 
 <app-player-history-modal
   *ngIf="selectedPlayerId !== null"

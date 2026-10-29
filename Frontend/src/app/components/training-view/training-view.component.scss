@@ -1,192 +1,332 @@
-// Styl spójny z resztą aplikacji: białe karty na jasnym tle (nagłówek strony w styles.scss).
-.training-container {
-  width: 100%;
-  margin: 0;
-  padding: 0;
+// Trening: planer minut trenowanych (wybór, pokrycie, rozdział na mecze) i szczegółowy raport.
+.training-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-gap);
 }
 
-.training-body {
-  padding: 0 0 20px;
+.training-card > h3 {
+  margin: 0 0 0.85rem;
+  font-size: var(--ht-fs-lg);
 }
 
-.training-summary-card,
-.training-card {
-  background: white;
-  padding: 15px 20px;
-  border-radius: 10px;
-  box-shadow: 0 4px 15px rgba(46, 125, 50, 0.15);
-  border: 2px solid #a5d6a7;
-  margin-bottom: 15px;
+.training-hint {
+  margin: 0.6rem 0 0;
+  color: var(--ht-text-subtle);
+  font-size: var(--ht-fs-xs);
+}
 
-  h3 {
-    color: #1b5e20;
-    font-size: 1.1em;
-    font-weight: 600;
-    margin: 0 0 12px 0;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #e8f5e9;
+// ==================== PLANER ====================
+
+.planner-intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+
+  h2 {
+    margin: 0;
+    font-size: var(--ht-fs-xl);
+  }
+
+  p {
+    margin: 0.4rem 0 0;
   }
 }
 
-.training-summary-card {
+.roster-search {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 1rem;
+  color: var(--ht-text-muted);
+  font-size: var(--ht-fs-sm);
+  font-weight: 600;
+}
+
+.trainee-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.5rem;
+  max-height: 340px;
+  overflow-y: auto;
+
+  > label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--ht-border);
+    border-radius: var(--ht-radius);
+    font-size: var(--ht-fs-sm);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+
+    &:hover {
+      border-color: var(--ht-green-300);
+    }
+
+    &.selected {
+      background: var(--ht-green-50);
+      border-color: var(--ht-green-400);
+    }
+  }
+
+  // Nazwisko ma pierwszeństwo — odznaki (kontuzja, zawieszenie) w razie potrzeby spadają niżej.
+  > label > span:not(.availability-badge) {
+    flex: 1 1 130px;
+    min-width: 0;
+  }
+
+  small {
+    display: block;
+    margin-top: 0.15rem;
+    color: var(--ht-text-subtle);
+    font-size: var(--ht-fs-xs);
+  }
+}
+
+.availability-badge {
+  margin-left: auto;
+  padding: 0.05rem 0.45rem;
+  border-radius: var(--ht-radius-pill);
+  background: var(--ht-danger-bg);
+  color: var(--ht-danger-text);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.coverage-status {
+  margin: 0 0 0.85rem;
+  padding: 0.7rem 1rem;
+  background: var(--ht-warning-bg);
+  border: 1px solid var(--ht-warning-border);
+  border-left: 3px solid var(--ht-warning);
+  border-radius: var(--ht-radius);
+  color: var(--ht-warning-text);
+  font-size: var(--ht-fs-sm);
+
+  &.ready {
+    background: var(--ht-success-bg);
+    border-color: var(--ht-success-border);
+    border-left-color: var(--ht-success);
+    color: var(--ht-success-text);
+  }
+}
+
+.plan-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 28px;
+  gap: 0.55rem;
+  margin-top: 1rem;
+}
+
+.suggestion-actions {
+  align-items: center;
+  margin: 0.25rem 0 1rem;
+
+  .training-hint {
+    flex: 1;
+    min-width: 180px;
+    margin: 0;
+  }
+}
+
+.suggestion-result {
+  margin-bottom: 1rem;
+  padding: 0.7rem 1rem;
+  background: var(--ht-info-bg);
+  border: 1px solid var(--ht-info-border);
+  border-radius: var(--ht-radius);
+  color: var(--ht-info-text);
+  font-size: var(--ht-fs-sm);
+}
+
+.match-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.match-plan {
+  min-width: 0;
+  padding: 1rem;
+  background: var(--ht-surface-muted);
+  border: 1px solid var(--ht-border);
+  border-radius: var(--ht-radius);
+
+  h4 {
+    margin: 0 0 0.85rem;
+  }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+    color: var(--ht-text-muted);
+    font-size: var(--ht-fs-xs);
+    font-weight: 600;
+  }
+
+  input,
+  select {
+    width: 100%;
+  }
+}
+
+.fixture-select {
+  margin-bottom: 0.7rem;
+}
+
+.assignment {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--ht-border);
+
+  .remove {
+    align-self: end;
+  }
+}
+
+.assignment-player {
+  grid-column: 1 / -1;
+}
+
+.plan-issues {
+  margin: 1rem 0 0;
+  padding: 0.85rem 1rem 0.85rem 2rem;
+  background: var(--ht-warning-bg);
+  border: 1px solid var(--ht-warning-border);
+  border-radius: var(--ht-radius);
+  color: var(--ht-warning-text);
+  font-size: var(--ht-fs-sm);
+
+  li + li {
+    margin-top: 0.4rem;
+  }
+
+  .issue-error {
+    color: var(--ht-danger-text);
+  }
+}
+
+// ==================== SZCZEGÓŁOWY RAPORT ====================
+
+.training-summary-card {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.5rem 1.5rem;
+  margin-bottom: 1.5rem;
 
   .summary-item {
     display: flex;
-    gap: 6px;
-    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--ht-border);
+    font-size: var(--ht-fs-sm);
   }
 
   .label {
-    color: #666;
+    color: var(--ht-text-muted);
   }
 
   .value {
+    color: var(--ht-text-strong);
     font-weight: 600;
+    text-align: right;
 
     &.highlight {
-      color: #2e7d32;
+      color: var(--ht-primary-text);
     }
   }
 }
 
-.training-table-wrap {
-  overflow-x: auto;
+.training-details .training-card > h3 {
+  font-size: var(--ht-fs-md);
 }
 
 .training-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9em;
-
-  th, td {
-    padding: 8px 10px;
+  th,
+  td {
     text-align: center;
-    border-bottom: 1px solid #e8f5e9;
-    white-space: nowrap;
   }
 
   // Dużo kolumn z długimi nazwami — nagłówki zawijamy zamiast rozpychać tabelę.
-  th {
-    background: #2e7d32;
-    color: white;
-    font-weight: 600;
-    font-size: 0.85em;
+  thead th {
+    min-width: 64px;
     line-height: 1.25;
     white-space: normal;
-    min-width: 64px;
     vertical-align: bottom;
   }
 
-  // Kolumna z nazwiskiem zostaje widoczna przy przewijaniu tabeli w poziomie.
+  // Nazwisko zostaje widoczne przy przewijaniu w poziomie.
   .player-col {
     position: sticky;
     left: 0;
     z-index: 1;
-    text-align: left;
     min-width: 170px;
-    background: white;
+    background: var(--ht-surface);
+    box-shadow: inset -1px 0 0 var(--ht-border);
+    text-align: left;
   }
 
-  th.player-col {
+  thead .player-col {
     z-index: 2;
-    background: #2e7d32;
+    background: var(--ht-gray-50);
   }
 
-  .full-training,
-  .full-training .player-col {
-    background: #f1f8e9;
+  tbody tr.full-training > * {
+    background: var(--ht-green-50);
   }
 
-  .partial-training,
-  .partial-training .player-col {
-    background: #fffde7;
+  tbody tr.partial-training > * {
+    background: var(--ht-warning-bg);
   }
 }
 
 .training-player-warning {
   display: inline-block;
-  margin-left: 6px;
-  padding: 1px 6px;
-  border-radius: 8px;
-  background: #fff3e0;
-  border: 1px solid #ffcc80;
-  color: #e65100;
-  font-size: 0.75em;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: var(--ht-radius-pill);
+  background: var(--ht-warning-bg);
+  color: var(--ht-warning-text);
+  font-size: 0.6875rem;
   font-weight: 600;
   cursor: help;
 }
 
 .training-warnings {
-  margin: 12px 0 0;
-  padding: 8px 14px;
+  margin: 1rem 0 0;
+  padding: 0.75rem 1rem;
   list-style: none;
-  background: #fff8e1;
-  border: 1px solid #ffe082;
-  border-left: 4px solid #ffc107;
-  border-radius: 8px;
-  color: #8d6e00;
-  font-size: 0.85em;
+  background: var(--ht-warning-bg);
+  border: 1px solid var(--ht-warning-border);
+  border-radius: var(--ht-radius);
+  color: var(--ht-warning-text);
+  font-size: var(--ht-fs-sm);
 
   li + li {
-    margin-top: 4px;
+    margin-top: 0.3rem;
   }
 }
 
-.training-hint {
-  margin-top: 10px;
-  color: #777;
-  font-size: 0.85em;
+@media (max-width: 1150px) {
+  .match-plan-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
-.loading-indicator {
-  text-align: center;
-  padding: 20px;
-  color: #43a047;
-  font-style: italic;
+@media (max-width: 600px) {
+  .planner-intro,
+  .roster-search {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
-
-.error-message {
-  padding: 12px;
-  margin-bottom: 12px;
-  background: #ffebee;
-  color: #c62828;
-  border-radius: 6px;
-}
-
-.planner-intro { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; }
-.planner-intro h2 { margin: 0; color: #173d2a; font-size: 1.35rem; }
-.planner-intro p { margin: .5rem 0 0; }
-.plan-button { border: 1px solid #256640; border-radius: 7px; background: #256640; color: #fff; padding: .6rem .85rem; cursor: pointer; font: inherit; font-weight: 600; }
-.plan-button.secondary { color: #24543a; background: #f2f8f4; }
-.plan-button.remove { color: #9c3030; border-color: #e8cccc; background: #fff; padding: .4rem .7rem; }
-.plan-button:disabled { opacity: .5; cursor: not-allowed; }
-.roster-search { display: flex; align-items: center; gap: .7rem; margin-bottom: 1rem; }
-.roster-search input, .match-plan input, .match-plan select { padding: .5rem; border: 1px solid #aebfb4; border-radius: 5px; max-width: 100%; font: inherit; box-sizing: border-box; background: #fff; color: #203d2c; }
-.trainee-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .5rem; max-height: 330px; overflow-y: auto; }
-.trainee-picker > label { border: 1px solid #dde7df; border-radius: 6px; padding: .65rem; display: flex; align-items: center; gap: .6rem; cursor: pointer; }
-.trainee-picker > label.selected { background: #ecf6ee; border-color: #438358; }
-.trainee-picker small { display: block; color: #63736a; font-size: .78rem; margin-top: .2rem; }
-.availability-badge { font-size: .7rem; color: #9a3830; }
-.match-plan-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
-.match-plan { border: 1px solid #d6e3d9; border-radius: 8px; padding: 1rem; background: #fafcfb; min-width: 0; }
-.match-plan h4 { margin: 0 0 .9rem; }
-.fixture-select { margin-bottom: .7rem; }
-.match-plan label { display: flex; flex-direction: column; gap: .3rem; font-size: .8rem; min-width: 0; }
-.assignment { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; padding: 1rem 0; border-bottom: 1px solid #dce5df; }
-.assignment-player { grid-column: 1 / -1; }
-.assignment .remove { align-self: end; }
-.plan-actions { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1rem; }
-.suggestion-actions { align-items: center; margin-bottom: 1rem; }
-.suggestion-actions .training-hint { flex: 1; min-width: 180px; margin: 0; }
-.suggestion-result { padding: .7rem 1rem; background: #eff4f0; color: #435c4c; border-radius: 7px; margin-bottom: 1rem; font-size: .85rem; }
-.plan-issues { background: #fff7e6; padding: 1rem 1rem 1rem 2rem; border-radius: 6px; color: #7a5b16; font-size: .85rem; }
-.plan-issues li + li { margin-top: .4rem; }
-.plan-issues .issue-error { color: #9a3131; }
-.coverage-status { border-left: 3px solid #b98625; background: #fff8e9; padding: .7rem; }
-.coverage-status.ready { border-color: #3d8553; background: #eaf5ed; }
-.training-details > summary { padding: 1rem; background: #edf3ef; border-radius: 7px; color: #2e593c; cursor: pointer; margin-bottom: 1rem; font-weight: 600; }
-@media (max-width: 1150px) { .match-plan-grid { grid-template-columns: 1fr; } }
-@media (max-width: 600px) { .planner-intro, .roster-search { flex-direction: column; } .trainee-picker { grid-template-columns: 1fr; } }

@@ -22,8 +22,8 @@ public class PendingAuth
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
-// Cache w pamięci z write-through do SQL — tokeny przeżywają restart/skalowanie.
-// Gdy baza jest niedostępna (np. brak konfiguracji), działa wyłącznie w pamięci.
+// Development persists encrypted sessions to disk; deployments can use SQL.
+// The in-memory cache avoids repeated reads, but is not the local source of truth.
 public class TokenStore
 {
     private static readonly TimeSpan SlidingExpiry = TimeSpan.FromDays(30);
@@ -36,16 +36,30 @@ public class TokenStore
     private readonly string? _connectionString;
     private readonly IDataProtector _protector;
     private readonly ILogger<TokenStore> _logger;
+    private readonly LocalOAuthStore? _localStore;
     private DateTime _dbDisabledUntil = DateTime.MinValue;
     private DateTime _lastPurge = DateTime.MinValue;
     private bool _schemaEnsured;
     private readonly object _schemaLock = new();
 
-    public TokenStore(IConfiguration configuration, IDataProtectionProvider dataProtection, ILogger<TokenStore> logger)
+    public TokenStore(IConfiguration configuration, IDataProtectionProvider dataProtection, ILogger<TokenStore> logger,
+        IHostEnvironment? environment = null)
     {
         _connectionString = configuration.GetConnectionString("HattrickDb");
         _protector = dataProtection.CreateProtector("HattrickAnalizer.OAuthTokens");
         _logger = logger;
+        var provider = configuration["OAuth:StorageProvider"] ?? (environment?.IsDevelopment() == true ? "File" : "Sql");
+        if (string.Equals(provider, "File", StringComparison.OrdinalIgnoreCase))
+        {
+            var path = configuration["OAuth:StoragePath"] ?? "App_Data/oauth";
+            path = Path.GetFullPath(path, environment?.ContentRootPath ?? Directory.GetCurrentDirectory());
+            _localStore = new LocalOAuthStore(path, dataProtection, logger);
+            _connectionString = null;
+            _logger.LogInformation("OAuth sessions persist in encrypted local storage: {Path}", path);
+            return;
+        }
+        if (!string.Equals(provider, "Sql", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("OAuth:StorageProvider must be File or Sql.");
         if (string.IsNullOrEmpty(_connectionString))
         {
             _logger.LogWarning("Brak connection stringa HattrickDb — tokeny OAuth będą przechowywane tylko w pamięci i znikną po restarcie.");
@@ -58,7 +72,7 @@ public class TokenStore
 
         if (!_tokens.TryGetValue(sessionId, out var token))
         {
-            token = LoadFromDb(sessionId);
+            token = _localStore != null ? _localStore.Read(sessionId)?.Token : LoadFromDb(sessionId);
             if (token != null) _tokens[sessionId] = token;
         }
 
@@ -73,6 +87,7 @@ public class TokenStore
         if (DateTime.UtcNow - token.LastUsedAt > TouchInterval)
         {
             token.LastUsedAt = DateTime.UtcNow;
+            _localStore?.Update(sessionId, session => session.Token = token);
             TryDb(conn =>
             {
                 using var cmd = new SqlCommand("UPDATE dbo.OAuthSessions SET LastUsedAt = @now WHERE SessionId = @sid", conn);
@@ -97,7 +112,9 @@ public class TokenStore
     {
         if (string.IsNullOrEmpty(sessionId)) return;
         token.LastUsedAt = DateTime.UtcNow;
+        _localStore?.Update(sessionId, session => { session.Token = token; session.Pending = null; });
         _tokens[sessionId] = token;
+        _pending.TryRemove(sessionId, out _);
 
         TryDb(conn =>
         {
@@ -130,6 +147,7 @@ public class TokenStore
     public void Clear(string sessionId)
     {
         if (string.IsNullOrEmpty(sessionId)) return;
+        _localStore?.Delete(sessionId);
         _tokens.TryRemove(sessionId, out _);
         _pending.TryRemove(sessionId, out _);
 
@@ -144,6 +162,7 @@ public class TokenStore
     public void SavePending(string sessionId, PendingAuth pending)
     {
         if (string.IsNullOrEmpty(sessionId)) return;
+        _localStore?.Update(sessionId, session => session.Pending = pending);
         _pending[sessionId] = pending;
 
         TryDb(conn =>
@@ -172,14 +191,14 @@ public class TokenStore
 
         if (!_pending.TryGetValue(sessionId, out var pending))
         {
-            pending = LoadPendingFromDb(sessionId);
+            pending = _localStore != null ? _localStore.Read(sessionId)?.Pending : LoadPendingFromDb(sessionId);
             if (pending != null) _pending[sessionId] = pending;
         }
 
         if (pending == null) return null;
         if (DateTime.UtcNow - pending.CreatedAt > PendingExpiry)
         {
-            _pending.TryRemove(sessionId, out _);
+            ClearPending(sessionId);
             return null;
         }
         return pending;
@@ -188,7 +207,14 @@ public class TokenStore
     public void ClearPending(string sessionId)
     {
         if (string.IsNullOrEmpty(sessionId)) return;
+        _localStore?.Update(sessionId, session => session.Pending = null);
         _pending.TryRemove(sessionId, out _);
+        TryDb(conn =>
+        {
+            using var cmd = new SqlCommand("UPDATE dbo.OAuthSessions SET RequestToken = NULL, RequestTokenSecret = NULL WHERE SessionId = @sid", conn);
+            cmd.Parameters.AddWithValue("@sid", sessionId);
+            cmd.ExecuteNonQuery();
+        });
     }
 
     private StoredToken? LoadFromDb(string sessionId)

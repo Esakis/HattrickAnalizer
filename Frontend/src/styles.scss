@@ -1,28 +1,105 @@
-// Style globalne: paleta, reset i wspólne elementy stron (nagłówek strony).
+// Style globalne: zmienne (paleta, typografia, kształty), reset oraz wspólne elementy UI
+// (przyciski, pola, karty, tabele, komunikaty). Komponenty dokładają już tylko własny układ.
+
 :root {
-  --ht-green-900: #1b5e20;
-  --ht-green-800: #2e7d32;
-  --ht-green-600: #43a047;
-  --ht-green-400: #66bb6a;
-  --ht-green-200: #a5d6a7;
-  --ht-green-100: #c8e6c9;
-  --ht-green-50: #e8f5e9;
+  // Zieleń marki (boisko) — akcent aplikacji i elementy „moja drużyna”.
+  --ht-green-50: #eef7f1;
+  --ht-green-100: #d8ede0;
+  --ht-green-200: #b4dbc3;
+  --ht-green-300: #85c19e;
+  --ht-green-400: #51a273;
+  --ht-green-500: #2f8656;
+  --ht-green-600: #246f46;
+  --ht-green-700: #1d5a39;
+  --ht-green-800: #17472e;
+  --ht-green-900: #103422;
 
-  --ht-bg: #f2f5f1;
+  // Szarości z lekkim zielonym odcieniem.
+  --ht-gray-25: #fafbfa;
+  --ht-gray-50: #f4f6f5;
+  --ht-gray-100: #ecf0ee;
+  --ht-gray-200: #dfe5e2;
+  --ht-gray-300: #c9d2cd;
+  --ht-gray-400: #9aa7a0;
+  --ht-gray-500: #6e7c75;
+  --ht-gray-600: #55625b;
+  --ht-gray-700: #3c4741;
+  --ht-gray-800: #26302b;
+  --ht-gray-900: #151c18;
+
+  // Role kolorów.
+  --ht-bg: var(--ht-gray-50);
   --ht-surface: #ffffff;
-  --ht-border: #dfe7dc;
-  --ht-text: #1f2a1f;
-  --ht-text-muted: #5f6f5f;
+  --ht-surface-muted: var(--ht-gray-25);
+  --ht-border: var(--ht-gray-200);
+  --ht-border-strong: var(--ht-gray-300);
+  --ht-text: var(--ht-gray-800);
+  --ht-text-strong: var(--ht-gray-900);
+  --ht-text-muted: var(--ht-gray-600);
+  --ht-text-subtle: var(--ht-gray-500);
 
+  --ht-primary: var(--ht-green-600);
+  --ht-primary-hover: var(--ht-green-700);
+  --ht-primary-text: var(--ht-green-700);
+
+  // Rywal — spokojny grafit zamiast „alarmowej” czerwieni.
+  --ht-opponent: #56677b;
+
+  --ht-success: var(--ht-green-500);
+  --ht-success-bg: #edf7f1;
+  --ht-success-border: #c2e2cf;
+  --ht-success-text: var(--ht-green-700);
+  --ht-warning: #c98a12;
+  --ht-warning-bg: #fff8e8;
+  --ht-warning-border: #f0d9a6;
+  --ht-warning-text: #7a4f05;
+  --ht-danger: #c53939;
+  --ht-danger-bg: #fdf1f1;
+  --ht-danger-border: #f0c8c8;
+  --ht-danger-text: #9b2c2c;
+  --ht-info: #3b74b5;
+  --ht-info-bg: #eef4fb;
+  --ht-info-border: #cadcf0;
+  --ht-info-text: #24507e;
+
+  // Typografia.
+  --ht-font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --ht-font-mono: 'Cascadia Mono', Consolas, 'SFMono-Regular', Menlo, monospace;
+  --ht-fs-xs: 0.75rem;
+  --ht-fs-sm: 0.8125rem;
+  --ht-fs-base: 0.9375rem;
+  --ht-fs-md: 1rem;
+  --ht-fs-lg: 1.125rem;
+  --ht-fs-xl: 1.375rem;
+  --ht-fs-2xl: 1.75rem;
+
+  // Kształt i głębia.
+  --ht-radius-sm: 6px;
   --ht-radius: 10px;
-  --ht-shadow: 0 1px 3px rgba(27, 94, 32, 0.08), 0 4px 14px rgba(27, 94, 32, 0.06);
-  --ht-font: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --ht-radius-lg: 14px;
+  --ht-radius-pill: 999px;
+  --ht-shadow-xs: 0 1px 2px rgba(16, 52, 34, 0.06);
+  --ht-shadow-sm: 0 1px 3px rgba(16, 52, 34, 0.06), 0 1px 2px rgba(16, 52, 34, 0.04);
+  --ht-shadow-md: 0 8px 20px rgba(16, 52, 34, 0.08), 0 2px 6px rgba(16, 52, 34, 0.05);
+  --ht-shadow-lg: 0 24px 56px rgba(16, 52, 34, 0.22);
+  --ht-focus-ring: 0 0 0 3px rgba(47, 134, 86, 0.28);
+
+  // Rytm układu.
+  --ht-gap: 1rem;
+  --ht-card-padding: 1.25rem 1.5rem;
 }
+
+// ==================== RESET I TYPOGRAFIA ====================
 
 *,
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scrollbar-color: var(--ht-gray-300) transparent;
 }
 
 html,
@@ -33,17 +110,84 @@ body {
 
 body {
   font-family: var(--ht-font);
+  font-size: var(--ht-fs-base);
+  line-height: 1.5;
   color: var(--ht-text);
   background: var(--ht-bg);
-  line-height: 1.4;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-button,
-input,
-select,
-textarea {
-  font-family: inherit;
+h1,
+h2,
+h3,
+h4,
+h5 {
+  margin: 0 0 0.5rem;
+  color: var(--ht-text-strong);
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+h1 {
+  font-size: var(--ht-fs-2xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: var(--ht-fs-xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  font-size: var(--ht-fs-lg);
+}
+
+h4 {
+  font-size: var(--ht-fs-md);
+}
+
+p {
+  margin: 0 0 0.75rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+ul,
+ol {
+  margin: 0 0 0.75rem;
+  padding-left: 1.25rem;
+}
+
+small {
+  font-size: var(--ht-fs-xs);
+}
+
+strong,
+b {
+  font-weight: 600;
+}
+
+a {
+  color: var(--ht-primary-text);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+
+  &:hover {
+    color: var(--ht-green-800);
+  }
+}
+
+code {
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: var(--ht-gray-100);
+  font-family: var(--ht-font-mono);
+  font-size: 0.9em;
 }
 
 :focus-visible {
@@ -51,29 +195,606 @@ textarea {
   outline-offset: 2px;
 }
 
-// Nagłówek strony (tytuł + podtytuł) — wspólny dla wszystkich zakładek.
+::selection {
+  background: var(--ht-green-100);
+}
+
+// ==================== UKŁAD STRONY ====================
+
+// Korzeń każdej zakładki: sekcje jedna pod drugą w stałym odstępie.
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-gap);
+  min-width: 0;
+}
+
+// Nagłówek zakładki: tytuł, podtytuł i ewentualne akcje po prawej.
 .page-header {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 14px 20px;
-  margin-bottom: 15px;
-  background: var(--ht-surface);
-  border-radius: var(--ht-radius);
-  border-left: 5px solid var(--ht-green-800);
-  box-shadow: var(--ht-shadow);
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  padding: 0.25rem 0 0.25rem;
 
   h1 {
     margin: 0;
-    font-size: 1.45em;
-    font-weight: 700;
-    color: var(--ht-green-900);
   }
 
   .subtitle {
-    margin: 4px 0 0;
-    font-size: 0.88em;
+    margin: 0.3rem 0 0;
     color: var(--ht-text-muted);
+    font-size: var(--ht-fs-base);
+  }
+}
+
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.eyebrow {
+  display: block;
+  margin: 0 0 0.35rem;
+  color: var(--ht-green-600);
+  font-size: var(--ht-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+// ==================== KARTY ====================
+
+.card {
+  min-width: 0;
+  padding: var(--ht-card-padding);
+  background: var(--ht-surface);
+  border: 1px solid var(--ht-border);
+  border-radius: var(--ht-radius-lg);
+  box-shadow: var(--ht-shadow-sm);
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.card-title {
+  margin: 0;
+  color: var(--ht-text-strong);
+  font-size: var(--ht-fs-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.card-subtitle {
+  margin: 0.25rem 0 0;
+  color: var(--ht-text-muted);
+  font-size: var(--ht-fs-sm);
+}
+
+// Karta-harmonijka: <details class="card disclosure"> z nagłówkiem w <summary>.
+.disclosure {
+  padding: 0 1.5rem;
+
+  > summary {
+    margin: 0 -1.5rem;
+    padding: 1rem 1.5rem;
+    border-radius: var(--ht-radius-lg);
+  }
+
+  &[open] {
+    padding-bottom: 1.25rem;
+
+    > summary {
+      margin-bottom: 1.25rem;
+      border-bottom: 1px solid var(--ht-border);
+      border-radius: var(--ht-radius-lg) var(--ht-radius-lg) 0 0;
+    }
+  }
+}
+
+// ==================== PRZYCISKI ====================
+
+button {
+  font: inherit;
+}
+
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.375rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-surface);
+  color: var(--ht-text-strong);
+  font: inherit;
+  font-size: var(--ht-fs-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--ht-focus-ring);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+}
+
+.btn-primary {
+  background: var(--ht-primary);
+  border-color: var(--ht-primary);
+  color: #fff;
+  box-shadow: var(--ht-shadow-xs);
+
+  &:hover:not(:disabled) {
+    background: var(--ht-primary-hover);
+    border-color: var(--ht-primary-hover);
+    color: #fff;
+  }
+}
+
+.btn-secondary {
+  border-color: var(--ht-border-strong);
+  box-shadow: var(--ht-shadow-xs);
+
+  &:hover:not(:disabled) {
+    background: var(--ht-gray-50);
+    border-color: var(--ht-gray-400);
+    color: var(--ht-text-strong);
+  }
+}
+
+.btn-danger {
+  border-color: var(--ht-danger-border);
+  color: var(--ht-danger-text);
+
+  &:hover:not(:disabled) {
+    background: var(--ht-danger-bg);
+    color: var(--ht-danger-text);
+  }
+}
+
+.btn-sm {
+  min-height: 2rem;
+  padding: 0.3rem 0.7rem;
+  font-size: var(--ht-fs-xs);
+}
+
+.btn-lg {
+  min-height: 2.75rem;
+  padding: 0.65rem 1.4rem;
+  font-size: var(--ht-fs-base);
+}
+
+// Link tekstowy z akcją (np. „Sprawdź rywala →”).
+.text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--ht-primary-text);
+  font-size: var(--ht-fs-sm);
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+// Przełącznik segmentowy (widok, tryb symulacji, zakładki).
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  background: var(--ht-gray-100);
+  border: 1px solid var(--ht-border);
+  border-radius: var(--ht-radius);
+
+  > button {
+    padding: 0.4rem 0.85rem;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ht-text-muted);
+    font-size: var(--ht-fs-sm);
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+
+    &:hover:not(:disabled) {
+      color: var(--ht-text-strong);
+    }
+
+    &.active {
+      background: var(--ht-surface);
+      color: var(--ht-primary-text);
+      box-shadow: var(--ht-shadow-sm);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--ht-focus-ring);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+// ==================== POLA FORMULARZY ====================
+
+// :where() ma zerową specyficzność — komponent może nadpisać dowolną właściwość.
+:where(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']), select, textarea) {
+  min-height: 2.375rem;
+  max-width: 100%;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--ht-border-strong);
+  border-radius: var(--ht-radius-sm);
+  background-color: var(--ht-surface);
+  color: var(--ht-text-strong);
+  font: inherit;
+  font-size: var(--ht-fs-sm);
+  font-weight: 400;
+  line-height: 1.3;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover:not(:disabled) {
+    border-color: var(--ht-gray-400);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--ht-green-500);
+    box-shadow: var(--ht-focus-ring);
+  }
+
+  &:disabled,
+  &[readonly] {
+    background-color: var(--ht-gray-50);
+    color: var(--ht-text-muted);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+
+  &::placeholder {
+    color: var(--ht-gray-400);
+  }
+}
+
+:where(select) {
+  padding-right: 2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%2355625b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  background-size: 12px 12px;
+  appearance: none;
+  cursor: pointer;
+}
+
+:where(input[type='checkbox'], input[type='radio']) {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  flex: none;
+  accent-color: var(--ht-primary);
+  cursor: pointer;
+}
+
+// Pole z etykietą nad kontrolką.
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+
+  > label {
+    color: var(--ht-text-muted);
+    font-size: var(--ht-fs-xs);
+    font-weight: 600;
+  }
+}
+
+.hint,
+.optimizer-help {
+  display: block;
+  color: var(--ht-text-subtle);
+  font-size: var(--ht-fs-xs);
+  line-height: 1.5;
+}
+
+// ==================== TABELE ====================
+
+.table-wrap {
+  overflow-x: auto;
+  background: var(--ht-surface);
+  border: 1px solid var(--ht-border);
+  border-radius: var(--ht-radius);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--ht-fs-sm);
+  font-variant-numeric: tabular-nums;
+
+  th,
+  td {
+    padding: 0.6rem 0.75rem;
+    text-align: left;
+    vertical-align: middle;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--ht-border);
+  }
+
+  thead th {
+    background: var(--ht-gray-50);
+    color: var(--ht-text-muted);
+    font-size: var(--ht-fs-xs);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  tbody th {
+    color: var(--ht-text-strong);
+    font-weight: 600;
+  }
+
+  tbody tr:last-child > * {
+    border-bottom: 0;
+  }
+
+  tbody tr > * {
+    transition: background-color 0.12s ease;
+  }
+
+  tbody tr:hover > * {
+    background-color: var(--ht-gray-25);
+  }
+
+  .num {
+    text-align: right;
+  }
+
+  .center {
+    text-align: center;
+  }
+}
+
+// Wiersze-przyciski (np. wybór wariantu, karta zawodnika).
+.data-table.is-interactive tbody tr {
+  cursor: pointer;
+
+  &:hover > * {
+    background-color: var(--ht-green-50);
+  }
+}
+
+// ==================== KOMUNIKATY ====================
+
+.alert,
+.error-message,
+.warning-message,
+.info-message,
+.success-message {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid;
+  border-left-width: 3px;
+  border-radius: var(--ht-radius);
+  font-size: var(--ht-fs-sm);
+  line-height: 1.5;
+}
+
+.alert-info,
+.info-message {
+  background: var(--ht-info-bg);
+  border-color: var(--ht-info-border);
+  border-left-color: var(--ht-info);
+  color: var(--ht-info-text);
+}
+
+.alert-warning,
+.warning-message {
+  background: var(--ht-warning-bg);
+  border-color: var(--ht-warning-border);
+  border-left-color: var(--ht-warning);
+  color: var(--ht-warning-text);
+}
+
+.alert-danger,
+.error-message {
+  background: var(--ht-danger-bg);
+  border-color: var(--ht-danger-border);
+  border-left-color: var(--ht-danger);
+  color: var(--ht-danger-text);
+}
+
+.alert-success,
+.success-message {
+  background: var(--ht-success-bg);
+  border-color: var(--ht-success-border);
+  border-left-color: var(--ht-success);
+  color: var(--ht-success-text);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.12rem 0.55rem;
+  border-radius: var(--ht-radius-pill);
+  background: var(--ht-gray-100);
+  color: var(--ht-text-muted);
+  font-size: var(--ht-fs-xs);
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.badge-success {
+  background: var(--ht-success-bg);
+  color: var(--ht-success-text);
+}
+
+// ==================== HARMONIJKI ====================
+
+details > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--ht-text-strong);
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+
+  &::-webkit-details-marker {
+    display: none;
+  }
+
+  // Strzałka rozwijania.
+  &::before {
+    content: '';
+    flex: none;
+    width: 0.45rem;
+    height: 0.45rem;
+    margin: 0 0.1rem;
+    border-right: 2px solid var(--ht-text-subtle);
+    border-bottom: 2px solid var(--ht-text-subtle);
+    transform: rotate(-45deg);
+    transition: transform 0.15s ease;
+  }
+
+  &:hover {
+    color: var(--ht-primary-text);
+  }
+}
+
+details[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+// ==================== STANY ====================
+
+.empty-state {
+  margin: 0;
+  padding: 1.5rem 1rem;
+  color: var(--ht-text-muted);
+  font-size: var(--ht-fs-sm);
+  text-align: center;
+}
+
+.loading-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 1.5rem 1rem;
+  color: var(--ht-text-muted);
+  font-size: var(--ht-fs-sm);
+
+  &::before {
+    content: '';
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--ht-green-100);
+    border-top-color: var(--ht-green-500);
+    border-radius: 50%;
+    animation: ht-spin 0.8s linear infinite;
+  }
+}
+
+@keyframes ht-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Kafelek z pojedynczą liczbą (KPI).
+.stat-tile {
+  min-width: 0;
+  padding: 1rem 1.25rem;
+  background: var(--ht-surface);
+  border: 1px solid var(--ht-border);
+  border-radius: var(--ht-radius-lg);
+  box-shadow: var(--ht-shadow-sm);
+
+  .stat-value {
+    color: var(--ht-text-strong);
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat-label {
+    margin-top: 0.25rem;
+    color: var(--ht-text-muted);
+    font-size: var(--ht-fs-sm);
+  }
+}
+
+// ==================== POMOCNICZE ====================
+
+.muted {
+  color: var(--ht-text-muted);
+}
+
+.positive {
+  color: var(--ht-green-600);
+}
+
+.negative {
+  color: var(--ht-danger);
+}
+
+@media (max-width: 640px) {
+  :root {
+    --ht-card-padding: 1rem;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  .disclosure {
+    padding: 0 1rem;
+
+    > summary {
+      margin: 0 -1rem;
+      padding: 0.9rem 1rem;
+    }
   }
 }

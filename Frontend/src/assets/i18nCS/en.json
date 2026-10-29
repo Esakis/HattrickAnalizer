@@ -273,6 +273,9 @@
     "predictedOpponentLineup": "Predicted Opponent Lineup"
   },
   "oauth": {
+    "checkingSession": "Checking your saved sign-in…",
+    "remembered": "Your sign-in is remembered in this browser. Restarting the local app does not require authorization again. The session expires after 30 days of inactivity.",
+    "logout": "Sign out and forget this sign-in",
     "title": "Hattrick OAuth Configuration",
     "step1": {
       "title": "Step 1: Start Authorization",

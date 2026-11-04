@@ -75,10 +75,32 @@ describe('LineupOptimizerComponent', () => {
       onLangChange: new Subject(),
       onTranslationChange: new Subject()
     } as unknown as TranslateService;
-    component = new LineupOptimizerComponent(api, translate, cache);
+    component = new LineupOptimizerComponent(api, translate, cache, {getPlan:()=>undefined,save:()=>true} as any);
     component.myTeamId = 1;
     component.opponentTeamId = 2;
     cache.nextOpponent$.next({ matchId: 42, opponentTeamId: 2, opponentTeamName: 'Opp', isHomeMatch: true });
+  });
+
+  it('clears training-specific constraints when selecting a different fixture', () => {
+    component.trainingHandoff={teamId:1,weekStart:'',matchDate:'2099-01-01T00:00:00Z',assignments:[{playerId:7,match:'friendly',slot:'IM',startMinute:0,minutes:90}]};
+    component.requiredPlayerIds=[7,8]; component.excludedPlayerIds=[9]; component.lockedPositions={IM:7}; component.requiredPositionSlots=['IM'];
+    component.upcomingMatches=[{matchId:50,opponentTeamId:2,opponentTeamName:'Other',matchDate:'2099-01-02T00:00:00Z'}];
+    spyOn(component,'loadOpponentTeam'); spyOn(component,'loadOpponentTeamStats'); spyOn(component,'loadOpponentScout');
+    component.selectUpcomingMatch(50);
+    expect(component.trainingHandoff).toBeNull();
+    expect(component.requiredPlayerIds).toEqual([8]);
+    expect(component.excludedPlayerIds).toEqual([9]);
+    expect(component.lockedPositions).toEqual({});
+    expect(component.requiredPositionSlots).toEqual([]);
+  });
+
+  it('loads formation experience even when the dashboard has already cached the roster', () => {
+    component.myTeamPlayers = [player(1)];
+    component.lastLoadedMyTeamId = 1;
+    component.loadMyTeam();
+    expect(api.getFormationExperience).toHaveBeenCalledWith(1);
+    formationExperienceSubjects[0].next({'4-4-2':10});
+    expect(component.formationExperience['4-4-2']).toBe(10);
   });
 
   it('switches the displayed full lineup and exports the selected alternative snapshot', () => {
@@ -138,6 +160,11 @@ describe('LineupOptimizerComponent', () => {
     expect(component.resultStale).toBeFalse();
     expect(component.teamSpiritLevel).toBe(5);
     expect(component.confidenceLevel).toBe(5);
+    component.result=null; (component as any).restoredPlanKey='';
+    cache.formationExperience$.next({'4-4-2':10});
+    (component as any).tryRestorePlan();
+    expect(component.formationExperience['4-4-2']).toBe(10);
+    expect(component.resultStale).toBeTrue();
     component.result=null; (component as any).restoredPlanKey='';
     component.myTeamPlayers=players.map((p,i)=>i===0?{...p,form:p.form+1}:p);
     (component as any).tryRestorePlan();

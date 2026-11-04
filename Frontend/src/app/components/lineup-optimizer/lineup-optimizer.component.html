@@ -194,7 +194,7 @@
 
   </details>
   <p *ngIf="storageWarning" class="warning-message">{{ 'workbench.storageWarning' | translate }}</p>
-  <app-match-workbench *ngIf="result" [response]="result" [lineup]="displayedLineup" [reference]="referenceResult" [players]="myTeamPlayers" [stale]="resultStale" [mockMode]="mockMode" [nextMatch]="nextMatch" [selectedAlternative]="selectedAlternative" [teamContextKey]="teamContextKey" (evaluated)="applyManualResponse($event)"></app-match-workbench>
+  <app-match-workbench *ngIf="result" [response]="result" [lineup]="displayedLineup" [reference]="referenceResult" [players]="myTeamPlayers" [stale]="resultStale" [mockMode]="mockMode" [nextMatch]="nextMatch" [selectedAlternative]="selectedAlternative" [teamContextKey]="teamContextKey" [trainingPlan]="activeTrainingPlan" (evaluated)="applyManualResponse($event)"></app-match-workbench>
   <ng-container *ngIf="result">
     <section class="card alternatives-section" *ngIf="result.alternatives?.length">
       <div class="card-header">

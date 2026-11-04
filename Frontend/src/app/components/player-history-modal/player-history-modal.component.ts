@@ -1,4 +1,4 @@
-﻿import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges, ViewChild, ElementRef, OnDestroy } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges, ViewChild, ElementRef, OnDestroy } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { TranslateService } from '@ngx-translate/core';
 import { PlayerHistoryService, PlayerSkillHistory } from '../../services/player-history.service';
@@ -26,7 +26,7 @@ export class PlayerHistoryModalComponent implements OnChanges, OnDestroy {
   readonly columns: Record<Tab, Metric[]> = {
     skills: ['keeper', 'defending', 'playmaking', 'winger', 'passing', 'scoring', 'setPieces'],
     basic: ['form', 'stamina', 'age', 'tsi', 'experience', 'loyalty', 'leadership', 'injuryLevel'],
-    matches: ['totalMatches', 'goals', 'assists', 'yellowCards', 'redCards', 'averageRating', 'averageForm', 'minutesPlayed']
+    matches: ['totalMatches', 'yellowCards', 'redCards', 'averageRating', 'minutesPlayed']
   };
   private chart: Chart | null = null;
   private request?: Subscription;

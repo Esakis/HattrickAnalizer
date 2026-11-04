@@ -8,6 +8,7 @@ public class OptimizerRequest
     // Postawa druzyny: "Normal" (normalne spotkanie), "PIC" (gra na luzie), "MOTS" (mecz sezonu)
     public string TeamAttitude { get; set; } = "Normal";
     public List<string> FocusAreas { get; set; } = new();
+    public List<string> RequiredPositionSlots { get; set; } = new();
     public List<int> RequiredPlayerIds { get; set; } = new();
     public List<int> ExcludedPlayerIds { get; set; } = new();
     public Dictionary<string, int> LockedPositions { get; set; } = new();
@@ -44,6 +45,7 @@ public class OptimizerRequest
 
 public class EvaluateLineupRequest
 {
+    public int? SetPiecesTakerId { get; set; }
     public OptimizerRequest Context { get; set; } = new();
     public Dictionary<string, EvaluationPosition> Positions { get; set; } = new();
     public string Tactic { get; set; } = "Normal";

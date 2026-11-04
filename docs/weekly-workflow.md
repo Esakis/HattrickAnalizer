@@ -1,4 +1,4 @@
-﻿# Weekly management workflow
+# Weekly management workflow
 
 The application now connects weekly training, opponent analysis, match preparation and post-match review. The home page (`/`) summarizes the next match, the saved plan, missing training minutes and recent squad changes.
 
@@ -8,6 +8,8 @@ The application now connects weekly training, opponent analysis, match preparati
 2. In **Training** (`/training`), select trainees and assign positions, start minutes and durations for the league and friendly slots. The planner combines recorded and planned minutes, caps coverage at the best 90 minutes, and distinguishes full, half and unknown effects.
 3. Check conflicts, unavailable players, missing dates and incomplete observations. Suggested assignments preserve existing assignments. Unknown historical minutes do not become zero minutes.
 4. Send the selected match's trainees and locked starting positions to the optimizer. A real fixture is linked only when its identity or type/date can be matched to an upcoming match. Otherwise the result is a draft.
+
+Training handoff preserves all intervals, reserves later entrants out of the starting XI, and constrains the formation to contain every training slot. Use **Apply planned substitutions** after optimization. Confirmation checks the actual orders against the promised intervals. The automatic handoff supports fixed positions, five-minute boundaries and at most five unconditional orders; unsupported timelines remain explicit errors. Switching fixtures clears training-specific constraints.
 
 The current planner has league and friendly planning slots; it is not a complete cup or multiweek calendar. Projected minutes assume the planned appearances happen. Injuries, red cards and conditional substitutions can change the actual training received. The planner does not claim exact skill-up dates or transfer values.
 
@@ -43,7 +45,7 @@ New captures preserve the ratings and model version computed before kickoff. Old
 
 | Data | Location | Scope and persistence |
 | --- | --- | --- |
-| Match plans | Browser `localStorage`, keys starting `hattrick.matchPlans.v1.` | Per team, match and opponent; up to 16 plans per team. Bound to this browser profile and site origin. |
+| Match plans | Browser `localStorage`, keys starting `hattrick.matchPlans.v2.` (legacy v1 records remain readable) | Per team, match and opponent; one independent record per match; no fixed count cap. Bound to this browser profile and site origin. |
 | Weekly training plans | Browser `localStorage`, keys starting `hattrick.training-plan.v1.` | Per team and training-week start. Bound to this browser profile and site origin. |
 | Player history | Server `App_Data/player-history/team-<id>.json` | Persistent observations and recent changes, isolated by own team. |
 | Calibration captures | Server `App_Data/calibration/team-<id>.json` | Persistent pre-match snapshots and forecasts, isolated by own team. |
@@ -55,3 +57,7 @@ The server paths above are relative to the ASP.NET application content root (nor
 SQL is not required for player history. If `ConnectionStrings:HattrickDb` is configured and available, existing rows from `PlayerSkillHistory` are imported into the per-team local store. New history is stored in JSON; SQL is not a second synchronized copy. SQL unavailability does not disable local history.
 
 With `UseMockData=true`, both server stores use a separate `demo/` subdirectory, and legacy SQL history is not imported. The interface labels demo data, and live CHPP requests and match-order writes remain disabled.
+
+CHPP timestamps without an offset are interpreted as Europe/Stockholm wall time ([CHPP time implementation](https://pkg.go.dev/github.com/lucianoq/hattrick/chpp#HattrickTime)); UTC is used across the API. Weather comparisons use the local Hattrick calendar date. Ambiguous or nonexistent DST timestamps remain unknown.
+
+Player tables distinguish career and season goals from the recent match sample. The current matchlineup aggregation does not supply sample goals, assists or historical form; these fields and goal rates remain null, and unavailable metrics are not shown as measured zeroes.

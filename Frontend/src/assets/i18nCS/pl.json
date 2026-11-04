@@ -74,7 +74,10 @@
       "scoring": "Skuteczność",
       "setPieces": "Stałe fragmenty"
     },
-    "unknown": "nieznany"
+    "unknown": "nieznany",
+    "careerGoals": "Gole w karierze",
+    "sampleMatches": "Mecze w próbce",
+    "seasonGoals": "Gole w sezonie"
   },
   "optimizer": {
     "title": "Przygotuj skład na mecz",

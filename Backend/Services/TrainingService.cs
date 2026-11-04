@@ -844,8 +844,7 @@ public class TrainingService
         return int.TryParse(player == null ? null : ChildValue(player, "PlayerID"), out var playerId)
             ? playerId : null;
     }
-    private static DateTime? ParseDate(string? value) => DateTime.TryParse(value, CultureInfo.InvariantCulture,
-        DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var date) ? date : null;
+    private static DateTime? ParseDate(string? value) => ChppTime.Parse(value);
 
     private sealed class PlayerTrainingMinutes
     {

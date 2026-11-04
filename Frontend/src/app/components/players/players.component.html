@@ -138,24 +138,16 @@
               <span class="sort-icon" *ngIf="playerSortColumn === 'setPieces'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
             </th>
             <th (click)="sortTable('goals')" class="sortable">
-              Bramki
+              {{ 'players.careerGoals' | translate }}
               <span class="sort-icon" *ngIf="playerSortColumn === 'goals'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
             </th>
-            <th (click)="sortTable('assists')" class="sortable">
-              Asysty
-              <span class="sort-icon" *ngIf="playerSortColumn === 'assists'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            <th (click)="sortTable('seasonGoals')" class="sortable">
+              {{ 'players.seasonGoals' | translate }}
+              <span class="sort-icon" *ngIf="playerSortColumn === 'seasonGoals'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
             </th>
-            <th (click)="sortTable('avgForm')" class="sortable">
-              Śr. Forma
-              <span class="sort-icon" *ngIf="playerSortColumn === 'avgForm'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
-            </th>
-            <th (click)="sortTable('goalsPerMatch')" class="sortable">
-              Bramki/Mecz
-              <span class="sort-icon" *ngIf="playerSortColumn === 'goalsPerMatch'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
-            </th>
-            <th (click)="sortTable('matchesPerGoal')" class="sortable">
-              Mecze/Bramka
-              <span class="sort-icon" *ngIf="playerSortColumn === 'matchesPerGoal'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
+            <th (click)="sortTable('sampleMatches')" class="sortable">
+              {{ 'players.sampleMatches' | translate }}
+              <span class="sort-icon" *ngIf="playerSortColumn === 'sampleMatches'">{{ playerSortDirection === 'asc' ? '▲' : '▼' }}</span>
             </th>
           </tr>
         </thead>
@@ -181,11 +173,9 @@
             <td>{{ isSkillAvailable(player, 'passing') ? player.skills.passing : '—' }}</td>
             <td>{{ isSkillAvailable(player, 'scoring') ? player.skills.scoring : '—' }}</td>
             <td>{{ isSkillAvailable(player, 'setPieces') ? player.skills.setPieces : '—' }}</td>
-            <td>{{ (player.matchStats?.goals ?? 0) || '—' }}</td>
-            <td>{{ player.matchStats?.assists || '—' }}</td>
-            <td>{{ (player.matchStats?.averageForm ?? player.form) | number:'1.1-1' }}</td>
-            <td>{{ player.matchStats?.totalMatches ? (player.matchStats?.goalsPerMatch | number:'1.2-2') : '—' }}</td>
-            <td>{{ player.matchStats?.matchesPerGoal ? (player.matchStats?.matchesPerGoal | number:'1.1-1') : '—' }}</td>
+            <td>{{ player.matchStats?.careerGoals ?? '—' }}</td>
+            <td>{{ player.matchStats?.seasonGoals ?? '—' }}</td>
+            <td>{{ player.matchStats?.totalMatches ?? '—' }}</td>
           </tr>
         </tbody>
       </table>

@@ -197,6 +197,27 @@ public class MatchOrdersService
             if (order.PlayerInId == order.PlayerOutId && order.Position == -1 && order.Behaviour == -1)
                 return "A behaviour-change order must change position or behaviour.";
         }
+        if (request.Substitutions.All(o => o.Minute >= 0 && o.Standing == -1))
+        {
+            var pitch = request.Positions.ToDictionary(p => p.Key, p => (Id: p.Value.PlayerId, Behaviour: BehaviourCode(p.Key, p.Value.Behaviour)));
+            var used = ids.ToHashSet();
+            foreach (var order in request.Substitutions.OrderBy(o => o.Minute == 46 ? 45 : o.Minute == 91 ? 90 : o.Minute))
+            {
+                var from = pitch.FirstOrDefault(p => p.Value.Id == order.PlayerOutId);
+                if (from.Key == null) return "An unconditional order removes a player who is not on the pitch at that time.";
+                if (order.PlayerInId != order.PlayerOutId && !used.Add(order.PlayerInId))
+                    return "A player cannot enter the pitch twice.";
+                var target = order.Position < 0 ? from.Key : RoleIdToSlot(100 + order.Position);
+                if (target != from.Key && pitch.ContainsKey(target)) return "An unconditional order moves a player into an occupied position.";
+                var behaviour = order.Behaviour < 0 ? from.Value.Behaviour : order.Behaviour;
+                if (!FormationData.SlotBehaviourOptions[target].Any(b => BehaviourCode(target, b) == behaviour))
+                    return "The order behaviour is not legal for the player's position at that time.";
+                pitch.Remove(from.Key);
+                pitch[target] = (order.PlayerInId, behaviour);
+                if (!pitch.ContainsKey("GK") || !FormationData.Formations.Values.Any(f => f.Positions.ToHashSet(StringComparer.Ordinal).SetEquals(pitch.Keys)))
+                    return "An unconditional order creates an unsupported formation.";
+            }
+        }
         return null;
     }
 

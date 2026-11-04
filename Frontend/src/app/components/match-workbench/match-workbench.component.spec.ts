@@ -11,6 +11,18 @@ describe('MatchWorkbenchComponent', () => {
     component.response={inputSnapshot:{myTeamId:1,opponentTeamId:2,matchId:3,matchDate:'2099-01-01T00:00:00Z'},alternatives:[]} as unknown as OptimizerResponse;
     component.nextMatch={matchId:3,opponentTeamId:2,opponentTeamName:'Opponent'};
   });
+  it('clears previous fixture orders when a new match has no saved orders', () => {
+    api.getTrainingSummary=()=>of({teamId:1});
+    component.lineup={positions:{GK:{player:{playerId:1},behavior:'GK'}},tacticType:'Normal',setPiecesTakerId:1} as any;
+    component.players=[{playerId:1,skills:{setPieces:1},experience:1,leadership:1}] as any;
+    component.lastKey='1:2:2';
+    component.bench[0]=77; component.kickers[0]=77; component.addSubstitution();
+    component.ngOnChanges();
+    expect(component.bench.every(id=>id===0)).toBeTrue();
+    expect(component.kickers.every(id=>id===0)).toBeTrue();
+    expect(component.substitutions).toEqual([]);
+  });
+
   it('swaps occupied slots instead of creating duplicate players', () => {
     component.rows=[{slot:'RIM',playerId:1,behaviour:'RIM'},{slot:'LIM',playerId:2,behaviour:'LIM'}];
     component.changePlayer(component.rows[0],2);
@@ -29,6 +41,30 @@ describe('MatchWorkbenchComponent', () => {
     component.preview={}; component.ordersChanged(); expect(component.preview).toBeNull();
     component.preview={}; component.edit(); expect(component.preview).toBeNull(); expect(component.dirty).toBeTrue();
   });
+  it('passes the selected set-piece taker into manual evaluation', async () => {
+    component.lineup={formation:'4-4-2'} as any;
+    component.setPiecesTakerId=42;
+    component.edit();
+    await component.evaluate();
+    expect(api.evaluateLineup.calls.mostRecent().args[3]).toBe(42);
+  });
+  it('blocks preview, save and sending when training intervals are not covered', async () => {
+    component.trainingPlan={teamId:1,weekStart:'',matchDate:'',assignments:[{playerId:2,match:'league',slot:'IM',startMinute:45,minutes:45}]};
+    component.rows=[{slot:'IM',playerId:1,behaviour:'IM'}];
+    api.previewMatchOrders=jasmine.createSpy();
+    (component as any).plans.save=jasmine.createSpy();
+    component.preview={};
+    expect(component.canSend).toBeFalse();
+    await component.preparePreview(); await component.save();
+    expect(api.previewMatchOrders).not.toHaveBeenCalled();
+    expect((component as any).plans.save).not.toHaveBeenCalled();
+  });
+  it('supports five orders and special timing criteria', () => {
+    for(let i=0;i<6;i++) component.addSubstitution();
+    expect(component.substitutions.length).toBe(5);
+    for(const minute of [-1,45,46,90,91,115]) expect(component.orderMinutes).toContain(minute);
+  });
+
   it('does not evaluate a stale lineup', async () => {
     component.stale=true;
     await component.evaluate();

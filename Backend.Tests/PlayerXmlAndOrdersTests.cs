@@ -22,6 +22,10 @@ public class PlayerXmlAndOrdersTests : IClassFixture<ApiTestFactory>
         var incomplete = api.ParsePlayer(PlayerXml(includePassing: false));
         var malformed = api.ParsePlayer(PlayerXml(includePassing: true, passing: "not-a-skill"));
 
+        Assert.Null(complete.MatchStats!.Goals);
+        Assert.Null(complete.MatchStats.GoalsPerMatch);
+        Assert.Null(complete.MatchStats.AverageForm);
+        Assert.Null(complete.MatchStats.CareerGoals);
         Assert.True(complete.SkillsAvailable);
         Assert.True(complete.InjuryStatusKnown);
         Assert.True(complete.SuspensionStatusKnown);
@@ -41,7 +45,8 @@ public class PlayerXmlAndOrdersTests : IClassFixture<ApiTestFactory>
         var current = new Player
         {
             PlayerId = 7, FirstName = "Current", MotherClubBonus = true, Loyalty = 20, Form = 7,
-            Skills = new PlayerSkills { Keeper = 5, KeeperAvailable = true }
+            Skills = new PlayerSkills { Keeper = 5, KeeperAvailable = true },
+            MatchStats = new PlayerMatchStats { CareerGoals = 100, SeasonGoals = 20 }
         };
         var historical = new Player
         {
@@ -56,7 +61,9 @@ public class PlayerXmlAndOrdersTests : IClassFixture<ApiTestFactory>
         Assert.Equal(20, merged.Loyalty);
         Assert.Equal(12, merged.MatchStats!.TotalMatches);
         Assert.Equal(8, merged.MatchStats.Goals);
-        Assert.Equal(7, merged.MatchStats.AverageForm);
+        Assert.Equal(100, merged.MatchStats.CareerGoals);
+        Assert.Equal(20, merged.MatchStats.SeasonGoals);
+        Assert.Equal(1, merged.MatchStats.AverageForm);
     }
 
     [Fact]

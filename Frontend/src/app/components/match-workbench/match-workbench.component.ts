@@ -10,6 +10,7 @@ import { HattrickApiService } from '../../services/hattrick-api.service';
 import { MatchPlanService, SavedMatchPlan, rosterFingerprint } from '../../services/match-plan.service';
 import { NextOpponent } from '../../services/data-cache.service';
 import { trainingFactor, WeeklyPlanService } from '../../services/weekly-plan.service';
+import { TrainingHandoff, buildTrainingOrders, trainingOrdersCover, PITCH_SLOTS } from '../../services/training-orders';
 import { TrainingSummary } from '../../models/training.model';
 
 export const BEHAVIOURS: Record<string, string[]> = {
@@ -38,6 +39,9 @@ export class MatchWorkbenchComponent implements OnChanges {
   @Input() nextMatch: NextOpponent | null = null;
   @Input() selectedAlternative = 0;
   @Input() teamContextKey = '';
+  @Input() trainingPlan: TrainingHandoff | null = null;
+  readonly pitchSlots = PITCH_SLOTS;
+  readonly orderMinutes = [-1, ...Array.from({length:23}, (_,i)=>(i+1)*5), 46, 91].sort((a,b)=>a-b);
   @Output() evaluated = new EventEmitter<OptimizerResponse>();
   rows: EditorRow[] = [];
   tactic = 'Normal';
@@ -76,6 +80,7 @@ export class MatchWorkbenchComponent implements OnChanges {
       this.lastLineup = this.lineup;
       this.rows = Object.entries(this.lineup.positions).map(([slot, pos]) => ({ slot, playerId: pos.player?.playerId ?? 0, behaviour: pos.behavior }));
       this.tactic = this.lineup.tacticType;
+      if (this.lineup.setPiecesTakerId) this.setPiecesTakerId = this.lineup.setPiecesTakerId;
       this.dirty = false;
       this.preview = null;
       this.scenarios = [];
@@ -87,6 +92,9 @@ export class MatchWorkbenchComponent implements OnChanges {
       const key = `${input?.myTeamId}:${input?.matchId}:${input?.opponentTeamId}`;
       if (input && key !== this.lastKey) {
         this.lastKey = key;
+        this.bench = Array(7).fill(0);
+        this.kickers = Array(11).fill(0);
+        this.substitutions = [];
         const orders = this.plans.getPlan(input.myTeamId, input.matchId ?? 0, input.opponentTeamId)?.orders;
         if (orders) {
           this.bench = Array(7).fill(0);
@@ -95,12 +103,27 @@ export class MatchWorkbenchComponent implements OnChanges {
           this.substitutions = (orders.substitutions ?? []).map((s: Substitution) => ({ ...s }));
           this.captainId = orders.captainId;
           this.setPiecesTakerId = orders.setPiecesTakerId;
+          if (this.lineup.setPiecesTakerId !== this.setPiecesTakerId) this.dirty = true;
         }
       }
     }
-    if (this.stale) this.preview = null;
+    if (this.stale || !this.trainingPlanMatches) this.preview = null;
   }
 
+  get trainingPlanMatches(): boolean {
+    return !this.trainingPlan || trainingOrdersCover(this.trainingPlan.assignments,
+      Object.fromEntries(this.rows.map(r=>[r.slot,r.playerId])), this.substitutions);
+  }
+  applyTrainingPlan(): void {
+    if (!this.trainingPlan) return;
+    try {
+      const orders = buildTrainingOrders(this.trainingPlan.assignments, Object.fromEntries(this.rows.map(r=>[r.slot,r.playerId])), this.players);
+      this.bench = orders.bench;
+      this.substitutions = orders.substitutions;
+      this.ordersChanged();
+    } catch (error: any) { this.error = this.translate.instant('planning.issues.' + error.message); }
+  }
+  get matchSquad(): Player[] { return this.players.filter(p=>this.rows.some(r=>r.playerId===p.playerId) || this.bench.includes(p.playerId)); }
   get starters(): Player[] { return this.rows.map(r => this.players.find(p => p.playerId === r.playerId)).filter((p): p is Player => !!p); }
   get reserves(): Player[] { return this.players.filter(p => !this.rows.some(r => r.playerId === p.playerId) && p.canOptimize !== false); }
   get active(): OptimizerResponse['alternatives'][number] | undefined { return this.response.alternatives?.[this.selectedAlternative] ?? this.response.alternatives?.[0]; }
@@ -121,7 +144,7 @@ export class MatchWorkbenchComponent implements OnChanges {
   get referenceRatings(): LineupRatings { return this.reference?.alternatives?.[0]?.ratings ?? this.reference?.optimalLineup.predictedRatings ?? this.currentRatings; }
   get canSend(): boolean {
     const input = this.response.inputSnapshot;
-    return !this.mockMode && !this.stale && !this.dirty && !this.busy && !!this.preview
+    return this.trainingPlanMatches && !this.mockMode && !this.stale && !this.dirty && !this.busy && !!this.preview
       && !!input?.matchId && this.nextMatch?.matchId === input.matchId
       && this.nextMatch?.opponentTeamId === input.opponentTeamId
       && !!input.matchDate && new Date(input.matchDate).getTime() > Date.now();
@@ -132,6 +155,7 @@ export class MatchWorkbenchComponent implements OnChanges {
     return this.rows.filter(r => baseline.positions[r.slot]?.player?.playerId !== r.playerId || baseline.positions[r.slot]?.behavior !== r.behaviour)
       .map(r => `${this.translate.instant('optimizer.positions.' + r.slot)}: ${this.playerName(baseline.positions[r.slot]?.player?.playerId ?? 0)} → ${this.playerName(r.playerId)} (${this.behaviourLabel(r.behaviour, r.slot)})`);
   }
+  minuteLabel(minute: number): string { return [-1,46,91].includes(minute) ? this.translate.instant('workbench.orderMinutes.' + minute) : `${minute}′`; }
   playerName(id: number): string { const p = this.players.find(p => p.playerId === id); return p ? `${p.firstName} ${p.lastName}` : '—'; }
   trackIndex(index: number): number { return index; }
   behaviours(slot: string): string[] { return BEHAVIOURS[slot] ?? [slot]; }
@@ -155,7 +179,7 @@ export class MatchWorkbenchComponent implements OnChanges {
     try {
       const context = { ...this.response.inputSnapshot, teamAttitude: this.active?.attitude ?? this.response.inputSnapshot.teamAttitude,
         preferredFormation: this.lineup.formation, preferredTactic: this.tactic };
-      const result = await firstValueFrom(this.api.evaluateLineup(context, this.positions(), this.tactic));
+      const result = await firstValueFrom(this.api.evaluateLineup(context, this.positions(), this.tactic, this.setPiecesTakerId));
       if (sequence !== this.operationSequence || this.stale) return;
       this.dirty = false;
       this.evaluated.emit(result);
@@ -163,6 +187,7 @@ export class MatchWorkbenchComponent implements OnChanges {
     finally { this.busy = false; }
   }
   addSubstitution(): void {
+    if (this.substitutions.length >= 5) return;
     this.substitutions.push({ playerOutId: 0, playerInId: 0, minute: 60, position: -1, behaviour: -1, standing: -1 });
     this.ordersChanged();
   }
@@ -174,7 +199,7 @@ export class MatchWorkbenchComponent implements OnChanges {
       kickers: this.penaltyOrder, substitutions: this.substitutions.map(s => ({...s})) };
   }
   async preparePreview(): Promise<void> {
-    if (this.stale || this.dirty || this.busy) return;
+    if (!this.trainingPlanMatches || this.stale || this.dirty || this.busy) return;
     this.busy = true; this.error = '';
     const sequence = ++this.operationSequence;
     try {
@@ -189,10 +214,10 @@ export class MatchWorkbenchComponent implements OnChanges {
     return JSON.parse(JSON.stringify({ teamId: input.myTeamId, matchId: input.matchId ?? 0, opponentTeamId: input.opponentTeamId,
       matchDate: input.matchDate, savedAt: new Date().toISOString(), label: this.lineup.formation ?? '',
       result: this.response, selectedAlternative: this.selectedAlternative, rosterFingerprint: rosterFingerprint(this.players), teamContextKey: this.teamContextKey,
-      status: input.matchId ? status : 'draft', orders: this.orderRequest(), referenceResult: this.reference ?? this.response }));
+      status: input.matchId ? status : 'draft', trainingPlan: this.trainingPlan ?? undefined, orders: this.orderRequest(), referenceResult: this.reference ?? this.response }));
   }
   async save(status: 'ready' | 'sent' = 'ready', submitted?: SavedMatchPlan): Promise<void> {
-    if (!submitted && (this.stale || this.dirty || !this.response.inputSnapshot)) return;
+    if (!submitted && (!this.trainingPlanMatches || this.stale || this.dirty || !this.response.inputSnapshot)) return;
     const plan = submitted ?? this.freezePlan(status);
     const input = plan.result.inputSnapshot!;
     const alternative = plan.result.alternatives[plan.selectedAlternative];
@@ -212,7 +237,7 @@ export class MatchWorkbenchComponent implements OnChanges {
     try {
       const capture = await firstValueFrom(this.api.captureForecast({
         matchId: input.matchId, matchDate: input.matchDate, isHomeMatch: input.isHomeMatch,
-        tactic: orders.tactic, attitude: orders.attitude, coachType: input.coachType,
+        tactic: orders.tactic, attitude: orders.attitude, coachType: input.coachType, setPiecesTakerId: orders.setPiecesTakerId,
         teamSpiritLevel: input.teamSpiritLevel, confidenceLevel: input.confidenceLevel,
         formation: lineup.formation, formationExperience: input.formationExperience[lineup.formation ?? ''],
         weatherId: (plan.result.weather?.weatherId ?? -1) >= 0 ? plan.result.weather?.weatherId : null,
@@ -250,8 +275,8 @@ export class MatchWorkbenchComponent implements OnChanges {
       for (const [label,factor] of [['workbench.typical',1],['workbench.stronger',1.15],['workbench.weaker',0.85]] as const) {
         const context = {...this.response.inputSnapshot, opponentRatingScale:factor};
         const [own, original] = await Promise.all([
-          firstValueFrom(this.api.evaluateLineup({...context,preferredFormation:this.lineup.formation},this.positions(),this.tactic)),
-          firstValueFrom(this.api.evaluateLineup({...context,preferredFormation:referenceLineup.formation, requiredPlayerIds:[],excludedPlayerIds:[],lockedPositions:{}},this.positions(referenceRows),referenceLineup.tacticType))
+          firstValueFrom(this.api.evaluateLineup({...context,preferredFormation:this.lineup.formation},this.positions(),this.tactic,this.setPiecesTakerId)),
+          firstValueFrom(this.api.evaluateLineup({...context,preferredFormation:referenceLineup.formation, requiredPlayerIds:[],excludedPlayerIds:[],lockedPositions:{},requiredPositionSlots:[]},this.positions(referenceRows),referenceLineup.tacticType,referenceLineup.setPiecesTakerId))
         ]);
         if (sequence !== this.operationSequence || this.stale || this.dirty) return;
         this.scenarios.push({label,current:own.alternatives[0].winProbability,recommended:original.alternatives[0].winProbability});

@@ -67,8 +67,8 @@ export class HattrickApiService {
     return this.http.post<OptimizerResponse>(`${this.apiUrl}/optimizer/optimize`, request);
   }
 
-  evaluateLineup(context: OptimizerRequest, positions: { [slot: string]: { playerId: number; behaviour: string } }, tactic: string): Observable<OptimizerResponse> {
-    return this.http.post<OptimizerResponse>(`${this.apiUrl}/optimizer/evaluate`, { context, positions, tactic });
+  evaluateLineup(context: OptimizerRequest, positions: { [slot: string]: { playerId: number; behaviour: string } }, tactic: string, setPiecesTakerId?: number): Observable<OptimizerResponse> {
+    return this.http.post<OptimizerResponse>(`${this.apiUrl}/optimizer/evaluate`, { context, positions, tactic, setPiecesTakerId });
   }
 
   captureForecast(context: any): Observable<any> {

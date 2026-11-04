@@ -153,6 +153,9 @@ export class TrainingViewComponent implements OnInit, OnDestroy {
       traineeIds: starters.map(a => a.playerId).join(','),
       lockedPositions: JSON.stringify(lockedPositions), trainingMatch: match,
       trainingWeek: this.plan?.weekStart, trainingMatchDate,
+      trainingAssignments: JSON.stringify(this.assignments(match)),
+      trainingSlots: [...new Set(this.assignments(match).map(a => a.slot))].join(','),
+      trainingExcludedIds: this.assignments(match).filter(a => !starters.some(s => s.playerId === a.playerId)).map(a => a.playerId).join(','),
       opponentId: fixture?.opponentTeamId, matchId: fixture?.matchId
     } });
   }

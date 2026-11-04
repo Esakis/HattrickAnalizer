@@ -1,3 +1,4 @@
+import { trainingTimelineIssues } from './training-orders';
 import { Injectable } from '@angular/core';
 import { Subject } from 'rxjs';
 import { Player } from '../models/player.model';
@@ -171,7 +172,7 @@ export class WeeklyPlanService {
             for (const startMinute of starts) {
               if (startMinute >= 90 || busy.some(a => a.startMinute <= startMinute && a.startMinute + a.minutes > startMinute)) continue;
               const end = Math.min(90, ...busy.filter(a => a.startMinute > startMinute).map(a => a.startMinute));
-              const candidate: TrainingAssignment = { playerId, match, slot, startMinute, minutes: Math.min(required, end - startMinute) };
+              const candidate: TrainingAssignment = { playerId, match, slot, startMinute, minutes: Math.min(Math.ceil(required / 5) * 5, end - startMinute) };
               proposed.assignments.push(candidate);
               const checked = this.evaluate(proposed, summary, roster);
               if (!checked.issues.some(i => i.severity === 'error')) { placed = true; break; }
@@ -242,6 +243,9 @@ export class WeeklyPlanService {
           }
         }
       }
+      const timelineIssues = trainingTimelineIssues(assignments);
+      if (!FORMATIONS.some(f => assignments.every(a => f.includes(a.slot)))) timelineIssues.push('trainingFormationChange');
+      for (const code of timelineIssues) { add(code, 'error', undefined, match); assignments.forEach(a => invalid.add(a)); }
       for (const minute of new Set(assignments.map(a => a.startMinute))) {
         const active = assignments.filter(a => a.startMinute <= minute && minute < a.startMinute + a.minutes);
         if (!FORMATIONS.some(formation => active.every(a => formation.includes(a.slot))) || active.length > 11) {

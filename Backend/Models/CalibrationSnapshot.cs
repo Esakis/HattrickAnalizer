@@ -29,6 +29,7 @@ public class CalibrationMatchContext
     public string? Formation { get; set; }
     public int? FormationExperience { get; set; }
     public int? WeatherId { get; set; }
+    public int? SetPiecesTakerId { get; set; }
     public int? AssistantManagerLevel { get; set; }
     public Dictionary<string, int> PlayerIdsBySlot { get; set; } = new();
     public Dictionary<string, string> BehavioursBySlot { get; set; } = new();

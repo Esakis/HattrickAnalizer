@@ -78,7 +78,7 @@ describe('TrainingViewComponent', () => {
     view.prepareMatch('friendly');
     expect((view as any).router.navigate).toHaveBeenCalledWith(['/optimizer'], { queryParams: {
       traineeIds: '1', lockedPositions: '{"IM":1}', trainingMatch: 'friendly', trainingWeek: view.plan.weekStart,
-      trainingMatchDate: '2026-10-20T14:00:00.000Z', opponentId: 202, matchId: 20
+      trainingMatchDate: '2026-10-20T14:00:00.000Z', trainingAssignments: JSON.stringify(view.plan!.assignments), trainingSlots: 'IM', trainingExcludedIds: '', opponentId: 202, matchId: 20
     } });
     for (const unavailable of [{ isSuspended: true }, { canOptimize: false }]) {
       const original = view.roster[0];

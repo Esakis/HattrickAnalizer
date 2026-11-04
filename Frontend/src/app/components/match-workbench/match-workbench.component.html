@@ -1,13 +1,18 @@
 <section class="card workbench" aria-labelledby="workbench-title">
   <div class="card-header workbench-heading">
     <div><h2 id="workbench-title" class="card-title">{{ 'workbench.title' | translate }}</h2><p class="card-subtitle">{{ 'workbench.subtitle' | translate }}</p></div>
-    <button class="btn-primary" (click)="save()" [disabled]="stale || dirty || busy">{{ 'workbench.save' | translate }}</button>
+    <button class="btn-primary" (click)="save()" [disabled]="stale || dirty || busy || !trainingPlanMatches">{{ 'workbench.save' | translate }}</button>
   </div>
   <p class="alert alert-warning" *ngIf="stale">{{ 'workbench.restoredStale' | translate }}</p>
   <p role="status" class="alert alert-success" *ngIf="message">{{ message }}</p>
   <p role="status" class="alert alert-info" *ngIf="captureMessage">{{ captureMessage }} <a routerLink="/review">{{ 'workbench.review' | translate }}</a></p>
   <p role="alert" class="alert alert-warning" *ngIf="error">{{ error }}</p>
 
+  <div class="alert alert-warning" *ngIf="dirty">{{ 'workbench.dirty' | translate }} <button class="btn-primary" (click)="evaluate()" [disabled]="stale || busy">{{ 'workbench.recalculate' | translate }}</button></div>
+  <div class="alert" *ngIf="trainingPlan">
+    <p>{{ (trainingPlanMatches ? 'workbench.trainingCovered' : 'workbench.trainingMissing') | translate }}</p>
+    <button class="btn-secondary" (click)="applyTrainingPlan()" [disabled]="stale || dirty || busy">{{ 'workbench.applyTraining' | translate }}</button>
+  </div>
   <div class="comparison-grid">
     <div>
       <h3 class="section-title">{{ 'workbench.comparison' | translate }}</h3>
@@ -39,27 +44,29 @@
 
   <details class="sub-panel orders"><summary>{{ 'workbench.orders' | translate }}</summary>
     <div class="sub-panel__body">
-      <div class="field-grid"><label class="field">{{ 'workbench.captain' | translate }}<select [(ngModel)]="captainId" (ngModelChange)="ordersChanged()"><option *ngFor="let p of starters" [ngValue]="p.playerId">{{ playerName(p.playerId) }}</option></select></label><label class="field">{{ 'workbench.setPieces' | translate }}<select [(ngModel)]="setPiecesTakerId" (ngModelChange)="ordersChanged()"><option *ngFor="let p of starters" [ngValue]="p.playerId">{{ playerName(p.playerId) }}</option></select></label></div>
+      <div class="field-grid"><label class="field">{{ 'workbench.captain' | translate }}<select [(ngModel)]="captainId" (ngModelChange)="ordersChanged()"><option *ngFor="let p of starters" [ngValue]="p.playerId">{{ playerName(p.playerId) }}</option></select></label><label class="field">{{ 'workbench.setPieces' | translate }}<select [(ngModel)]="setPiecesTakerId" (ngModelChange)="edit()"><option *ngFor="let p of starters" [ngValue]="p.playerId">{{ playerName(p.playerId) }}</option></select></label></div>
       <h3 class="section-title">{{ 'workbench.bench' | translate }}</h3>
       <div class="field-grid"><label class="field" *ngFor="let role of benchRoles; let i = index">{{ 'workbench.benchRoles.' + role | translate }}<select [(ngModel)]="bench[i]" (ngModelChange)="ordersChanged()"><option [ngValue]="0">—</option><option *ngFor="let p of reserves" [ngValue]="p.playerId">{{ playerName(p.playerId) }}</option></select></label></div>
       <h3 class="section-title">{{ 'workbench.substitutions' | translate }}</h3><p class="hint">{{ 'workbench.subHint' | translate }}</p>
       <div class="sub-row" *ngFor="let sub of substitutions; let i = index">
-        <label class="field">{{ 'workbench.out' | translate }}<select [(ngModel)]="sub.playerOutId" (ngModelChange)="ordersChanged()"><option [ngValue]="0">—</option><option *ngFor="let p of starters" [ngValue]="p.playerId">{{ playerName(p.playerId) }}</option></select></label>
-        <label class="field">{{ 'workbench.in' | translate }}<select [(ngModel)]="sub.playerInId" (ngModelChange)="ordersChanged()"><option [ngValue]="0">—</option><ng-container *ngFor="let id of bench"><option *ngIf="id" [ngValue]="id">{{ playerName(id) }}</option></ng-container></select></label>
-        <label class="field">{{ 'workbench.minute' | translate }}<input type="number" min="5" max="115" step="5" [(ngModel)]="sub.minute" (ngModelChange)="ordersChanged()"></label>
+        <label class="field">{{ 'workbench.out' | translate }}<select [(ngModel)]="sub.playerOutId" (ngModelChange)="ordersChanged()"><option [ngValue]="0">—</option><option *ngFor="let p of matchSquad" [ngValue]="p.playerId">{{ playerName(p.playerId) }}</option></select></label>
+        <label class="field">{{ 'workbench.in' | translate }}<select [(ngModel)]="sub.playerInId" (ngModelChange)="ordersChanged()"><option [ngValue]="0">—</option><option *ngIf="sub.playerOutId" [ngValue]="sub.playerOutId">{{ 'workbench.samePlayer' | translate }}</option><ng-container *ngFor="let id of bench"><option *ngIf="id && id !== sub.playerOutId" [ngValue]="id">{{ playerName(id) }}</option></ng-container></select></label>
+        <label class="field">{{ 'workbench.minute' | translate }}<select [(ngModel)]="sub.minute" (ngModelChange)="ordersChanged()"><option *ngFor="let minute of orderMinutes" [ngValue]="minute">{{ minuteLabel(minute) }}</option></select></label>
         <label class="field">{{ 'workbench.condition' | translate }}<select [(ngModel)]="sub.standing" (ngModelChange)="ordersChanged()"><option *ngFor="let code of standingCodes" [ngValue]="code">{{ 'workbench.standing.' + code | translate }}</option></select></label>
+        <label class="field">{{ 'workbench.position' | translate }}<select [(ngModel)]="sub.position" (ngModelChange)="ordersChanged()"><option [ngValue]="-1">{{ 'workbench.inherit' | translate }}</option><option *ngFor="let slot of pitchSlots; let position = index" [ngValue]="position">{{ positionLabel(slot) }}</option></select></label>
+        <label class="field">{{ 'workbench.behaviour' | translate }}<select [(ngModel)]="sub.behaviour" (ngModelChange)="ordersChanged()"><option *ngFor="let code of [-1,0,1,2,3,4]" [ngValue]="code">{{ 'workbench.orderBehaviours.' + code | translate }}</option></select></label>
         <button class="btn-danger" (click)="substitutions.splice(i,1); ordersChanged()">{{ 'workbench.remove' | translate }}</button>
       </div>
-      <div class="panel-actions"><button class="btn-secondary" (click)="addSubstitution()" [disabled]="substitutions.length >= 3">{{ 'workbench.addSub' | translate }}</button></div>
-      <details class="penalties"><summary>{{ 'workbench.penalties' | translate }}</summary><div class="field-grid"><label class="field" *ngFor="let value of kickers; let i = index; trackBy: trackIndex">{{ i + 1 }}<select [(ngModel)]="kickers[i]" (ngModelChange)="ordersChanged()"><option [ngValue]="0">—</option><option *ngFor="let p of starters" [ngValue]="p.playerId">{{ playerName(p.playerId) }}</option></select></label></div></details>
-      <div class="panel-actions"><button class="btn-primary" (click)="preparePreview()" [disabled]="stale || dirty || busy || !response.inputSnapshot?.matchId">{{ 'workbench.preview' | translate }}</button></div>
+      <div class="panel-actions"><button class="btn-secondary" (click)="addSubstitution()" [disabled]="substitutions.length >= 5">{{ 'workbench.addSub' | translate }}</button></div>
+      <details class="penalties"><summary>{{ 'workbench.penalties' | translate }}</summary><div class="field-grid"><label class="field" *ngFor="let value of kickers; let i = index; trackBy: trackIndex">{{ i + 1 }}<select [(ngModel)]="kickers[i]" (ngModelChange)="ordersChanged()"><option [ngValue]="0">—</option><option *ngFor="let p of matchSquad" [ngValue]="p.playerId">{{ playerName(p.playerId) }}</option></select></label></div></details>
+      <div class="panel-actions"><button class="btn-primary" (click)="preparePreview()" [disabled]="stale || dirty || busy || !trainingPlanMatches || !response.inputSnapshot?.matchId">{{ 'workbench.preview' | translate }}</button></div>
       <div class="preview" *ngIf="preview"><h3 class="section-title">{{ 'workbench.confirmTitle' | translate }}</h3><p class="hint">{{ 'workbench.confirmHint' | translate }}</p><p class="preview-match">{{ nextMatch?.opponentTeamName }} · {{ nextMatch?.matchDate | date:'dd.MM.yyyy HH:mm' }} · {{ lineup.formation }} · {{ 'workbench.tactics.' + tactic | translate }}</p>
         <ol><li *ngFor="let row of rows">{{ positionLabel(row.slot) }}: {{ playerName(row.playerId) }} — {{ behaviourLabel(row.behaviour,row.slot) }}</li></ol>
         <p>{{ 'workbench.captain' | translate }}: {{ playerName(captainId) }} · {{ 'workbench.setPieces' | translate }}: {{ playerName(setPiecesTakerId) }}</p>
         <p>{{ 'optimizer.teamAttitudeLabel' | translate }} {{ 'optimizer.attitudes.' + (active?.attitude || response.inputSnapshot?.teamAttitude || 'Normal').toLowerCase() | translate }}</p>
         <h4>{{ 'workbench.bench' | translate }}</h4><ul><li *ngFor="let id of bench; let i = index">{{ 'workbench.benchRoles.' + benchRoles[i] | translate }}: {{ playerName(id) }}</li></ul>
         <h4>{{ 'workbench.penalties' | translate }}</h4><ol *ngIf="penaltyOrder.length; else noPenalties"><li *ngFor="let id of penaltyOrder">{{ playerName(id) }}</li></ol><ng-template #noPenalties><p>—</p></ng-template>
-        <p *ngFor="let sub of substitutions">{{ sub.minute }}′: {{ playerName(sub.playerOutId) }} → {{ playerName(sub.playerInId) }}, {{ 'workbench.standing.' + sub.standing | translate }}</p>
+        <p *ngFor="let sub of substitutions">{{ minuteLabel(sub.minute) }}: {{ playerName(sub.playerOutId) }} → {{ playerName(sub.playerInId) }}, {{ 'workbench.standing.' + sub.standing | translate }}, {{ sub.position < 0 ? ('workbench.inherit' | translate) : positionLabel(pitchSlots[sub.position]) }}, {{ 'workbench.orderBehaviours.' + sub.behaviour | translate }}</p>
         <p class="alert alert-warning" *ngIf="mockMode">{{ 'workbench.demoNoSend' | translate }}</p>
         <div class="panel-actions"><button class="btn-primary" (click)="send()" [disabled]="!canSend">{{ 'workbench.confirmSend' | translate }}</button></div>
       </div>

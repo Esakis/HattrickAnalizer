@@ -49,7 +49,7 @@
     "setPieces": "Set-piece taker",
     "bench": "Substitutes",
     "substitutions": "Planned substitutions",
-    "subHint": "Substitutions keep the outgoing player's position and behaviour. Conditional substitutions do not guarantee training minutes.",
+    "subHint": "Up to five player orders. Select the same player to change position or behaviour. Forecast ratings describe the starting XI; later changes are not simulated.",
     "out": "Player out",
     "in": "Player in",
     "minute": "Minute",
@@ -133,6 +133,24 @@
     "fixture": "Match to prepare",
     "otherMatch": "Other match",
     "fixtureUnknown": "Draft without a linked fixture",
-    "trainingDraft": "The training plan date does not match an upcoming fixture. You can compare a lineup, but sending is disabled. Select the correct match above."
+    "trainingDraft": "The training plan date does not match an upcoming fixture. You can compare a lineup, but sending is disabled. Select the correct match above.",
+    "trainingCovered": "The orders cover the planned training intervals.",
+    "trainingMissing": "The orders do not cover the planned training intervals. Apply the plan or correct the lineup before confirming.",
+    "applyTraining": "Apply planned substitutions",
+    "samePlayer": "Same player — change position/order",
+    "inherit": "Keep current",
+    "orderMinutes": {
+      "-1": "Any time",
+      "46": "Half time",
+      "91": "Before extra time"
+    },
+    "orderBehaviours": {
+      "-1": "Keep current",
+      "0": "Normal",
+      "1": "Offensive",
+      "2": "Defensive",
+      "3": "Towards middle",
+      "4": "Towards wing"
+    }
   }
 }

@@ -93,6 +93,8 @@ public sealed class CalibrationSnapshotStore
         var c = snapshot.Context ?? throw new ArgumentException("Snapshot match context must not be null.");
         if (c.PlayerIdsBySlot == null || c.BehavioursBySlot == null)
             throw new ArgumentException("Lineup slots and behaviours must not be null.");
+        if (c.SetPiecesTakerId.HasValue && !c.PlayerIdsBySlot.Values.Contains(c.SetPiecesTakerId.Value))
+            throw new ArgumentException("Set-piece taker must be in the captured starting eleven.");
         if (snapshot.PredictedRatings is { } ratings)
         {
             var sectors = new[] { ratings.Midfield, ratings.RightDefense, ratings.CentralDefense, ratings.LeftDefense,

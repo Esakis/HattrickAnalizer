@@ -36,6 +36,16 @@ describe('Weekly training plan', () => {
     expect(trainingMatchKind(undefined)).toBeNull();
   });
 
+  it('does not mark an impossible eight-substitution goalkeeper plan ready', () => {
+    const draft=plan(); draft.selectedPlayerIds=Array.from({length:9},(_,i)=>i+1);
+    draft.assignments=draft.selectedPlayerIds.map((id,i)=>({playerId:id,match:'league',slot:'GK',startMinute:i*10,minutes:10}));
+    const report=summary(draft.selectedPlayerIds.map(id=>entry(id,80)));
+    report.trainingTypeCode=9;
+    const result=service.evaluate(draft,report,draft.selectedPlayerIds.map(player));
+    expect(result.ready).toBeFalse();
+    expect(result.issues.some(i=>i.code==='tooManyOrders')).toBeTrue();
+  });
+
   it('uses the best 90 physical minutes, so two half-effect matches do not make full training', () => {
     expect(bestTraining90(0, 180)).toBe(45);
     expect(bestTraining90(60, 90)).toBe(75);

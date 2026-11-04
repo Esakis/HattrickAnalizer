@@ -74,7 +74,10 @@
       "scoring": "Scoring",
       "setPieces": "Set Pieces"
     },
-    "unknown": "unknown"
+    "unknown": "unknown",
+    "careerGoals": "Career goals",
+    "sampleMatches": "Sample matches",
+    "seasonGoals": "Season goals"
   },
   "optimizer": {
     "title": "Hattrick Lineup Optimizer",

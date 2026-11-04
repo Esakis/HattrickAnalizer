@@ -10,6 +10,7 @@ import { Player } from '../../models/player.model';
 import { OpponentScoutReport, ScoutLikelyStarter } from '../../models/opponent-scout.model';
 import { MatchPlanService, rosterFingerprint, teamContextFingerprint } from '../../services/match-plan.service';
 import { NextOpponent } from '../../services/data-cache.service';
+import { TrainingHandoff, trainingTimelineIssues } from '../../services/training-orders';
 import { trainingMatchKind } from '../../services/weekly-plan.service';
 
 @Component({
@@ -44,6 +45,14 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   result: OptimizerResponse | null = null;
   referenceResult: OptimizerResponse | null = null;
   requiredPlayerIds: number[] = [];
+  requiredPositionSlots: string[] = [];
+  trainingHandoff: TrainingHandoff | null = null;
+  private trainingQueryDetached = false;
+  get activeTrainingPlan(): TrainingHandoff | null {
+    if (!this.trainingHandoff || this.trainingHandoff.teamId !== this.myTeamId) return null;
+    return !this.nextMatch || Date.parse(this.nextMatch.matchDate ?? '') === Date.parse(this.trainingHandoff.matchDate)
+      ? this.trainingHandoff : null;
+  }
   excludedPlayerIds: number[] = [];
   lockedPositions: { [slot: string]: number } = {};
   readonly lockSlots = ['GK','RWB','RCD','CD','LCD','LWB','RW','RIM','IM','LIM','LW','RFW','FW','LFW'];
@@ -122,11 +131,9 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     { key: 'passing', label: 'Podania' },
     { key: 'scoring', label: 'Skuteczność' },
     { key: 'setPieces', label: 'Stałe fragmenty' },
-    { key: 'goals', label: 'Bramki' },
-    { key: 'assists', label: 'Asysty' },
-    { key: 'avgForm', label: 'Śr. Forma' },
-    { key: 'goalsPerMatch', label: 'Bramki/Mecz' },
-    { key: 'matchesPerGoal', label: 'Mecze/Bramka' }
+    { key: 'goals', label: 'Gole w karierze' },
+    { key: 'seasonGoals', label: 'Gole w sezonie' },
+    { key: 'sampleMatches', label: 'Mecze w próbce' }
   ];
 
   tactics: { value: string; label: string }[] = [];
@@ -160,6 +167,14 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     }
     if (this.queryOpponentId) this.opponentTeamId = this.queryOpponentId;
     if (query?.has('traineeIds')) this.requiredPlayerIds = (query.get('traineeIds') ?? '').split(',').map(Number).filter(id => id > 0);
+    this.requiredPositionSlots = (query?.get('trainingSlots') ?? '').split(',').filter(Boolean);
+    this.excludedPlayerIds = (query?.get('trainingExcludedIds') ?? '').split(',').map(Number).filter(id => id > 0);
+    try {
+      const assignments = JSON.parse(query?.get('trainingAssignments') ?? 'null');
+      if (Array.isArray(assignments) && trainingTimelineIssues(assignments).length) throw new Error('invalid training plan');
+      if (Array.isArray(assignments)) this.trainingHandoff = {teamId: this.cache.auth$.value.ownTeamId ?? this.myTeamId,
+        weekStart: query?.get('trainingWeek') ?? '', matchDate: this.queryMatchDate, assignments};
+    } catch { this.error = this.translate.instant('planning.issues.invalidMinutes'); }
     try { this.lockedPositions = JSON.parse(query?.get('lockedPositions') || '{}'); } catch { this.lockedPositions = {}; }
     this.cache.ownTeam$.pipe(takeUntil(this.destroy$)).subscribe(team => {
       if (!team || team.teamId !== this.myTeamId) return;
@@ -243,6 +258,16 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   selectUpcomingMatch(matchId: number): void {
     const selected = this.upcomingMatches.find(m => m.matchId === Number(matchId)) ?? null;
     const previous = this.nextMatch;
+    if (this.trainingHandoff && selected && Date.parse(selected.matchDate ?? '') !== Date.parse(this.trainingHandoff.matchDate)) {
+      const plannedIds = new Set(this.trainingHandoff.assignments.map(a=>a.playerId));
+      this.requiredPlayerIds = this.requiredPlayerIds.filter(id=>!plannedIds.has(id));
+      this.excludedPlayerIds = this.excludedPlayerIds.filter(id=>!plannedIds.has(id));
+      this.lockedPositions = Object.fromEntries(Object.entries(this.lockedPositions).filter(([,id])=>!plannedIds.has(id)));
+      this.requiredPositionSlots = [];
+      this.trainingHandoff = null;
+      this.queryTrainingMatch = ''; this.queryMatchDate = ''; this.queryMatchId = 0;
+      this.trainingQueryDetached = true;
+    }
     this.selectedMatchId = selected?.matchId ?? 0;
     this.cache.matchSelectionExplicit = true;
     this.cache.selectedMatch$.next(selected);
@@ -279,10 +304,12 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     this.teamSpiritLevel = contextMatches ? input.teamSpiritLevel ?? null : this.cache.ownTeam$.value?.teamSpiritLevel ?? null;
     this.confidenceLevel = contextMatches ? input.confidenceLevel ?? null : this.cache.ownTeam$.value?.confidenceLevel ?? null;
     this.objective = input.objective;
-    this.formationExperience = this.sanitizeFormationExperience(input.formationExperience);
-    if (!this.route?.snapshot.queryParamMap.has('traineeIds')) this.requiredPlayerIds = input.requiredPlayerIds ?? [];
-    this.excludedPlayerIds = (input.excludedPlayerIds ?? []).filter(id => !this.requiredPlayerIds.includes(id) && !Object.values(this.lockedPositions).includes(id));
-    if (!this.route?.snapshot.queryParamMap.has('lockedPositions')) this.lockedPositions = input.lockedPositions ?? {};
+    this.formationExperience = this.sanitizeFormationExperience(this.cache.formationExperience$.value ?? input.formationExperience);
+    if (this.trainingQueryDetached || !this.route?.snapshot.queryParamMap.has('traineeIds')) this.requiredPlayerIds = input.requiredPlayerIds ?? [];
+    if (this.trainingQueryDetached || !this.route?.snapshot.queryParamMap.has('lockedPositions')) this.lockedPositions = input.lockedPositions ?? {};
+    this.excludedPlayerIds = [...new Set([...(input.excludedPlayerIds ?? []), ...(this.activeTrainingPlan ? this.excludedPlayerIds : [])])].filter(id => !this.requiredPlayerIds.includes(id) && !Object.values(this.lockedPositions).includes(id));
+    if (this.trainingQueryDetached || !this.route?.snapshot.queryParamMap.has('trainingAssignments')) this.trainingHandoff = plan.trainingPlan ?? null;
+    if (this.trainingQueryDetached || !this.route?.snapshot.queryParamMap.has('trainingSlots')) this.requiredPositionSlots = input.requiredPositionSlots ?? [];
     this.result = plan.result;
     this.referenceResult = plan.referenceResult ?? plan.result;
     this.selectedAlternative = Math.min(plan.selectedAlternative, Math.max(0, plan.result.alternatives.length - 1));
@@ -292,7 +319,8 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       || plan.teamContextKey !== this.teamContextKey
       || !!(matchId && (Date.parse(input.matchDate ?? '') !== Date.parse(next?.matchDate ?? '') || input.isHomeMatch !== next?.isHomeMatch))
       || !!(plan.matchDate && new Date(plan.matchDate).getTime() <= Date.now())
-      || !!this.route?.snapshot.queryParamMap.has('traineeIds');
+      || JSON.stringify(this.sanitizeFormationExperience(input.formationExperience)) !== JSON.stringify(this.formationExperience)
+      || (!this.trainingQueryDetached && !!this.route?.snapshot.queryParamMap.has('traineeIds'));
     this.resultStaleReason = this.resultStale ? this.translate.instant('workbench.restoredStale') : null;
     this.cache.optimizerResult$.next(this.resultStale ? null : this.result);
   }
@@ -336,7 +364,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     this.storageWarning = !this.plans.save({ teamId: this.myTeamId, matchId: input.matchId ?? 0,
       opponentTeamId: this.opponentTeamId, matchDate: input.matchDate, savedAt: new Date().toISOString(),
       label: this.myTeamName, result: this.result, selectedAlternative: this.selectedAlternative,
-      rosterFingerprint: rosterFingerprint(this.myTeamPlayers), teamContextKey: this.teamContextKey, status: 'draft', referenceResult: this.referenceResult ?? this.result, orders: previous?.orders });
+      rosterFingerprint: rosterFingerprint(this.myTeamPlayers), teamContextKey: this.teamContextKey, status: 'draft', referenceResult: this.referenceResult ?? this.result, orders: previous?.orders, trainingPlan: this.activeTrainingPlan ?? undefined });
   }
 
   private restoreFromCache(): void {
@@ -671,7 +699,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       coachType: this.coachType, assistantManagerLevel: this.assistantManagerLevel,
       teamSpiritLevel: this.teamSpiritLevel, confidenceLevel: this.confidenceLevel, objective: this.objective,
       formationExperience: this.sanitizeFormationExperience(this.formationExperience), preferredFormation: this.selectedMyFormation,
-      requiredPlayerIds: [...this.requiredPlayerIds], excludedPlayerIds: [...this.excludedPlayerIds],
+      requiredPositionSlots: [...this.requiredPositionSlots], requiredPlayerIds: [...this.requiredPlayerIds], excludedPlayerIds: [...this.excludedPlayerIds],
       lockedPositions: { ...this.lockedPositions },
       language: this.translate.currentLang || 'pl', matchId: isNextOpponent ? nextOpp!.matchId : 0,
       isHomeMatch: isNextOpponent ? !!nextOpp!.isHomeMatch : false,
@@ -832,6 +860,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     
     // Nie pobieraj ponownie jeśli dane są już załadowane dla tego samego ID
     if (this.myTeamPlayers.length > 0 && this.lastLoadedMyTeamId === this.myTeamId) {
+      this.loadFormationExperience();
       return;
     }
     
@@ -1250,9 +1279,9 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       case 'passing': return player.skills?.passing || 0;
       case 'scoring': return player.skills?.scoring || 0;
       case 'setPieces': return player.skills?.setPieces || 0;
-      case 'goals': return player.matchStats?.goals || 0;
-      case 'assists': return player.matchStats?.assists || 0;
-      case 'avgForm': return player.matchStats?.averageForm || player.form;
+      case 'goals': return player.matchStats?.careerGoals ?? -1;
+      case 'seasonGoals': return player.matchStats?.seasonGoals ?? -1;
+      case 'sampleMatches': return player.matchStats?.totalMatches ?? -1;
       case 'goalsPerMatch': return player.matchStats?.goalsPerMatch || 0;
       case 'matchesPerGoal': return player.matchStats?.matchesPerGoal || 999;
       default: return 0;
@@ -1390,14 +1419,14 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       if (!player.matchStats) {
         player.matchStats = {
           totalMatches: 0,
-          goals: 0,
-          assists: 0,
+          goals: null,
+          assists: null,
           yellowCards: 0,
           redCards: 0,
           averageRating: 0,
-          averageForm: player.form,
-          goalsPerMatch: 0,
-          matchesPerGoal: 0,
+          averageForm: null,
+          goalsPerMatch: null,
+          matchesPerGoal: null,
           minutesPlayed: 0,
           positionRatings: {}
         };
@@ -1409,14 +1438,14 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       if (!player.matchStats) {
         player.matchStats = {
           totalMatches: 0,
-          goals: 0,
-          assists: 0,
+          goals: null,
+          assists: null,
           yellowCards: 0,
           redCards: 0,
           averageRating: 0,
-          averageForm: player.form,
-          goalsPerMatch: 0,
-          matchesPerGoal: 0,
+          averageForm: null,
+          goalsPerMatch: null,
+          matchesPerGoal: null,
           minutesPlayed: 0,
           positionRatings: {}
         };

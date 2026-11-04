@@ -2,6 +2,7 @@ namespace HattrickAnalizer.Models;
 
 public class Lineup
 {
+    public int? SetPiecesTakerId { get; set; }
     public Dictionary<string, LineupPosition> Positions { get; set; } = new();
     public string TacticType { get; set; } = "";
     public string TacticSkill { get; set; } = "";

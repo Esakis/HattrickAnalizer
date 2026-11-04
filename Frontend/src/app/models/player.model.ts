@@ -11,6 +11,7 @@ export interface Player {
   loyalty: number;
   leadership: number;
   specialty: string;
+  motherClubBonus?: boolean;
   injuryLevel: number;
   injuryStatusKnown?: boolean;
   skillsAvailable?: boolean;
@@ -25,14 +26,16 @@ export interface Player {
 
 export interface PlayerMatchStats {
   totalMatches: number;
-  goals: number;
-  assists: number;
+  careerGoals?: number | null;
+  seasonGoals?: number | null;
+  goals: number | null;
+  assists: number | null;
   yellowCards: number;
   redCards: number;
   averageRating: number;
-  averageForm: number;
-  goalsPerMatch: number;
-  matchesPerGoal: number;
+  averageForm: number | null;
+  goalsPerMatch: number | null;
+  matchesPerGoal: number | null;
   minutesPlayed: number;
   // Oceny na różnych pozycjach
   positionRatings?: { [position: string]: number };

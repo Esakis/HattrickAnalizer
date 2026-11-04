@@ -339,12 +339,16 @@ public sealed class RatingEngine
     /// Atak: wykonawca (najlepsze SP) + SP i skutecznosc reszty.
     /// Obrona: bramkarz + obrona i SP druzyny. Wspolczynniki kalibrowalne.
     /// </summary>
-    internal (double Att, double Def) ComputeIndirectSetPieces(AssignedLineup lineup)
+    internal (double Att, double Def) ComputeIndirectSetPieces(AssignedLineup lineup, int? setPiecesTakerId = null)
     {
         var players = lineup.Slots.Values.Select(s => s.Player).ToList();
         if (players.Count == 0) return (0, 0);
 
-        double takerSp = players.Max(p => EffSkill(p, p.Skills.SetPieces));
+        var taker = setPiecesTakerId.HasValue
+            ? players.SingleOrDefault(p => p.PlayerId == setPiecesTakerId.Value)
+                ?? throw new ArgumentException("Set-piece taker must be in the starting eleven.")
+            : players.OrderByDescending(p => EffSkill(p, p.Skills.SetPieces)).ThenBy(p => p.PlayerId).First();
+        double takerSp = EffSkill(taker, taker.Skills.SetPieces);
         double avgSp = players.Average(p => EffSkill(p, p.Skills.SetPieces));
         double avgSc = players.Average(p => EffSkill(p, p.Skills.Scoring));
         double avgDef = players.Average(p => EffSkill(p, p.Skills.Defending));

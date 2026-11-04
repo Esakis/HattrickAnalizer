@@ -49,7 +49,7 @@
     "setPieces": "Wykonawca stałych fragmentów",
     "bench": "Ławka rezerwowych",
     "substitutions": "Planowane zmiany",
-    "subHint": "Zmiany zachowują pozycję i polecenie schodzącego gracza. Warunkowa zmiana nie gwarantuje minut treningu.",
+    "subHint": "Maksymalnie pięć zleceń. Wybierz tego samego zawodnika, aby zmienić pozycję lub zachowanie. Prognozy dotyczą wyjściowej jedenastki; późniejsze zmiany nie są symulowane.",
     "out": "Schodzi",
     "in": "Wchodzi",
     "minute": "Minuta",
@@ -133,6 +133,24 @@
     "fixture": "Mecz do przygotowania",
     "otherMatch": "Inny mecz",
     "fixtureUnknown": "Szkic bez przypisanego meczu",
-    "trainingDraft": "Termin treningowego planu nie odpowiada żadnemu nadchodzącemu meczowi. Możesz porównać skład, ale wysyłka jest wyłączona. Wybierz właściwy mecz powyżej."
+    "trainingDraft": "Termin treningowego planu nie odpowiada żadnemu nadchodzącemu meczowi. Możesz porównać skład, ale wysyłka jest wyłączona. Wybierz właściwy mecz powyżej.",
+    "trainingCovered": "Zlecenia pokrywają zaplanowane przedziały treningowe.",
+    "trainingMissing": "Zlecenia nie pokrywają zaplanowanych minut treningu. Zastosuj plan lub popraw skład przed zatwierdzeniem.",
+    "applyTraining": "Zastosuj zaplanowane zmiany",
+    "samePlayer": "Ten sam zawodnik — zmiana pozycji/zachowania",
+    "inherit": "Zachowaj aktualne",
+    "orderMinutes": {
+      "-1": "W dowolnym momencie",
+      "46": "Przerwa",
+      "91": "Przed dogrywką"
+    },
+    "orderBehaviours": {
+      "-1": "Zachowaj aktualne",
+      "0": "Normalnie",
+      "1": "Ofensywnie",
+      "2": "Defensywnie",
+      "3": "Do środka",
+      "4": "Do skrzydła"
+    }
   }
 }

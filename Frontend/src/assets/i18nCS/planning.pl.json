@@ -23,7 +23,10 @@
     "coverageHint": "Liczymy najlepsze 90 minut: pełny efekt ma pierwszeństwo przed połowicznym. To pokrycie podstawowego treningu, bez specjalnych bonusów stałych fragmentów, prognozy skoku i gwarancji realizacji meczu. Braki danych nie są zerowym treningiem.",
     "allocateMatches": "Rozdziel pozostałe minuty",
     "datesHint": "Wpisz daty przyszłych meczów przed następnym treningiem. Odbyte mecze są już w raporcie — nie dodawaj ich ponownie. Wszystkie godziny są lokalne.",
-    "matches": { "league": "Liga", "friendly": "Sparing" },
+    "matches": {
+      "league": "Liga",
+      "friendly": "Sparing"
+    },
     "matchDate": "Termin meczu",
     "knownFixture": "Mecz z terminarza",
     "manualDate": "Własny termin / szkic",
@@ -39,7 +42,7 @@
     "skippedUnknown": "Pominięto zawodników bez potwierdzonych minut w raporcie:",
     "suggested": "Minuty wybranych trenowanych są rozpisane. Sprawdź ustawienia, a następnie uzupełnij każdy skład w optymalizatorze.",
     "prepareLineup": "Uzupełnij skład w optymalizatorze",
-    "handoffHint": "Do optymalizatora przechodzą wymagani zawodnicy pierwszego składu i ich pozycje. Rozpisane minuty oraz zmiany nie są zleceniami meczowymi — uwzględnij je podczas ustawiania zmian w Hattricku.",
+    "handoffHint": "Po obliczeniu składu użyj „Zastosuj zaplanowane zmiany”. Zatwierdzenie sprawdza pokrycie minut; kontuzje i kartki podczas meczu mogą je zmienić.",
     "saveError": "Nie udało się zapisać planu w tej przeglądarce. Zmiany pozostają tylko na bieżącym ekranie.",
     "saved": "Zapisano w tej przeglądarce, dla tej drużyny i tygodnia:",
     "details": "Pokaż szczegółowy raport i metodę obliczeń",
@@ -58,7 +61,14 @@
       "unknownEffect": "Ta pozycja ma nieokreślony liczbowo efekt; nie wliczamy go jako pełnego ani połowicznego treningu.",
       "playerOverlap": "Zawodnik ma nakładające się przedziały gry.",
       "slotOverlap": "Dwóch zawodników zajmuje tę samą pozycję w tym samym czasie.",
-      "illegalFormation": "Tych jednoczesnych pozycji nie da się uzupełnić do legalnej formacji obsługiwanej przez optymalizator."
+      "illegalFormation": "Tych jednoczesnych pozycji nie da się uzupełnić do legalnej formacji obsługiwanej przez optymalizator.",
+      "orderMinute": "Zaplanuj zmiany w odstępach pięciu minut.",
+      "playerReentry": "Zmieniony zawodnik nie może wrócić na boisko.",
+      "trainingPositionChange": "Automatyczne zlecenia treningowe wymagają jednej pozycji dla każdego trenowanego.",
+      "trainingFormationChange": "Tych przedziałów nie można rozegrać w jednej obsługiwanej formacji.",
+      "tooManyOrders": "Mecz wymaga więcej niż pięciu zleceń. Ogranicz zmiany lub wykorzystaj drugi mecz.",
+      "trainingReserves": "Brakuje dostępnych rezerwowych do wypełnienia przedziałów.",
+      "trainingLineupMismatch": "Wyjściowy skład jest sprzeczny z planowanymi przedziałami."
     }
   },
   "week": {
@@ -66,8 +76,10 @@
     "subtitle": "Najbliższe decyzje dla Twojej drużyny.",
     "nextMatch": "Najbliższy mecz",
     "noMatch": "Brak potwierdzonego najbliższego meczu.",
-    "home": "U siebie", "away": "Na wyjeździe",
-    "prepare": "Przygotuj mecz", "scout": "Sprawdź rywala",
+    "home": "U siebie",
+    "away": "Na wyjeździe",
+    "prepare": "Przygotuj mecz",
+    "scout": "Sprawdź rywala",
     "planReady": "Zapisany skład jest gotowy do sprawdzenia.",
     "planDraft": "Masz zapisany szkic składu.",
     "planSent": "Zlecenia dla tego planu zostały wysłane.",
@@ -93,18 +105,27 @@
   "leagueEvidence": {
     "title": "Jak czytać tę prognozę",
     "unvalidated": "Model nie został jeszcze zweryfikowany na wystarczającej próbie rzeczywistych meczów. Traktuj procenty jako orientacyjne porównanie scenariuszy.",
-    "confidence": "Pewność modelu", "version": "Wersja", "details": "Założenia modelu",
-    "source": "Podstawa ocen", "scout": "Historia meczów", "default": "Oceny domyślne — brakuje obserwacji", "mock": "Dane demonstracyjne", "unknown": "Źródło nieznane",
+    "confidence": "Pewność modelu",
+    "version": "Wersja",
+    "details": "Założenia modelu",
+    "source": "Podstawa ocen",
+    "scout": "Historia meczów",
+    "default": "Oceny domyślne — brakuje obserwacji",
+    "mock": "Dane demonstracyjne",
+    "unknown": "Źródło nieznane",
     "fallback": "Część drużyn ma oceny domyślne. Wyniki symulacji mogą być szczególnie niedokładne."
   },
   "scoutEvidence": {
     "title": "Co wynika z ostatnich meczów?",
     "prepare": "Przygotuj skład na tego rywala",
-    "formation": "Najczęstsza formacja", "tactic": "Najczęstsza taktyka",
+    "formation": "Najczęstsza formacja",
+    "tactic": "Najczęstsza taktyka",
     "sample": "w {{count}} z {{total}} analizowanych meczów",
     "weakestDefense": "Najniższa obserwowana ocena obrony",
     "strongestAttack": "Najwyższa obserwowana ocena ataku",
-    "left": "lewa strona rywala", "central": "środek", "right": "prawa strona rywala",
+    "left": "lewa strona rywala",
+    "central": "środek",
+    "right": "prawa strona rywala",
     "caution": "To opis obserwacji, a nie pewny skład na następny mecz. Lewa obrona rywala mierzy się z Twoim prawym atakiem i odwrotnie.",
     "openMatch": "Otwórz mecz w Hattricku"
   }

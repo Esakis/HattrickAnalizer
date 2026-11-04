@@ -99,7 +99,7 @@ public static class MockChppData
         return new XDocument(root);
     }
 
-    private static string Stamp(DateTime value) => value.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+    private static string Stamp(DateTime value) => value.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
     private static XElement TeamSide(string side, int id) => new(side + "Team",
         new XElement(side + "TeamID", id), new XElement(side + "TeamName", Name(id)));
     private static XElement Match(int teamId, int sequence)

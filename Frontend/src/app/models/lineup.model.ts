@@ -1,6 +1,7 @@
 import { Player } from './player.model';
 
 export interface Lineup {
+  setPiecesTakerId?: number;
   positions: { [key: string]: LineupPosition };
   tacticType: string;
   tacticSkill: string;
@@ -46,6 +47,7 @@ export interface OptimizerRequest {
   isHomeMatch?: boolean;
   matchDate?: string;
   requiredPlayerIds?: number[];
+  requiredPositionSlots?: string[];
   excludedPlayerIds?: number[];
   lockedPositions?: { [slot: string]: number };
   opponentScenario?: { tactic: string; ratings: { [sector: string]: number } };

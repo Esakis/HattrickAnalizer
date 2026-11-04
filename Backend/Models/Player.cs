@@ -35,14 +35,16 @@ public class Player
 public class PlayerMatchStats
 {
     public int TotalMatches { get; set; }
-    public int Goals { get; set; }
-    public int Assists { get; set; }
+    public int? CareerGoals { get; set; }
+    public int? SeasonGoals { get; set; }
+    public int? Goals { get; set; }
+    public int? Assists { get; set; }
     public int YellowCards { get; set; }
     public int RedCards { get; set; }
     public double AverageRating { get; set; }
-    public double AverageForm { get; set; }
-    public double GoalsPerMatch { get; set; }
-    public double MatchesPerGoal { get; set; }
+    public double? AverageForm { get; set; }
+    public double? GoalsPerMatch { get; set; }
+    public double? MatchesPerGoal { get; set; }
     public int MinutesPlayed { get; set; }
     public Dictionary<string, double> PositionRatings { get; set; } = new();
 }

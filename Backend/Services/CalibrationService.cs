@@ -46,7 +46,7 @@ public class CalibrationService
                 return status.Equals("FINISHED", StringComparison.OrdinalIgnoreCase)
                     && matchType >= 1 && matchType <= 12;
             })
-            .OrderByDescending(m => DateTime.TryParse(m.Element("MatchDate")?.Value, out var d) ? d : DateTime.MinValue)
+            .OrderByDescending(m => ParseDate(m.Element("MatchDate")?.Value) ?? DateTime.MinValue)
             .Take(count)
             .ToList();
 
@@ -148,7 +148,7 @@ public class CalibrationService
         var lineupContainer = teamElement?.Element("Lineup") ?? teamElement?.Element("StartingLineup");
         if (lineupContainer == null) return null;
 
-        var lineup = new Lineup { Formation = snapshot.Context.Formation, TacticType = snapshot.Context.Tactic! };
+        var lineup = new Lineup { Formation = snapshot.Context.Formation, TacticType = snapshot.Context.Tactic!, SetPiecesTakerId = snapshot.Context.SetPiecesTakerId };
 
         foreach (var playerEl in lineupContainer.Elements("Player"))
         {
@@ -299,8 +299,7 @@ public class CalibrationService
         return true;
     }
 
-    private static DateTime? ParseDate(string? value) =>
-        DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt) ? dt : null;
+    private static DateTime? ParseDate(string? value) => ChppTime.Parse(value);
 
     internal static string MapTacticCode(int code) => code switch
     {

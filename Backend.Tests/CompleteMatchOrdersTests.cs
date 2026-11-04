@@ -92,6 +92,31 @@ public class CompleteMatchOrdersTests
         Assert.Equal(0, handler.Writes);
     }
 
+    [Fact]
+    public void Consecutive_substitutions_and_same_player_behaviour_changes_are_serialized()
+    {
+        var request = Request();
+        request.Bench = new() { new() { PlayerId = 12, PositionCode = 0 }, new() { PlayerId = 13, PositionCode = 6 } };
+        request.Substitutions = new() {
+            new() { PlayerOutId=1, PlayerInId=12, Minute=46 },
+            new() { PlayerOutId=12, PlayerInId=12, Minute=60, Behaviour=0 },
+            new() { PlayerOutId=12, PlayerInId=13, Minute=75 }
+        };
+        Assert.Null(MatchOrdersService.ValidateRequest(request));
+        using var json = JsonDocument.Parse(MatchOrdersService.BuildLineupJson(request));
+        Assert.Equal("1", json.RootElement.GetProperty("substitutions")[1].GetProperty("orderType").GetString());
+        request.Substitutions.Add(new() { PlayerOutId=13, PlayerInId=12, Minute=85 });
+        Assert.NotNull(MatchOrdersService.ValidateRequest(request));
+    }
+
+    [Fact]
+    public void Inherited_position_cannot_use_an_illegal_behaviour()
+    {
+        var request=Request();
+        request.Substitutions.Add(new() { PlayerOutId=1, PlayerInId=1, Minute=46, Behaviour=1 });
+        Assert.NotNull(MatchOrdersService.ValidateRequest(request));
+    }
+
     private static MatchOrdersRequest Request() => new()
     {
         MatchId = 123, CaptainId = 1, SetPiecesTakerId = 1,

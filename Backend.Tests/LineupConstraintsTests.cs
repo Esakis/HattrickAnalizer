@@ -150,6 +150,45 @@ public class LineupConstraintsTests : IClassFixture<ApiTestFactory>
         Assert.Equal(expected.Alternatives[0].ExpectedGoalsAgainst, scaled.Alternatives[0].ExpectedGoalsAgainst, 10);
     }
 
+    [Fact]
+    public async Task Selected_set_piece_taker_changes_forecast_and_survives_replay()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var team = await scope.ServiceProvider.GetRequiredService<HattrickApiService>().GetTeamDetailsAsync(10);
+        var optimizer = scope.ServiceProvider.GetRequiredService<AdvancedLineupOptimizer>();
+        var players = team.Players.Where(p => p.CanOptimize).Take(11).ToList();
+        players[0].Skills.SetPieces = 1;
+        players[1].Skills.SetPieces = 20;
+        var request = new EvaluateLineupRequest {
+            Context = Request(), Tactic = "Normal", SetPiecesTakerId = players[0].PlayerId,
+            Positions = FormationData.Formations["4-4-2"].Positions.Select((slot,i)=>(slot,i))
+                .ToDictionary(x=>x.slot,x=>new EvaluationPosition {PlayerId=players[x.i].PlayerId,Behaviour=x.slot})
+        };
+        var weak = optimizer.EvaluateRoster(team, Opponent(), request);
+        Assert.Equal(players[0].PlayerId, weak.OptimalLineup.SetPiecesTakerId);
+        var replay = optimizer.EvaluateAssignedLineup(weak.OptimalLineup, Opponent().Ratings, weak.InputSnapshot);
+        Assert.Equal(weak.Alternatives[0].WinProbability, replay.WinProbability, 10);
+        request.SetPiecesTakerId = players[1].PlayerId;
+        var strong = optimizer.EvaluateRoster(team, Opponent(), request);
+        Assert.True(strong.Alternatives[0].ExpectedGoalsFor > weak.Alternatives[0].ExpectedGoalsFor);
+        request.SetPiecesTakerId = int.MaxValue;
+        Assert.Throws<ArgumentException>(()=>optimizer.EvaluateRoster(team, Opponent(), request));
+    }
+
+    [Fact]
+    public async Task Future_training_slots_constrain_formation_even_without_starting_player_locks()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var team = await scope.ServiceProvider.GetRequiredService<HattrickApiService>().GetTeamDetailsAsync(10);
+        var optimizer = scope.ServiceProvider.GetRequiredService<AdvancedLineupOptimizer>();
+        var request = Request();
+        request.RequiredPositionSlots = new() { "CD" }; // 4-4-2 has RCD/LCD, no central slot.
+        Assert.Throws<ArgumentException>(()=>optimizer.OptimizeRoster(team, Opponent(), request));
+        request.PreferredFormation = "Auto";
+        var result = optimizer.OptimizeRoster(team, Opponent(), request);
+        Assert.All(result.Alternatives, a=>Assert.Contains("CD", a.Lineup.Positions.Keys));
+    }
+
     private static OptimizerRequest Request() => new()
     {
         MyTeamId = 10, OpponentTeamId = 20, PreferredFormation = "4-4-2", PreferredTactic = "Normal",

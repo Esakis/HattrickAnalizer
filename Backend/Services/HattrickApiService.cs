@@ -259,11 +259,11 @@ public class HattrickApiService
         foreach (var current in result)
         {
             if (!history.TryGetValue(current.PlayerId, out var historical) || historical.MatchStats == null) continue;
-            historical.MatchStats.AverageForm = current.Form;
+
             if (current.MatchStats != null)
             {
-                historical.MatchStats.Goals = current.MatchStats.Goals;
-                historical.MatchStats.Assists = current.MatchStats.Assists;
+                historical.MatchStats.CareerGoals = current.MatchStats.CareerGoals;
+                historical.MatchStats.SeasonGoals = current.MatchStats.SeasonGoals;
                 historical.MatchStats.YellowCards = current.MatchStats.YellowCards;
                 historical.MatchStats.RedCards = current.MatchStats.RedCards;
             }
@@ -338,12 +338,12 @@ public class HattrickApiService
                 var stats = new PlayerMatchStats
                 {
                     TotalMatches = agg.Matches,
-                    Goals = agg.Goals,
+                    Goals = null,
                     MinutesPlayed = agg.Minutes,
                     AverageRating = Math.Round(agg.RatingSum / agg.Matches, 2),
-                    AverageForm = player.Form,
-                    GoalsPerMatch = agg.Matches > 0 ? Math.Round((double)agg.Goals / agg.Matches, 2) : 0,
-                    MatchesPerGoal = agg.Goals > 0 ? Math.Round((double)agg.Matches / agg.Goals, 1) : 0
+                    AverageForm = null,
+                    GoalsPerMatch = null,
+                    MatchesPerGoal = null
                 };
 
                 // Oblicz średnie oceny na pozycjach
@@ -511,7 +511,7 @@ public class HattrickApiService
             .OrderByDescending(m =>
             {
                 var dateStr = m.Element("MatchDate")?.Value ?? "";
-                return DateTime.TryParse(dateStr, out var dt) ? dt : DateTime.MinValue;
+                return ParseDate(dateStr) ?? DateTime.MinValue;
             })
             .Select(m => m.Element("MatchID")?.Value)
             .Where(id => !string.IsNullOrEmpty(id))
@@ -549,7 +549,11 @@ public class HattrickApiService
             stats.TotalMatches = agg.Matches;
             stats.MinutesPlayed = agg.Minutes;
             stats.AverageRating = agg.Matches > 0 ? Math.Round(agg.RatingSum / agg.Matches, 2) : 0;
-            stats.AverageForm = player.Form;
+            stats.AverageForm = null;
+            stats.Goals = null;
+            stats.Assists = null;
+            stats.GoalsPerMatch = null;
+            stats.MatchesPerGoal = null;
             
             Debug.WriteLine($"[EnrichPlayers] Player {player.PlayerId}: {agg.Matches} matches, {agg.PositionRatings.Count} positions");
             
@@ -728,8 +732,8 @@ public class HattrickApiService
             .FirstOrDefault(r => r.Element("WeatherID") != null);
         if (region == null) return weather;
 
-        var today = DateTime.UtcNow.Date;
-        var matchDay = matchDate?.Date;
+        var today = ChppTime.LocalDate(DateTime.UtcNow);
+        var matchDay = matchDate.HasValue ? ChppTime.LocalDate(matchDate.Value) : (DateTime?)null;
         if (matchDay == today)
         {
             weather.WeatherId = int.Parse(region.Element("WeatherID")?.Value ?? "-1");
@@ -864,13 +868,7 @@ public class HattrickApiService
         return (null, null);
     }
 
-    private static DateTime? ParseDate(string? value)
-    {
-        if (string.IsNullOrEmpty(value)) return null;
-        if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt))
-            return dt;
-        return null;
-    }
+    private static DateTime? ParseDate(string? value) => ChppTime.Parse(value);
 
     /// <summary>Surowe zapytanie CHPP z tokenami biezacej sesji — dla serwisow pomocniczych (kalibracja).</summary>
     internal async Task<XDocument> FetchChppXmlAsync(Dictionary<string, string> queryParams, string context)
@@ -937,12 +935,10 @@ public class HattrickApiService
 
         // Podstawowe statystyki - career + bieżący sezon. Per-mecz dane są później
         // uzupełniane przez EnrichPlayersWithMatchStatsAsync (z matchlineup).
-        var careerGoals = ParseChppInt(element, "CareerGoals");
         var leagueGoals = ParseChppInt(element, "LeagueGoals");
         var cupGoals = ParseChppInt(element, "CupGoals");
         var friendlyGoals = ParseChppInt(element, "FriendliesGoals");
         var seasonGoals = leagueGoals + cupGoals + friendlyGoals;
-        var totalGoals = careerGoals > 0 ? careerGoals : seasonGoals;
 
         var lastMatchElement = element.Element("LastMatch");
         var lastMatchRating = lastMatchElement != null
@@ -952,14 +948,16 @@ public class HattrickApiService
         player.MatchStats = new PlayerMatchStats
         {
             TotalMatches = 0,
-            Goals = totalGoals,
-            Assists = 0, // API Hattrick nie udostępnia asyst
+            CareerGoals = TryParseChppInt(element, "CareerGoals", out var parsedCareer) ? parsedCareer : null,
+            SeasonGoals = new[] { "LeagueGoals", "CupGoals", "FriendliesGoals" }.All(n => TryParseChppInt(element, n, out _)) ? seasonGoals : null,
+            Goals = null,
+            Assists = null, // API Hattrick nie udostępnia asyst
             YellowCards = cardsAvailable ? cards : 0,
             RedCards = 0,
             AverageRating = lastMatchRating,
-            AverageForm = player.Form,
-            GoalsPerMatch = 0,
-            MatchesPerGoal = 0,
+            AverageForm = null,
+            GoalsPerMatch = null,
+            MatchesPerGoal = null,
             MinutesPlayed = 0
         };
 
@@ -1085,7 +1083,7 @@ public class HattrickApiService
                 MatchStats = new PlayerMatchStats
                 {
                     TotalMatches = totalMatches,
-                    Goals = goals,
+                    Goals = goals, CareerGoals = goals, SeasonGoals = goals,
                     Assists = assists,
                     YellowCards = cards,
                     RedCards = random.Next(0, 3),
@@ -1151,7 +1149,7 @@ public class HattrickApiService
         return new MatchRecord
         {
             MatchId = long.Parse(element.Element("MatchID")?.Value ?? "0"),
-            MatchDate = DateTime.Parse(element.Element("MatchDate")?.Value ?? DateTime.MinValue.ToString()),
+            MatchDate = ParseDate(element.Element("MatchDate")?.Value) ?? DateTime.MinValue,
             MatchType = element.Element("MatchType")?.Value ?? "",
             OpponentTeam = opponentName,
             IsHomeMatch = isHome,

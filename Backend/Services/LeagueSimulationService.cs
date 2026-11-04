@@ -295,8 +295,7 @@ public class LeagueSimulationService
         LeftAttackRating = 30
     };
 
-    private static DateTime? ParseDate(string? value) =>
-        DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt) ? dt : null;
+    private static DateTime? ParseDate(string? value) => ChppTime.Parse(value);
 }
 
 public class LeagueSimulationReport

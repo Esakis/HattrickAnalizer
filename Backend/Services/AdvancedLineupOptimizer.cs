@@ -99,6 +99,8 @@ public class AdvancedLineupOptimizer
             ?? throw new ArgumentException("Positions do not form a legal formation.");
         if (request.PreferredFormation is { Length: > 0 } preferred && preferred != "Auto" && preferred != formation.Name)
             throw new ArgumentException("The submitted XI does not match the selected formation.");
+        if (request.RequiredPositionSlots.Any(slot => !evaluation.Positions.ContainsKey(slot)))
+            throw new ArgumentException("The submitted formation does not contain the training plan positions.");
         if (evaluation.Positions.Any(p => !BehavioursFor(p.Key).Contains(p.Value.Behaviour)))
             throw new ArgumentException("A player behaviour is invalid for its position.");
         var assigned = new AssignedLineup
@@ -115,6 +117,7 @@ public class AdvancedLineupOptimizer
         var ratings = ScaleOpponentRatings(request.OpponentScenario?.Ratings ?? opponent.Ratings, request.OpponentRatingScale);
         var context = new MatchContext
         {
+            SetPiecesTakerId = evaluation.SetPiecesTakerId,
             IsHomeMatch = request.IsHomeMatch, WeatherId = weather?.WeatherId ?? RatingEngine.WeatherUnknown,
             TeamSpiritLevel = request.TeamSpiritLevel ?? team.TeamSpiritLevel,
             ConfidenceLevel = request.ConfidenceLevel ?? team.ConfidenceLevel,
@@ -166,7 +169,7 @@ public class AdvancedLineupOptimizer
         OptimizationCandidate? best = null;
         var allCandidates = new List<OptimizationCandidate>();
         var formationsToTry = ResolveFormationCandidates(request.PreferredFormation)
-            .Where(f => request.LockedPositions.Keys.All(f.Positions.Contains)).ToList();
+            .Where(f => request.LockedPositions.Keys.Concat(request.RequiredPositionSlots).All(f.Positions.Contains)).ToList();
         if (formationsToTry.Count == 0) throw new ArgumentException("Locked positions do not fit the selected formation.");
         foreach (var formation in formationsToTry)
         {
@@ -327,7 +330,7 @@ public class AdvancedLineupOptimizer
         var available = GetConstrainedRoster(team, request).OrderBy(p => p.PlayerId).ToList();
         if (available.Count < 11) throw new InvalidOperationException("At least eleven eligible players are required.");
         var formation = ResolveFormationCandidates(request.PreferredFormation)
-            .FirstOrDefault(f => request.LockedPositions.Keys.All(f.Positions.Contains))
+            .FirstOrDefault(f => request.LockedPositions.Keys.Concat(request.RequiredPositionSlots).All(f.Positions.Contains))
             ?? throw new ArgumentException("Locked positions do not fit the selected formation.");
         var keeperId = available.OrderByDescending(p => EffectiveSkill(p, p.Skills.Keeper))
             .ThenBy(p => p.PlayerId).Take(2).Select(p => p.PlayerId).First();
@@ -366,6 +369,8 @@ public class AdvancedLineupOptimizer
         if (!string.IsNullOrWhiteSpace(request.PreferredFormation) && request.PreferredFormation != "Auto" && !FormationData.Formations.ContainsKey(request.PreferredFormation)) throw new ArgumentException("PreferredFormation is invalid.");
         if (request.FormationExperience is null || request.FormationExperience.Values.Any(level => level is < 3 or > 10)) throw new ArgumentException("FormationExperience levels must be 3..10.");
         if (request.FocusAreas is null) throw new ArgumentException("FocusAreas must not be null.");
+        if (request.RequiredPositionSlots is null || request.RequiredPositionSlots.Any(slot => !FormationData.SlotBehaviourOptions.ContainsKey(slot)))
+            throw new ArgumentException("Required position slots must be legal.");
         if (request.RequiredPlayerIds is null || request.ExcludedPlayerIds is null || request.LockedPositions is null)
             throw new ArgumentException("Player constraints must not be null.");
         if (request.RequiredPlayerIds.Concat(request.ExcludedPlayerIds).Concat(request.LockedPositions.Values).Any(id => id <= 0)
@@ -396,6 +401,7 @@ public class AdvancedLineupOptimizer
         MyTeamId = request.MyTeamId, OpponentTeamId = request.OpponentTeamId,
         PreferredTactic = request.PreferredTactic, TeamAttitude = request.TeamAttitude,
         FocusAreas = request.FocusAreas.ToList(), CoachType = request.CoachType,
+        RequiredPositionSlots = request.RequiredPositionSlots.ToList(),
         RequiredPlayerIds = request.RequiredPlayerIds.ToList(), ExcludedPlayerIds = request.ExcludedPlayerIds.ToList(),
         LockedPositions = new Dictionary<string, int>(request.LockedPositions),
         AssistantManagerLevel = request.AssistantManagerLevel, TeamSpiritLevel = request.TeamSpiritLevel,
@@ -843,7 +849,7 @@ public class AdvancedLineupOptimizer
             disorderRisk, context.TeamSpiritLevel, context.ConfidenceLevel);
         var opp = ConvertToLineupRatings(opponent);
 
-        var (myIspAtt, myIspDef) = _engine.ComputeIndirectSetPieces(lineup);
+        var (myIspAtt, myIspDef) = _engine.ComputeIndirectSetPieces(lineup, context.SetPiecesTakerId);
         var ownSide = new MatchTacticalSide
         {
             Ratings = ratings, Tactic = tactic, IsHome = context.IsHomeMatch,
@@ -871,6 +877,8 @@ public class AdvancedLineupOptimizer
         return new OptimizationCandidate
         {
             Lineup = CloneLineup(lineup),
+            SetPiecesTakerId = context.SetPiecesTakerId ?? lineup.Slots.Values.Select(s => s.Player)
+                .OrderByDescending(p => RatingEngine.EffSkill(p, p.Skills.SetPieces)).ThenBy(p => p.PlayerId).First().PlayerId,
             Tactic = tactic,
             Attitude = attitude,
             Coach = coach,
@@ -1280,6 +1288,7 @@ public class AdvancedLineupOptimizer
             NormaliseAttitude(context.TeamAttitude), NormaliseCoachType(context.CoachType), assigned,
             opponentRatings, new MatchContext
             {
+                SetPiecesTakerId = lineup.SetPiecesTakerId,
                 IsHomeMatch = context.IsHomeMatch, WeatherId = weatherId,
                 TeamSpiritLevel = context.TeamSpiritLevel, ConfidenceLevel = context.ConfidenceLevel,
                 OpponentIspAtt = opponentRatings.IndirectSetPiecesAttRating,
@@ -1392,6 +1401,7 @@ public class AdvancedLineupOptimizer
     {
         var assignedLineup = ToLineup(CloneLineup(best.Lineup));
         assignedLineup.TacticType = best.Tactic;
+        assignedLineup.SetPiecesTakerId = best.SetPiecesTakerId;
         assignedLineup.PredictedRatings = best.Ratings;
         return assignedLineup;
     }
@@ -1546,6 +1556,7 @@ internal class AssignedSlot
 // Kontekst meczu przekazywany do oceny kandydatow (dom/wyjazd, ISP przeciwnika).
 internal class MatchContext
 {
+    public int? SetPiecesTakerId { get; set; }
     public bool IsHomeMatch { get; set; }
     public double OpponentIspAtt { get; set; }
     public double OpponentIspDef { get; set; }
@@ -1570,6 +1581,7 @@ internal class AssignedLineup
 
 internal class OptimizationCandidate
 {
+    public int? SetPiecesTakerId { get; set; }
     public AssignedLineup Lineup { get; set; } = null!;
     public string Tactic { get; set; } = "";
     public string Attitude { get; set; } = "Normal";

@@ -341,9 +341,9 @@ export class PlayersComponent implements OnInit, OnDestroy {
       case 'passing': return player.skills?.passing || 0;
       case 'scoring': return player.skills?.scoring || 0;
       case 'setPieces': return player.skills?.setPieces || 0;
-      case 'goals': return player.matchStats?.goals || 0;
-      case 'assists': return player.matchStats?.assists || 0;
-      case 'avgForm': return player.matchStats?.averageForm || player.form;
+      case 'goals': return player.matchStats?.careerGoals ?? -1;
+      case 'seasonGoals': return player.matchStats?.seasonGoals ?? -1;
+      case 'sampleMatches': return player.matchStats?.totalMatches ?? -1;
       case 'goalsPerMatch': return player.matchStats?.goalsPerMatch || 0;
       case 'matchesPerGoal': return player.matchStats?.matchesPerGoal || 999;
       default: return 0;

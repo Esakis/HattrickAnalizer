@@ -401,8 +401,7 @@ public class OpponentScoutService
         return true;
     }
 
-    private static DateTime? ParseDate(string? value) =>
-        DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt) ? dt : null;
+    private static DateTime? ParseDate(string? value) => ChppTime.Parse(value);
 
     private class ScoutStarterAggregate
     {

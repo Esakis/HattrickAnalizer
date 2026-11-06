@@ -11,6 +11,84 @@
   <div *ngIf="error" class="error-message">{{ error }}</div>
 
   <div *ngIf="!loading && summary" class="training-stack">
+    <section class="card training-card recommendation-panel" aria-labelledby="recommendation-title">
+      <div class="recommendation-heading">
+        <div>
+          <h2 id="recommendation-title">{{ 'planning.recommendations.title' | translate }}</h2>
+          <p class="training-hint">{{ 'planning.recommendations.intro' | translate }}</p>
+        </div>
+        <label>{{ 'planning.recommendations.formation' | translate }}
+          <select [(ngModel)]="previewFormation" (ngModelChange)="refreshRecommendations()">
+            <option *ngFor="let formation of trainingFormations" [value]="formation.name">{{ formation.name }}</option>
+          </select>
+        </label>
+      </div>
+      <p class="training-hint">{{ 'planning.recommendations.currentType' | translate }} <strong>{{ getTrainingTypeLabel() }}</strong></p>
+      <p *ngIf="!roster.length" class="training-hint">{{ 'planning.rosterLoading' | translate }}</p>
+      <p *ngIf="roster.length && availablePlayerCount < 11" class="coverage-status">{{ 'planning.recommendations.smallRoster' | translate:{ count: availablePlayerCount } }}</p>
+      <div class="table-wrap training-table-wrap">
+        <table class="data-table training-table recommendation-types">
+          <caption>{{ 'planning.recommendations.comparison' | translate }}</caption>
+          <thead>
+            <tr>
+              <th class="player-col">{{ 'training.type' | translate }}</th>
+              <th>{{ 'planning.recommendations.perMatch' | translate }}<small>{{ 'planning.recommendations.effectColumns' | translate }}</small></th>
+              <th>{{ 'planning.recommendations.twoMatches' | translate }}<small>{{ 'planning.recommendations.effectColumns' | translate }}</small></th>
+              <th>{{ 'planning.recommendations.yourPlayers' | translate }}<small>{{ 'planning.recommendations.effectColumns' | translate }}</small></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let option of recommendations; let first = first" [class.full-training]="option.trainingTypeCode === previewTrainingType">
+              <td class="player-col">
+                <label class="recommendation-choice">
+                  <input type="radio" name="recommended-training" [value]="option.trainingTypeCode" [(ngModel)]="previewTrainingType">
+                  <span>{{ ('training.types.' + option.trainingTypeName) | translate }}<small *ngIf="first && option.fullPlayerCount > 0">{{ 'planning.recommendations.mostPlayers' | translate }}</small></span>
+                </label>
+              </td>
+              <td>{{ option.fullSlotsPerMatch }} / {{ option.halfSlotsPerMatch }}</td>
+              <td>{{ option.fullCapacity }} / {{ option.halfCapacity }}</td>
+              <td><strong>{{ option.fullPlayerCount }} / {{ option.halfPlayerCount }}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="training-hint">{{ 'planning.recommendations.capacityHint' | translate }}</p>
+      <div *ngIf="selectedRecommendation as recommendation" class="recommendation-detail">
+        <h3>{{ 'planning.recommendations.trainees' | translate }}: {{ ('players.skills.' + recommendation.skill) | translate }}</h3>
+        <p class="training-hint">{{ 'planning.recommendations.selectionHint' | translate }}</p>
+        <p *ngIf="!recommendation.trainees.length" class="training-hint">{{ 'planning.recommendations.noCandidates' | translate }}</p>
+        <div *ngIf="recommendation.trainees.length" class="table-wrap training-table-wrap">
+          <table class="data-table training-table recommendation-trainees">
+            <thead><tr>
+              <th class="player-col">{{ 'training.player' | translate }}</th>
+              <th>{{ 'training.age' | translate }}</th>
+              <th>{{ 'planning.recommendations.skill' | translate }}</th>
+              <th>{{ 'planning.recommendations.match' | translate }}</th>
+              <th>{{ 'training.position' | translate }}</th>
+              <th>{{ 'planning.minutes' | translate }}</th>
+              <th>{{ 'planning.recommendations.effect' | translate }}</th>
+              <th>{{ 'planning.recommendations.reason' | translate }}</th>
+            </tr></thead>
+            <tbody><tr *ngFor="let trainee of recommendation.trainees">
+              <td class="player-col">{{ trainee.playerName }}</td>
+              <td>{{ trainee.age }}</td>
+              <td>{{ trainee.skillValue }}<small>{{ getSkillLevelName(trainee.skillValue) }}</small></td>
+              <td>{{ ('planning.matches.' + trainee.match) | translate }}</td>
+              <td>{{ trainee.slot }}</td>
+              <td>{{ trainee.minutes }}</td>
+              <td>{{ trainee.factor | percent:'1.0-0' }}</td>
+              <td class="recommendation-reasons"><span *ngFor="let reason of trainee.reasons">{{ ('planning.recommendations.reasons.' + reason) | translate }}</span></td>
+            </tr></tbody>
+          </table>
+        </div>
+        <div class="plan-actions">
+          <button type="button" class="btn-primary plan-button" (click)="applyRecommendation()" [disabled]="!canApplyRecommendation">{{ 'planning.recommendations.apply' | translate }}</button>
+        </div>
+        <p *ngIf="recommendation.trainingTypeCode !== summary.trainingTypeCode || summary.trainingTypeKnown === false" class="training-hint">{{ 'planning.recommendations.alternativeHint' | translate }}</p>
+        <p *ngIf="recommendation.trainingTypeCode === summary.trainingTypeCode && summary.trainingTypeKnown !== false" class="training-hint">{{ 'planning.recommendations.applyHint' | translate }}</p>
+      </div>
+    </section>
+
     <section class="card training-card planner-intro">
       <div>
         <h2>{{ 'planning.title' | translate }}</h2>
@@ -60,6 +138,12 @@
 
       <section class="card training-card">
         <h3>2. {{ 'planning.allocateMatches' | translate }}</h3>
+        <label class="roster-search">{{ 'planning.recommendations.planFormation' | translate }}
+          <select [(ngModel)]="plan.formation" (ngModelChange)="save()">
+            <option [ngValue]="undefined">{{ 'planning.recommendations.automaticFormation' | translate }}</option>
+            <option *ngFor="let formation of trainingFormations" [value]="formation.name">{{ formation.name }}</option>
+          </select>
+        </label>
         <p class="training-hint">{{ 'planning.datesHint' | translate }}</p>
         <p *ngIf="fixturesError" class="training-hint">{{ 'planning.fixturesError' | translate }}</p>
         <div class="plan-actions suggestion-actions"><button type="button" class="btn-primary plan-button" (click)="suggestAssignments()" [disabled]="!selectedPlayers.length">{{ 'planning.suggest' | translate }}</button><span class="training-hint">{{ 'planning.suggestHint' | translate }}</span></div>
@@ -84,7 +168,7 @@
                 <select [(ngModel)]="assignment.playerId" (ngModelChange)="save()"><option *ngFor="let player of roster" [ngValue]="player.playerId">{{ player.firstName }} {{ player.lastName }}</option></select>
               </label>
               <label>{{ 'training.position' | translate }}
-                <select [(ngModel)]="assignment.slot" (ngModelChange)="save()"><option *ngFor="let slot of slots" [value]="slot">{{ slot }} · {{ factorLabel(slot) }}</option></select>
+                <select [(ngModel)]="assignment.slot" (ngModelChange)="save()"><option *ngFor="let slot of assignmentSlots(assignment.slot)" [value]="slot">{{ slot }} · {{ factorLabel(slot) }}</option></select>
               </label>
               <label>{{ 'planning.fromMinute' | translate }}<input type="number" min="0" max="89" step="1" [(ngModel)]="assignment.startMinute" (ngModelChange)="save()"></label>
               <label>{{ 'planning.minutes' | translate }}<input type="number" min="1" max="90" step="1" [(ngModel)]="assignment.minutes" (ngModelChange)="save()"></label>

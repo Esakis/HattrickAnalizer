@@ -38,7 +38,7 @@
     "addAssignment": "Add player",
     "prepareLineup": "Complete the lineup in the optimizer",
     "suggest": "Suggest trainee allocation",
-    "suggestHint": "Set match dates first. The suggestion fills free full-training slots and preserves manual entries.",
+    "suggestHint": "Set match dates first. The suggestion preserves manual entries and fills full-training positions first. When a formation is selected, it also uses free positions with a 50% effect.",
     "unassigned": "Full training could not be allocated — check dates, availability and slots:",
     "skippedUnknown": "Skipped players without confirmed minutes in the report:",
     "suggested": "The selected trainees' minutes are allocated. Review the plan, then complete each lineup in the optimizer.",
@@ -68,7 +68,40 @@
       "trainingFormationChange": "These intervals cannot be completed in a single supported formation.",
       "tooManyOrders": "This match needs more than five player orders. Reduce changes or use another match.",
       "trainingReserves": "Not enough available reserves to complete the planned intervals.",
-      "trainingLineupMismatch": "The starting XI conflicts with the planned intervals."
+      "trainingLineupMismatch": "The starting XI conflicts with the planned intervals.",
+      "selectedFormation": "Positions do not match the selected plan formation. Change positions or choose another formation."
+    },
+    "recommendations": {
+      "title": "Choose training for your formation",
+      "intro": "Compare how many different players can train in this formation and see suggested trainees for the league and friendly.",
+      "formation": "Formation to compare",
+      "currentType": "Current team training:",
+      "smallRoster": "Available players: {{count}}. A full lineup needs 11; the suggestions below cover training positions only.",
+      "comparison": "Training types ranked by the number of full-effect trainees in your squad",
+      "perMatch": "Positions per match",
+      "twoMatches": "Two-match capacity",
+      "yourPlayers": "Suggested from squad",
+      "effectColumns": "100% / 50%",
+      "mostPlayers": "Most full-effect trainees from squad",
+      "capacityHint": "Assumes 90 minutes each in a league match and a friendly, using the same formation and different players. This compares potential capacity without recorded minutes or fixture validation. 50% is not full training. Position counts do not compare development speeds across skills; small effects and set-piece bonuses are excluded here.",
+      "trainees": "Who to train",
+      "selectionHint": "Full-effect positions are filled before half-effect positions. Selection considers age and skills useful for the position. This is a squad-development suggestion, not a prediction of skill-up dates or transfer values.",
+      "noCandidates": "No available candidates with a known trained skill for this formation.",
+      "skill": "Current level of trained skill",
+      "match": "Match",
+      "effect": "Position effect",
+      "reason": "Why this player",
+      "apply": "Add trainees to this week's plan",
+      "alternativeHint": "The whole team uses one training type. This is an alternative to consider: to use it in the current-week planner, change training in Hattrick and refresh the report.",
+      "applyHint": "Set match dates below first. Players and the chosen formation will be added while preserving manual entries. Minutes will be adjusted to the report and available positions; half-effect trainees will still show a shortfall from full training.",
+      "planFormation": "Formation for the league and friendly plan",
+      "automaticFormation": "Any supported formation",
+      "reasons": {
+        "developSkill": "Develop the selected skill",
+        "young": "Young player (17–21 years)",
+        "roleFit": "Skills suit this position",
+        "unknownAvailability": "Check unconfirmed availability"
+      }
     }
   },
   "week": {

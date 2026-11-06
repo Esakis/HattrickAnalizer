@@ -8,6 +8,7 @@ import { TrainingPlayerEntry, TrainingSummary } from '../../models/training.mode
 import { Player } from '../../models/player.model';
 import { DataCacheService, NextOpponent } from '../../services/data-cache.service';
 import { TRAINING_SLOTS, TrainingAssessment, TrainingAssignment, TrainingMatch, WeeklyPlanService, WeeklyTrainingPlan, trainingFactor, trainingMatchKind } from '../../services/weekly-plan.service';
+import { FormationTrainingRecommendation, TRAINING_FORMATIONS, TrainingRecommendationService } from '../../services/training-recommendation.service';
 
 @Component({
   selector: 'app-training-view',
@@ -31,18 +32,23 @@ export class TrainingViewComponent implements OnInit, OnDestroy {
   unknownNames: string[] = [];
   upcomingMatches: NextOpponent[] = [];
   fixturesError = false;
+  readonly trainingFormations = TRAINING_FORMATIONS;
+  previewFormation = '3-5-2';
+  previewTrainingType: number | null = null;
+  recommendations: FormationTrainingRecommendation[] = [];
 
   constructor(
     private hattrickApi: HattrickApiService,
     private translate: TranslateService,
     private cache: DataCacheService,
     private weeklyPlans: WeeklyPlanService,
-    private router: Router
+    private router: Router,
+    private trainingRecommendations: TrainingRecommendationService = new TrainingRecommendationService()
   ) {}
 
   ngOnInit(): void {
     this.cache.ownTeam$.pipe(takeUntil(this.destroy$)).subscribe(team => {
-      if (team) { this.roster = team.players; this.recalculate(); }
+      if (team) { this.roster = team.players; this.recalculate(); this.refreshRecommendations(); }
     });
     this.cache.nextOpponent$.pipe(takeUntil(this.destroy$)).subscribe(() => this.applyNextMatchDefault());
     this.hattrickApi.getUpcomingMatches().pipe(takeUntil(this.destroy$)).subscribe({
@@ -61,6 +67,9 @@ export class TrainingViewComponent implements OnInit, OnDestroy {
       next: (summary) => {
         this.summary = summary;
         this.plan = this.weeklyPlans.getPlan(summary.teamId, summary.weekStart ?? '');
+        this.previewFormation = this.plan.formation ?? '3-5-2';
+        this.previewTrainingType = summary.trainingTypeCode;
+        this.refreshRecommendations();
         this.applyNextMatchDefault();
         this.recalculate();
         this.loading = false;
@@ -81,6 +90,44 @@ export class TrainingViewComponent implements OnInit, OnDestroy {
     return this.roster.filter(p => this.plan?.selectedPlayerIds.includes(p.playerId));
   }
 
+  refreshRecommendations(): void {
+    this.recommendations = this.trainingRecommendations.recommend(this.previewFormation, this.roster);
+    if (!this.recommendations.some(item => item.trainingTypeCode === this.previewTrainingType)) {
+      this.previewTrainingType = this.recommendations[0]?.trainingTypeCode ?? null;
+    }
+  }
+
+  get selectedRecommendation(): FormationTrainingRecommendation | undefined {
+    return this.recommendations.find(item => item.trainingTypeCode === this.previewTrainingType);
+  }
+
+  get canApplyRecommendation(): boolean {
+    return !!this.plan && this.summary?.trainingTypeKnown !== false
+      && this.selectedRecommendation?.trainingTypeCode === this.summary?.trainingTypeCode
+      && !!this.selectedRecommendation?.trainees.length;
+  }
+
+  get availablePlayerCount(): number {
+    return this.roster.filter(player => !(player.injuryLevel > 0) && !player.isSuspended
+      && player.canOptimize !== false && player.skillsAvailable !== false).length;
+  }
+
+  applyRecommendation(): void {
+    if (!this.canApplyRecommendation || !this.plan || !this.selectedRecommendation) return;
+    this.plan.formation = this.previewFormation;
+    this.plan.selectedPlayerIds = [...new Set([
+      ...this.plan.selectedPlayerIds,
+      ...this.selectedRecommendation.trainees.map(trainee => trainee.playerId)
+    ])];
+    this.suggestAssignments(this.selectedRecommendation.trainees);
+  }
+
+  assignmentSlots(currentSlot?: string): string[] {
+    const selected = this.trainingFormations.find(formation => formation.name === this.plan?.formation);
+    const slots = selected?.slots ?? this.slots;
+    return currentSlot && !slots.includes(currentSlot) ? [...slots, currentSlot] : slots;
+  }
+
   togglePlayer(playerId: number): void {
     if (!this.plan) return;
     this.plan.selectedPlayerIds = this.plan.selectedPlayerIds.includes(playerId)
@@ -96,8 +143,12 @@ export class TrainingViewComponent implements OnInit, OnDestroy {
     if (!this.plan || !this.selectedPlayers.length || !this.summary) return;
     const assigned = this.assignments(match);
     const player = this.selectedPlayers.find(p => !assigned.some(a => a.playerId === p.playerId)) ?? this.selectedPlayers[0];
-    const preferred = this.slots.filter(slot => trainingFactor(this.summary!.trainingTypeCode, slot) === 1);
-    const slot = preferred.find(s => !assigned.some(a => a.slot === s)) ?? preferred[0] ?? 'IM';
+    const legalSlots = this.assignmentSlots();
+    const fullSlots = legalSlots.filter(slot => trainingFactor(this.summary!.trainingTypeCode, slot) === 1);
+    const halfSlots = legalSlots.filter(slot => trainingFactor(this.summary!.trainingTypeCode, slot) === 0.5);
+    const preferred = [...fullSlots, ...halfSlots];
+    const slot = preferred.find(s => !assigned.some(a => a.slot === s)) ?? preferred[0]
+      ?? legalSlots.find(s => !assigned.some(a => a.slot === s)) ?? legalSlots[0];
     this.plan.assignments.push({ playerId: player.playerId, match, slot, startMinute: 0, minutes: 90 });
     this.save();
   }
@@ -108,9 +159,9 @@ export class TrainingViewComponent implements OnInit, OnDestroy {
     this.save();
   }
 
-  suggestAssignments(): void {
+  suggestAssignments(preferredAssignments: TrainingAssignment[] = []): void {
     if (!this.plan || !this.summary) return;
-    const suggested = this.weeklyPlans.suggestAssignments(this.plan, this.summary, this.roster);
+    const suggested = this.weeklyPlans.suggestAssignments(this.plan, this.summary, this.roster, preferredAssignments);
     this.plan = suggested.plan;
     this.unassignedNames = suggested.unassignedPlayerIds.map(id => this.playerName(id));
     this.unknownNames = suggested.unknownPlayerIds.map(id => this.playerName(id));
@@ -149,12 +200,14 @@ export class TrainingViewComponent implements OnInit, OnDestroy {
     const lockedPositions = Object.fromEntries(starters.map(a => [a.slot, a.playerId]));
     const trainingMatchDate = new Date(this.plan!.matchDates[match]).toISOString();
     const fixture = this.fixtureForPlan(match);
+    const formation = this.trainingFormations.find(item => item.name === this.plan?.formation);
     this.router.navigate(['/optimizer'], { queryParams: {
       traineeIds: starters.map(a => a.playerId).join(','),
       lockedPositions: JSON.stringify(lockedPositions), trainingMatch: match,
       trainingWeek: this.plan?.weekStart, trainingMatchDate,
       trainingAssignments: JSON.stringify(this.assignments(match)),
-      trainingSlots: [...new Set(this.assignments(match).map(a => a.slot))].join(','),
+      ...(formation ? { trainingFormation: formation.name } : {}),
+      trainingSlots: (formation?.slots ?? [...new Set(this.assignments(match).map(a => a.slot))]).join(','),
       trainingExcludedIds: this.assignments(match).filter(a => !starters.some(s => s.playerId === a.playerId)).map(a => a.playerId).join(','),
       opponentId: fixture?.opponentTeamId, matchId: fixture?.matchId
     } });

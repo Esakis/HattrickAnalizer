@@ -177,6 +177,83 @@ describe('Weekly training plan', () => {
     expect(suggestion.plan.assignments).toEqual([]);
   });
 
+  it('fills both full and half places within the selected formation without double training players', () => {
+    const draft = plan();
+    draft.formation = '4-4-2';
+    draft.selectedPlayerIds = Array.from({ length: 10 }, (_, i) => i + 1);
+    const roster = draft.selectedPlayerIds.map(player);
+    const report = summary(draft.selectedPlayerIds.map(id => entry(id)));
+    const result = service.suggestAssignments(draft, report, roster);
+    const coverage = service.evaluate(result.plan, report, roster);
+    expect(coverage.issues.filter(i => i.severity === 'error')).toEqual([]);
+    expect(coverage.players.filter(p => p.projected === 90).length).toBe(4);
+    expect(coverage.players.filter(p => p.projected === 45).length).toBe(4);
+    expect(coverage.players.filter(p => p.projected === 0).length).toBe(2);
+    expect(result.plan.assignments.length).toBe(8);
+    expect(new Set(result.plan.assignments.map(a => a.playerId)).size).toBe(8);
+    expect(result.plan.assignments.some(a => a.slot === 'IM')).toBeFalse();
+    expect(coverage.ready).toBeFalse();
+  });
+
+  it('rejects an otherwise legal slot outside the chosen formation and preserves the manual entry', () => {
+    const draft = plan();
+    draft.formation = '4-4-2';
+    draft.assignments = [{ playerId: 1, match: 'league', slot: 'IM', startMinute: 0, minutes: 90 }];
+    const result = service.evaluate(draft, summary(), [player(1)]);
+    expect(result.players[0].projected).toBe(0);
+    expect(result.issues.some(i => i.code === 'selectedFormation')).toBeTrue();
+    expect(service.suggestAssignments(draft, summary(), [player(1)]).plan.assignments).toEqual(draft.assignments);
+  });
+
+  it('completes more partially trained players before using the final free full slot for a new trainee', () => {
+    const draft = plan();
+    draft.formation = '4-4-2';
+    draft.selectedPlayerIds = [1, 2, 3];
+    draft.matchDates.friendly = '';
+    const report = summary([entry(1), entry(2, 60), entry(3, 60)]);
+    report.trainingTypeCode = 9;
+    const roster = draft.selectedPlayerIds.map(player);
+    const result = service.suggestAssignments(draft, report, roster);
+    const assessment = service.evaluate(result.plan, report, roster);
+    expect(assessment.players.filter(p => p.projected === 90).map(p => p.playerId)).toEqual([2, 3]);
+    expect(result.plan.assignments.every(a => a.match === 'league' && a.slot === 'GK')).toBeTrue();
+  });
+
+  it('does not refill half-effect minutes already capped at the best 90 minutes', () => {
+    const draft = plan();
+    draft.formation = '5-2-3';
+    const report = summary([entry(1, 0, 90)]);
+    const result = service.suggestAssignments(draft, report, [player(1)]);
+    expect(result.plan.assignments).toEqual([]);
+    expect(service.evaluate(result.plan, report, [player(1)]).players[0].projected).toBe(45);
+  });
+
+  it('uses the final interval through minute 90 to complete six trainees within five substitutions', () => {
+    const draft = plan();
+    draft.formation = '4-4-2';
+    draft.matchDates.friendly = '';
+    draft.selectedPlayerIds = [1, 2, 3, 4, 5, 6];
+    const report = summary(draft.selectedPlayerIds.map(id => entry(id, 80)));
+    report.trainingTypeCode = 9;
+    const roster = draft.selectedPlayerIds.map(player);
+    const result = service.suggestAssignments(draft, report, roster);
+    expect(service.evaluate(result.plan, report, roster).ready).toBeTrue();
+    expect(result.plan.assignments[5]).toEqual({ playerId: 6, match: 'league', slot: 'GK', startMinute: 50, minutes: 40 });
+    expect(service.suggestAssignments(result.plan, report, roster).plan.assignments).toEqual(result.plan.assignments);
+  });
+
+  it('persists the selected formation and fails closed for unknown formations', () => {
+    const draft = plan();
+    draft.formation = '4-4-2';
+    try {
+      service.savePlan(draft);
+      expect(service.getPlan(draft.teamId, draft.weekStart).formation).toBe('4-4-2');
+    } finally { localStorage.removeItem(`hattrick.training-plan.v1.${draft.teamId}.${draft.weekStart}`); }
+    draft.formation = 'invalid';
+    expect(service.evaluate(draft, summary(), [player(1)]).issues.some(i => i.code === 'selectedFormation')).toBeTrue();
+    expect(service.suggestAssignments(draft, summary(), [player(1)]).plan.assignments).toEqual([]);
+  });
+
   it('does not propose suspended or optimizer-ineligible players for either fixture', () => {
     for (const unavailable of [{ ...player(1), isSuspended: true }, { ...player(1), canOptimize: false }]) {
       const suggestion = service.suggestAssignments(plan(), summary(), [unavailable]);

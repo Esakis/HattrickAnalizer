@@ -12,6 +12,7 @@ import { MatchPlanService, rosterFingerprint, teamContextFingerprint } from '../
 import { NextOpponent } from '../../services/data-cache.service';
 import { TrainingHandoff, trainingTimelineIssues } from '../../services/training-orders';
 import { trainingMatchKind } from '../../services/weekly-plan.service';
+import { TRAINING_FORMATIONS } from '../../services/training-formations';
 
 @Component({
   selector: 'app-lineup-optimizer',
@@ -48,6 +49,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
   requiredPositionSlots: string[] = [];
   trainingHandoff: TrainingHandoff | null = null;
   private trainingQueryDetached = false;
+  private trainingFormation = '';
   get activeTrainingPlan(): TrainingHandoff | null {
     if (!this.trainingHandoff || this.trainingHandoff.teamId !== this.myTeamId) return null;
     return !this.nextMatch || Date.parse(this.nextMatch.matchDate ?? '') === Date.parse(this.trainingHandoff.matchDate)
@@ -168,6 +170,12 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     if (this.queryOpponentId) this.opponentTeamId = this.queryOpponentId;
     if (query?.has('traineeIds')) this.requiredPlayerIds = (query.get('traineeIds') ?? '').split(',').map(Number).filter(id => id > 0);
     this.requiredPositionSlots = (query?.get('trainingSlots') ?? '').split(',').filter(Boolean);
+    const formation = TRAINING_FORMATIONS.find(item => item.name === query?.get('trainingFormation'));
+    if (this.queryTrainingMatch && formation) {
+      this.trainingFormation = formation.name;
+      this.selectedMyFormation = formation.name;
+      this.requiredPositionSlots = [...new Set([...this.requiredPositionSlots, ...formation.slots])];
+    }
     this.excludedPlayerIds = (query?.get('trainingExcludedIds') ?? '').split(',').map(Number).filter(id => id > 0);
     try {
       const assignments = JSON.parse(query?.get('trainingAssignments') ?? 'null');
@@ -264,6 +272,8 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       this.excludedPlayerIds = this.excludedPlayerIds.filter(id=>!plannedIds.has(id));
       this.lockedPositions = Object.fromEntries(Object.entries(this.lockedPositions).filter(([,id])=>!plannedIds.has(id)));
       this.requiredPositionSlots = [];
+      if (this.trainingFormation && this.selectedMyFormation === this.trainingFormation) this.selectedMyFormation = 'Auto';
+      this.trainingFormation = '';
       this.trainingHandoff = null;
       this.queryTrainingMatch = ''; this.queryMatchDate = ''; this.queryMatchId = 0;
       this.trainingQueryDetached = true;
@@ -295,7 +305,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     if (!plan?.result.inputSnapshot) return;
     this.restoredPlanKey = key;
     const input = plan.result.inputSnapshot;
-    this.selectedMyFormation = input.preferredFormation ?? 'Auto';
+    if (!this.trainingFormation || this.trainingQueryDetached) this.selectedMyFormation = input.preferredFormation ?? 'Auto';
     this.selectedMyTactic = input.preferredTactic;
     this.teamAttitude = input.teamAttitude;
     this.coachType = input.coachType;
@@ -309,7 +319,10 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
     if (this.trainingQueryDetached || !this.route?.snapshot.queryParamMap.has('lockedPositions')) this.lockedPositions = input.lockedPositions ?? {};
     this.excludedPlayerIds = [...new Set([...(input.excludedPlayerIds ?? []), ...(this.activeTrainingPlan ? this.excludedPlayerIds : [])])].filter(id => !this.requiredPlayerIds.includes(id) && !Object.values(this.lockedPositions).includes(id));
     if (this.trainingQueryDetached || !this.route?.snapshot.queryParamMap.has('trainingAssignments')) this.trainingHandoff = plan.trainingPlan ?? null;
-    if (this.trainingQueryDetached || !this.route?.snapshot.queryParamMap.has('trainingSlots')) this.requiredPositionSlots = input.requiredPositionSlots ?? [];
+    if (this.trainingQueryDetached || (!this.trainingFormation && !this.route?.snapshot.queryParamMap.has('trainingSlots'))) this.requiredPositionSlots = input.requiredPositionSlots ?? [];
+    if (this.trainingHandoff && !this.trainingFormation && this.availableFormations.includes(this.selectedMyFormation)) {
+      this.trainingFormation = this.selectedMyFormation;
+    }
     this.result = plan.result;
     this.referenceResult = plan.referenceResult ?? plan.result;
     this.selectedAlternative = Math.min(plan.selectedAlternative, Math.max(0, plan.result.alternatives.length - 1));
@@ -320,6 +333,7 @@ export class LineupOptimizerComponent implements OnInit, OnDestroy {
       || !!(matchId && (Date.parse(input.matchDate ?? '') !== Date.parse(next?.matchDate ?? '') || input.isHomeMatch !== next?.isHomeMatch))
       || !!(plan.matchDate && new Date(plan.matchDate).getTime() <= Date.now())
       || JSON.stringify(this.sanitizeFormationExperience(input.formationExperience)) !== JSON.stringify(this.formationExperience)
+      || (!!this.trainingFormation && input.preferredFormation !== this.selectedMyFormation)
       || (!this.trainingQueryDetached && !!this.route?.snapshot.queryParamMap.has('traineeIds'));
     this.resultStaleReason = this.resultStale ? this.translate.instant('workbench.restoredStale') : null;
     this.cache.optimizerResult$.next(this.resultStale ? null : this.result);

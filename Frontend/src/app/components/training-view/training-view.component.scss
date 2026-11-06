@@ -16,6 +16,70 @@
   font-size: var(--ht-fs-xs);
 }
 
+.recommendation-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+
+  h2 { margin: 0; font-size: var(--ht-fs-xl); }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 170px;
+    color: var(--ht-text-muted);
+    font-size: var(--ht-fs-sm);
+    font-weight: 600;
+  }
+}
+
+.recommendation-panel {
+  .table-wrap { margin-top: 1rem; }
+  caption {
+    padding: 0 0 0.65rem;
+    text-align: left;
+    color: var(--ht-text-muted);
+    font-size: var(--ht-fs-sm);
+  }
+  small {
+    display: block;
+    margin-top: 0.2rem;
+    color: var(--ht-text-subtle);
+    font-size: var(--ht-fs-xs);
+    font-weight: normal;
+  }
+}
+
+.recommendation-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  min-height: 2.5rem;
+
+  input { flex: 0 0 auto; }
+}
+
+.recommendation-detail {
+  border-top: 1px solid var(--ht-border);
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+
+  h3 { margin: 0; font-size: var(--ht-fs-lg); }
+}
+
+.training-table .recommendation-reasons {
+  min-width: 180px;
+  white-space: normal;
+  text-align: left;
+  font-size: var(--ht-fs-xs);
+
+  span { display: block; }
+  span + span { margin-top: 0.2rem; }
+}
+
 // ==================== PLANER ====================
 
 .planner-intro {
@@ -325,6 +389,7 @@
 
 @media (max-width: 600px) {
   .planner-intro,
+  .recommendation-heading,
   .roster-search {
     flex-direction: column;
     align-items: stretch;

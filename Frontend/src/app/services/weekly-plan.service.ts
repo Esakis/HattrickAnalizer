@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import { Subject } from 'rxjs';
 import { Player } from '../models/player.model';
 import { TrainingPlayerEntry, TrainingSummary } from '../models/training.model';
+import { TRAINING_FORMATIONS } from './training-formations';
 
 export type TrainingMatch = 'league' | 'friendly';
 
@@ -28,6 +29,7 @@ export interface WeeklyTrainingPlan {
   selectedPlayerIds: number[];
   matchDates: Record<TrainingMatch, string>;
   assignments: TrainingAssignment[];
+  formation?: string;
   updatedAt: string;
 }
 export interface TrainingPlanIssue {
@@ -56,18 +58,7 @@ export interface SuggestedTrainingPlan {
 
 export const TRAINING_SLOTS = ['GK', 'RWB', 'RCD', 'CD', 'LCD', 'LWB', 'RW', 'RIM', 'IM', 'LIM', 'LW', 'RFW', 'FW', 'LFW'];
 // Keep the same legal position sets as the optimizer's FormationData.
-const FORMATIONS = [
-  'GK RWB RCD CD LCD LWB RW RIM IM LIM LW',
-  'GK RWB RCD CD LCD LWB RW RIM LIM LW FW',
-  'GK RWB RCD CD LCD LWB RIM IM LIM RFW LFW',
-  'GK RWB RCD LCD LWB RW RIM IM LIM LW FW',
-  'GK RWB RCD LCD LWB RW RIM LIM LW RFW LFW',
-  'GK RWB RCD LCD LWB RW IM LW RFW FW LFW',
-  'GK RCD CD LCD RW RIM IM LIM LW RFW LFW',
-  'GK RCD CD LCD RW RIM LIM LW RFW FW LFW',
-  'GK RCD LCD RW RIM IM LIM LW RFW FW LFW',
-  'GK RWB RCD CD LCD LWB RW LW RFW FW LFW'
-].map(value => value.split(' '));
+const FORMATIONS = TRAINING_FORMATIONS.map(formation => formation.slots);
 
 /** Numeric effects only where the backend/manual defines them. null means an
  * unquantified small effect, not zero training. Special set-piece bonuses are
@@ -140,47 +131,78 @@ export class WeeklyPlanService {
 
   /** Fill only free intervals; preserve the user's assignments and never turn
    * missing history into a fictional zero. The optimizer completes each XI. */
-  suggestAssignments(plan: WeeklyTrainingPlan, summary: TrainingSummary, roster: Player[]): SuggestedTrainingPlan {
+  suggestAssignments(plan: WeeklyTrainingPlan, summary: TrainingSummary, roster: Player[], preferredAssignments: TrainingAssignment[] = []): SuggestedTrainingPlan {
     const proposed: WeeklyTrainingPlan = JSON.parse(JSON.stringify(plan));
     const initial = this.evaluate(proposed, summary, roster);
     const unknownPlayerIds = initial.players.filter(p => p.recorded === null).map(p => p.playerId);
-    const candidateSlots = [...new Set([...FORMATIONS]
+    const formations = proposed.formation
+      ? TRAINING_FORMATIONS.filter(f => f.name === proposed.formation).map(f => f.slots) : FORMATIONS;
+    const orderedSlots = [...new Set([...formations]
       .sort((a, b) => b.filter(s => trainingFactor(summary.trainingTypeCode, s) === 1).length
         - a.filter(s => trainingFactor(summary.trainingTypeCode, s) === 1).length)
-      .flat())].filter(slot => trainingFactor(summary.trainingTypeCode, slot) === 1);
-    for (const playerId of proposed.selectedPlayerIds) {
-      const player = roster.find(p => p.playerId === playerId);
-      if (!player || player.injuryLevel > 0 || player.isSuspended || player.canOptimize === false
-        || unknownPlayerIds.includes(playerId)) continue;
-      const observed = summary.players.find(p => p.playerId === playerId)!;
-      for (const match of ['league', 'friendly'] as TrainingMatch[]) {
-        let attempts = 0;
-        while (attempts++ < 30) {
-          const assessment = this.evaluate(proposed, summary, roster);
-          if (assessment.players.find(p => p.playerId === playerId)?.missing === 0) break;
-          // Full minutes must replace any half-effect minutes before full coverage
-          // can be claimed. A weighted deficit alone would underallocate time.
-          const fullPlanned = proposed.assignments.filter(a => a.playerId === playerId && trainingFactor(summary.trainingTypeCode, a.slot) === 1)
-            .reduce((total, a) => total + a.minutes, 0);
-          const required = 90 - (observed.observedFullMinutes ?? observed.fullTrainingMinutes ?? 0) - fullPlanned;
-          if (required <= 0) break;
-          const existing = proposed.assignments.filter(a => a.match === match);
-          let placed = false;
-          for (const slot of candidateSlots) {
-            const busy = existing.filter(a => a.slot === slot || a.playerId === playerId);
-            const starts = [...new Set([0, ...busy.map(a => a.startMinute + a.minutes)])].sort((a, b) => a - b);
-            for (const startMinute of starts) {
-              if (startMinute >= 90 || busy.some(a => a.startMinute <= startMinute && a.startMinute + a.minutes > startMinute)) continue;
-              const end = Math.min(90, ...busy.filter(a => a.startMinute > startMinute).map(a => a.startMinute));
-              const candidate: TrainingAssignment = { playerId, match, slot, startMinute, minutes: Math.min(Math.ceil(required / 5) * 5, end - startMinute) };
-              proposed.assignments.push(candidate);
-              const checked = this.evaluate(proposed, summary, roster);
-              if (!checked.issues.some(i => i.severity === 'error')) { placed = true; break; }
-              proposed.assignments.pop();
+      .flat())];
+    // Complete as many existing training targets as possible before allocating
+    // a fresh 90 minutes. Stable ties retain the user's/recommender's priority.
+    const fullNeeded = (playerId: number) => {
+      const observed = summary.players.find(p => p.playerId === playerId);
+      const planned = proposed.assignments.filter(a => a.playerId === playerId && trainingFactor(summary.trainingTypeCode, a.slot) === 1)
+        .reduce((total, a) => total + a.minutes, 0);
+      return Math.max(0, 90 - (observed?.observedFullMinutes ?? observed?.fullTrainingMinutes ?? 0) - planned);
+    };
+    const preference = (id: number) => preferredAssignments.find(a => a.playerId === id);
+    const preferredFactor = (id: number) => trainingFactor(summary.trainingTypeCode, preference(id)?.slot ?? '') ?? 0;
+    const candidates = [...new Set(proposed.selectedPlayerIds)].sort((a, b) => fullNeeded(a) - fullNeeded(b)
+      || preferredFactor(b) - preferredFactor(a));
+    // Half-effect places are additional opportunities, never a substitute for
+    // a free full-effect place in the other match. Legacy automatic plans retain
+    // their existing full-only behavior until a formation is chosen.
+    for (const factor of proposed.formation ? [1, 0.5] : [1]) {
+      const candidateSlots = orderedSlots.filter(slot => trainingFactor(summary.trainingTypeCode, slot) === factor);
+      for (const playerId of candidates) {
+        const player = roster.find(p => p.playerId === playerId);
+        if (!player || player.injuryLevel > 0 || player.isSuspended || player.canOptimize === false
+          || unknownPlayerIds.includes(playerId)) continue;
+        const observed = summary.players.find(p => p.playerId === playerId)!;
+        const preferred = preference(playerId);
+        const preferredMatch = preferred && trainingFactor(summary.trainingTypeCode, preferred.slot) === factor ? preferred.match : null;
+        const matches: TrainingMatch[] = preferredMatch === 'friendly' ? ['friendly', 'league'] : ['league', 'friendly'];
+        const playerSlots = [...candidateSlots].sort((a, b) => Number(b === preferred?.slot) - Number(a === preferred?.slot));
+        for (const match of matches) {
+          let attempts = 0;
+          while (attempts++ < 30) {
+            const assessment = this.evaluate(proposed, summary, roster);
+            if (assessment.players.find(p => p.playerId === playerId)?.missing === 0) break;
+            // Full minutes must replace any half-effect minutes before full coverage
+            // can be claimed. A weighted deficit alone would underallocate time.
+            const half = (observed.observedHalfMinutes ?? observed.halfTrainingMinutes ?? 0)
+              + proposed.assignments.filter(a => a.playerId === playerId && trainingFactor(summary.trainingTypeCode, a.slot) === 0.5)
+                .reduce((total, a) => total + a.minutes, 0);
+            const required = fullNeeded(playerId) - (factor === 0.5 ? half : 0);
+            if (required <= 0) break;
+            const existing = proposed.assignments.filter(a => a.match === match);
+            let placed = false;
+            for (const slot of playerSlots) {
+              const busy = existing.filter(a => a.slot === slot || a.playerId === playerId);
+              const starts = [...new Set([0, ...busy.map(a => a.startMinute + a.minutes)])].sort((a, b) => a - b);
+              for (const startMinute of starts) {
+                if (startMinute >= 90 || busy.some(a => a.startMinute <= startMinute && a.startMinute + a.minutes > startMinute)) continue;
+                const end = Math.min(90, ...busy.filter(a => a.startMinute > startMinute).map(a => a.startMinute));
+                const candidate: TrainingAssignment = { playerId, match, slot, startMinute, minutes: Math.min(Math.ceil(required / 5) * 5, end - startMinute) };
+                proposed.assignments.push(candidate);
+                let checked = this.evaluate(proposed, summary, roster);
+                // Staying until the end of a free interval can remove an exit
+                // order and make a sixth trainee possible with five substitutions.
+                if (checked.issues.some(i => i.code === 'tooManyOrders') && candidate.minutes < end - startMinute) {
+                  candidate.minutes = end - startMinute;
+                  checked = this.evaluate(proposed, summary, roster);
+                }
+                if (!checked.issues.some(i => i.severity === 'error')) { placed = true; break; }
+                proposed.assignments.pop();
+              }
+              if (placed) break;
             }
-            if (placed) break;
+            if (!placed) break;
           }
-          if (!placed) break;
         }
       }
     }
@@ -199,6 +221,8 @@ export class WeeklyPlanService {
     const byId = new Map(roster.map(p => [p.playerId, p]));
     const invalid = new Set<TrainingAssignment>();
     const knownType = summary.trainingTypeKnown !== false && summary.trainingTypeCode >= 2 && summary.trainingTypeCode <= 12;
+    const selectedFormation = TRAINING_FORMATIONS.find(f => f.name === plan.formation);
+    if (plan.formation && !selectedFormation) add('selectedFormation', 'error');
     if (!knownType) add('unknownType', 'warning');
     if (!plan.weekStart || plan.weekStart !== (summary.weekStart ?? '') || plan.teamId !== summary.teamId) add('unknownWeek', 'error');
 
@@ -219,6 +243,9 @@ export class WeeklyPlanService {
       }
 
       assignments.forEach(a => {
+        if (plan.formation && !selectedFormation?.slots.includes(a.slot)) {
+          add('selectedFormation', 'error', a.playerId, match); invalid.add(a);
+        }
         const player = byId.get(a.playerId);
         if (!player) { add('missingPlayer', 'error', a.playerId, match); invalid.add(a); }
         if (!TRAINING_SLOTS.includes(a.slot) || !Number.isInteger(a.startMinute) || !Number.isInteger(a.minutes)

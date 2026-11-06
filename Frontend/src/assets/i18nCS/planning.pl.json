@@ -37,7 +37,7 @@
     "remove": "Usuń",
     "addAssignment": "Dodaj zawodnika",
     "suggest": "Zaproponuj rozmieszczenie trenowanych",
-    "suggestHint": "Najpierw ustaw terminy meczów. Propozycja uzupełnia wolne miejsca pełnego treningu i zachowuje ręczne wpisy.",
+    "suggestHint": "Najpierw ustaw terminy meczów. Propozycja zachowuje ręczne wpisy i najpierw uzupełnia miejsca pełnego treningu. Po wybraniu formacji wykorzystuje też wolne miejsca z efektem 50%.",
     "unassigned": "Nie udało się przydzielić pełnego treningu — sprawdź terminy, dostępność i miejsca:",
     "skippedUnknown": "Pominięto zawodników bez potwierdzonych minut w raporcie:",
     "suggested": "Minuty wybranych trenowanych są rozpisane. Sprawdź ustawienia, a następnie uzupełnij każdy skład w optymalizatorze.",
@@ -68,7 +68,40 @@
       "trainingFormationChange": "Tych przedziałów nie można rozegrać w jednej obsługiwanej formacji.",
       "tooManyOrders": "Mecz wymaga więcej niż pięciu zleceń. Ogranicz zmiany lub wykorzystaj drugi mecz.",
       "trainingReserves": "Brakuje dostępnych rezerwowych do wypełnienia przedziałów.",
-      "trainingLineupMismatch": "Wyjściowy skład jest sprzeczny z planowanymi przedziałami."
+      "trainingLineupMismatch": "Wyjściowy skład jest sprzeczny z planowanymi przedziałami.",
+      "selectedFormation": "Pozycje nie pasują do wybranej formacji planu. Zmień pozycje lub wybierz inną formację."
+    },
+    "recommendations": {
+      "title": "Dobierz trening do ustawienia",
+      "intro": "Porównaj, ilu różnych zawodników możesz trenować w tej formacji, i zobacz propozycję obsady na ligę oraz sparing.",
+      "formation": "Porównywana formacja",
+      "currentType": "Aktualny trening drużyny:",
+      "smallRoster": "Dostępnych zawodników: {{count}}. Do wystawienia pełnego składu potrzeba 11; poniższe propozycje dotyczą tylko miejsc treningowych.",
+      "comparison": "Typy treningu według liczby zawodników z pełnym efektem w Twojej kadrze",
+      "perMatch": "Miejsca w jednym meczu",
+      "twoMatches": "Limit dla dwóch meczów",
+      "yourPlayers": "Proponowani z kadry",
+      "effectColumns": "100% / 50%",
+      "mostPlayers": "Najwięcej pełnych miejsc dla kadry",
+      "capacityHint": "Zakładamy po 90 minut w lidze i sparingu, w tej samej formacji, dla różnych zawodników. To porównanie możliwości, bez minut już rozegranych i bez weryfikacji terminarza. 50% nie jest pełnym treningiem. Liczba miejsc nie porównuje szybkości rozwoju różnych umiejętności; małych efektów i bonusów stałych fragmentów tu nie doliczamy.",
+      "trainees": "Kogo trenować",
+      "selectionHint": "Najpierw obsadzamy miejsca 100%, potem 50%. Przy doborze uwzględniamy wiek oraz umiejętności przydatne na pozycji. To propozycja rozwoju kadry, nie prognoza terminu skoku ani wartości transferowej.",
+      "noCandidates": "Brak dostępnych kandydatów z potwierdzoną trenowaną umiejętnością dla tego ustawienia.",
+      "skill": "Obecny poziom trenowanej umiejętności",
+      "match": "Mecz",
+      "effect": "Efekt pozycji",
+      "reason": "Dlaczego ten zawodnik",
+      "apply": "Dodaj trenowanych do planu tego tygodnia",
+      "alternativeHint": "Cała drużyna ma jeden typ treningu. To alternatywa do rozważenia: aby użyć jej w planerze bieżącego tygodnia, zmień trening w Hattricku i odśwież raport.",
+      "applyHint": "Ustaw najpierw terminy meczów poniżej. Dodamy zawodników i wybraną formację, zachowując ręczne wpisy. Minuty zostaną dopasowane do raportu i wolnych miejsc; przy 50% nadal będzie widoczny brak do pełnego treningu.",
+      "planFormation": "Formacja planu ligowego i sparingu",
+      "automaticFormation": "Dowolna obsługiwana formacja",
+      "reasons": {
+        "developSkill": "Rozwój wybranej umiejętności",
+        "young": "Młody zawodnik (17–21 lat)",
+        "roleFit": "Umiejętności pasują do tej pozycji",
+        "unknownAvailability": "Sprawdź niepotwierdzoną dostępność"
+      }
     }
   },
   "week": {

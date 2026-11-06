@@ -5,6 +5,8 @@ import { Player } from '../../models/player.model';
 import { DataCacheService } from '../../services/data-cache.service';
 import { LineupOptimizerComponent } from './lineup-optimizer.component';
 import { rosterFingerprint, teamContextFingerprint } from '../../services/match-plan.service';
+import { convertToParamMap } from '@angular/router';
+import { TRAINING_FORMATIONS } from '../../services/training-formations';
 
 describe('LineupOptimizerComponent', () => {
   let component: LineupOptimizerComponent;
@@ -92,6 +94,64 @@ describe('LineupOptimizerComponent', () => {
     expect(component.excludedPlayerIds).toEqual([9]);
     expect(component.lockedPositions).toEqual({});
     expect(component.requiredPositionSlots).toEqual([]);
+  });
+
+  function initializeTrainingQuery(formation = '3-5-2'): void {
+    (component as any).route = { snapshot: { queryParamMap: convertToParamMap({
+      trainingMatch: 'friendly', trainingFormation: formation,
+      trainingMatchDate: '2099-01-01T00:00:00Z', traineeIds: '7', trainingSlots: 'IM',
+      trainingAssignments: JSON.stringify([{ playerId: 7, match: 'friendly', slot: 'IM', startMinute: 0, minutes: 90 }])
+    }) } };
+    spyOn(component, 'loadOpponentTeam');
+    spyOn(component, 'loadOpponentTeamStats');
+    spyOn(component, 'loadOpponentScout');
+    component.ngOnInit();
+  }
+
+  it('hands the chosen training formation and every required position to the optimizer', () => {
+    initializeTrainingQuery();
+    expect(component.selectedMyFormation).toBe('3-5-2');
+    const request = (component as any).createRequestSnapshot();
+    expect(request.preferredFormation).toBe('3-5-2');
+    expect(new Set(request.requiredPositionSlots)).toEqual(new Set(TRAINING_FORMATIONS.find(f => f.name === '3-5-2')!.slots));
+    component.ngOnDestroy();
+  });
+
+  it('keeps a fresh training formation when an older saved match plan is restored', () => {
+    initializeTrainingQuery();
+    component.myTeamPlayers = [player(7)];
+    const result = response();
+    result.inputSnapshot!.preferredFormation = '4-4-2';
+    result.inputSnapshot!.requiredPositionSlots = ['RWB'];
+    (component as any).plans = { getPlan: () => ({ result, selectedAlternative: 0 }) };
+    (component as any).tryRestorePlan();
+    expect(component.selectedMyFormation).toBe('3-5-2');
+    expect(component.requiredPositionSlots).toContain('IM');
+    expect(component.requiredPositionSlots).not.toContain('RWB');
+    expect(component.resultStale).toBeTrue();
+    component.ngOnDestroy();
+  });
+
+  it('clears the imported formation on fixture change while preserving a manual formation change', () => {
+    initializeTrainingQuery();
+    component.upcomingMatches = [{ matchId: 50, opponentTeamId: 2, opponentTeamName: 'Other', matchDate: '2099-01-02T00:00:00Z' }];
+    component.selectUpcomingMatch(50);
+    expect(component.selectedMyFormation).toBe('Auto');
+    expect(component.requiredPositionSlots).toEqual([]);
+
+    component.trainingHandoff = { teamId: 1, weekStart: '', matchDate: '2099-01-01T00:00:00Z', assignments: [] };
+    (component as any).trainingFormation = '3-5-2';
+    component.selectedMyFormation = '4-4-2';
+    component.selectUpcomingMatch(50);
+    expect(component.selectedMyFormation).toBe('4-4-2');
+    component.ngOnDestroy();
+  });
+
+  it('ignores an unsupported training formation instead of passing it to the backend', () => {
+    initializeTrainingQuery('1-1-8');
+    expect(component.selectedMyFormation).toBe('Auto');
+    expect(component.requiredPositionSlots).toEqual(['IM']);
+    component.ngOnDestroy();
   });
 
   it('loads formation experience even when the dashboard has already cached the roster', () => {

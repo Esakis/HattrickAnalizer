@@ -7,6 +7,7 @@ import { DataCacheService } from '../../services/data-cache.service';
 import { WeeklyPlanService } from '../../services/weekly-plan.service';
 import { Router } from '@angular/router';
 import { Player } from '../../models/player.model';
+import { TRAINING_FORMATIONS } from '../../services/training-formations';
 
 describe('TrainingViewComponent', () => {
   function component(language: 'en' | 'pl' = 'en'): TrainingViewComponent {
@@ -92,5 +93,103 @@ describe('TrainingViewComponent', () => {
     }
     view.plan.matchDates.friendly = '2026-10-21T14:00:00Z';
     expect(view.fixtureForPlan('friendly')).toBeUndefined();
+  });
+
+  function recommendationView(): TrainingViewComponent {
+    const view = component();
+    view.roster = Array.from({ length: 12 }, (_, index) => ({
+      playerId: index + 1, firstName: `Player ${index + 1}`, lastName: 'Test', age: 18,
+      injuryLevel: -1, injuryStatusKnown: true, suspensionStatusKnown: true,
+      skills: { keeper: 1, defending: 4, playmaking: 8, winger: 6, passing: 5, scoring: 3, setPieces: 2 }
+    } as Player));
+    view.summary = {
+      teamId: 55, trainingTypeCode: 8, trainingTypeKnown: true, trainingTypeName: 'Playmaking', trainedSkill: 'Playmaking',
+      trainingLevel: 100, staminaTrainingPart: 10, trainerName: '', lastMatchId: 0, lastMatchDate: null,
+      weekStart: '2026-10-15T20:00:00Z', weekEnd: '2026-10-16T12:00:00Z',
+      players: view.roster.map(player => ({ playerId: player.playerId, observedFullMinutes: 0, observedHalfMinutes: 0 } as TrainingPlayerEntry))
+    };
+    view.plan = {
+      version: 1, teamId: 55, weekStart: view.summary.weekStart!, selectedPlayerIds: [12], updatedAt: '',
+      matchDates: { league: '2026-10-17T14:00:00Z', friendly: '2026-10-20T14:00:00Z' },
+      assignments: [{ playerId: 12, match: 'league', slot: 'RIM', startMinute: 0, minutes: 90 }]
+    };
+    view.previewTrainingType = 8;
+    view.refreshRecommendations();
+    spyOn((view as any).weeklyPlans, 'savePlan').and.returnValue(true);
+    return view;
+  }
+
+  it('previews other formations and training without changing the weekly plan or recorded type', () => {
+    const view = recommendationView();
+    const original = JSON.stringify(view.plan);
+    view.previewFormation = '4-4-2';
+    view.previewTrainingType = 3;
+    view.refreshRecommendations();
+    expect(view.selectedRecommendation?.fullSlotsPerMatch).toBe(4);
+    expect(view.canApplyRecommendation).toBeFalse();
+    view.applyRecommendation();
+    expect(JSON.stringify(view.plan)).toBe(original);
+    expect(view.summary?.trainingTypeCode).toBe(8);
+    expect((view as any).weeklyPlans.savePlan).not.toHaveBeenCalled();
+  });
+
+  it('adds current-type recommendations, keeps manual entries and reports half coverage honestly', () => {
+    const view = recommendationView();
+    const manual = { ...view.plan!.assignments[0] };
+    const suggestedIds = view.selectedRecommendation!.trainees.map(player => player.playerId);
+    expect(view.canApplyRecommendation).toBeTrue();
+    view.applyRecommendation();
+    expect(view.plan?.formation).toBe('3-5-2');
+    expect(view.plan?.assignments).toContain(manual);
+    expect(view.plan?.selectedPlayerIds).toContain(12);
+    for (const id of suggestedIds) expect(view.plan?.selectedPlayerIds).toContain(id);
+    expect((view as any).weeklyPlans.savePlan).toHaveBeenCalled();
+    expect(view.assessment.players.some(player => player.projected === 45 && player.missing === 45)).toBeTrue();
+    expect(view.assessment.ready).toBeFalse();
+  });
+
+  it('restricts slot editing to the plan formation while keeping an incompatible saved slot visible', () => {
+    const view = recommendationView();
+    view.plan!.formation = '4-4-2';
+    expect(view.assignmentSlots()).not.toContain('IM');
+    expect(view.assignmentSlots('IM')).toContain('IM');
+    expect(view.assignmentSlots()).toEqual(TRAINING_FORMATIONS.find(item => item.name === '4-4-2')!.slots);
+  });
+
+  it('preserves preview positions and matches when applying to an empty two-match plan', () => {
+    const view = recommendationView();
+    view.roster = view.roster.slice(0, 10);
+    view.plan!.selectedPlayerIds = [];
+    view.plan!.assignments = [];
+    view.refreshRecommendations();
+    const preview = view.selectedRecommendation!.trainees;
+    view.applyRecommendation();
+    for (const trainee of preview) {
+      expect(view.plan!.assignments).toContain({
+        playerId: trainee.playerId, match: trainee.match, slot: trainee.slot, startMinute: 0, minutes: 90
+      });
+      const coverage = view.assessment.players.find(player => player.playerId === trainee.playerId)!;
+      expect(coverage.projected).toBe(trainee.factor * 90);
+    }
+  });
+
+  it('adds manual trainees to a legal position when a formation has no full training positions', () => {
+    const view = recommendationView();
+    view.summary!.trainingTypeCode = 4;
+    view.plan!.formation = '5-5-0';
+    view.addAssignment('friendly');
+    expect(TRAINING_FORMATIONS.find(item => item.name === '5-5-0')!.slots).toContain(view.assignments('friendly')[0].slot);
+  });
+
+  it('hands the complete selected formation to the optimizer with the trainee constraints', () => {
+    const view = recommendationView();
+    view.plan!.formation = '3-5-2';
+    view.recalculate();
+    view.prepareMatch('league');
+    const params = (view as any).router.navigate.calls.mostRecent().args[1].queryParams;
+    expect(params.trainingFormation).toBe('3-5-2');
+    expect(params.trainingSlots).toBe(TRAINING_FORMATIONS.find(item => item.name === '3-5-2')!.slots.join(','));
+    expect(params.lockedPositions).toBe('{"RIM":12}');
+    expect(params.traineeIds).toBe('12');
   });
 });
